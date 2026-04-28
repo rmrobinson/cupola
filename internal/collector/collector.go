@@ -34,6 +34,12 @@ type EmailHandler interface {
 	Handle(msg EmailMessage) error
 }
 
+// SubscriptionNotifiable is an optional interface collectors can implement to
+// receive a non-blocking nudge when a new subscription arrives for their domain.
+type SubscriptionNotifiable interface {
+	OnSubscription()
+}
+
 // Registry holds registered collectors, enforcing one per DomainType.
 type Registry struct {
 	collectors map[domain.DomainType]Collector
@@ -62,6 +68,15 @@ func (r *Registry) Domains() []domain.DomainType {
 		out = append(out, dt)
 	}
 	return out
+}
+
+// NotifySubscription nudges the collector for dt if it implements SubscriptionNotifiable.
+func (r *Registry) NotifySubscription(dt domain.DomainType) {
+	if c, ok := r.collectors[dt]; ok {
+		if sn, ok := c.(SubscriptionNotifiable); ok {
+			sn.OnSubscription()
+		}
+	}
 }
 
 // StartAll starts every registered collector. Returns on the first error.

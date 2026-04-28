@@ -74,7 +74,7 @@ const Grid = (() => {
     chrome.innerHTML = `
       <span class="drag-handle" title="Drag to move">&#8942;&#8942;</span>
       <span class="widget-type-label">${esc(humanLabel(wc.type))}</span>
-      <button class="btn-widget-config${def?.configSchema?.length ? '' : ' hidden'}" title="Configure">&#9881;</button>
+      <button class="btn-widget-config${(def?.configSchema?.length || def?.buildConfig) ? '' : ' hidden'}" title="Configure">&#9881;</button>
       <button class="btn-widget-remove" title="Remove">&times;</button>
     `;
     chrome.querySelector('.btn-widget-remove').addEventListener('click', () => removeWidget(wc.id));
@@ -116,15 +116,29 @@ const Grid = (() => {
     // can re-render the widget after a settings change.
     let currentState = null;
 
-    buildConfigPanel(configPanel, def, wc, () => {
+    const onConfigSave = () => {
+      // Re-register subscription with updated params so parameterised collectors
+      // (e.g. transit arrivals) start fetching the newly-selected stop immediately.
+      if (def.subscriptionParams) {
+        Subscriptions.create(wc.id, def.domain, def.subscriptionParams(wc.config));
+      }
       if (currentState) def.render(content, currentState, wc.config);
       configPanel.classList.add('hidden');
       scheduleSave();
-    });
-
-    chrome.querySelector('.btn-widget-config').addEventListener('click', () => {
-      configPanel.classList.toggle('hidden');
-    });
+    };
+    if (def.buildConfig) {
+      // Widget provides its own async config panel builder; rebuild on each open.
+      chrome.querySelector('.btn-widget-config').addEventListener('click', () => {
+        const wasHidden = configPanel.classList.contains('hidden');
+        configPanel.classList.toggle('hidden');
+        if (wasHidden) def.buildConfig(configPanel, wc, onConfigSave);
+      });
+    } else {
+      buildConfigPanel(configPanel, def, wc, onConfigSave);
+      chrome.querySelector('.btn-widget-config').addEventListener('click', () => {
+        configPanel.classList.toggle('hidden');
+      });
+    }
 
     let state = null;
     try {

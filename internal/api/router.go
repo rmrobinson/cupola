@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/rmrobinson/cupola/internal/collector"
+	"github.com/rmrobinson/cupola/internal/collector/gtfsrt"
 	"github.com/rmrobinson/cupola/internal/store"
 	"github.com/rmrobinson/cupola/internal/tiles"
 )
@@ -21,6 +22,9 @@ type Handler struct {
 	notesRefresh func() error   // called after every notes mutation to push SSE
 	tileHandler  *tiles.Handler // nil until tiles are ready
 	frontend     fs.FS          // embedded static files; nil disables file serving
+	agencies     []*gtfsrt.Agency
+	homeLat      float64
+	homeLon      float64
 }
 
 func NewHandler(
@@ -31,6 +35,8 @@ func NewHandler(
 	notesRefresh func() error,
 	tileHandler *tiles.Handler,
 	frontend fs.FS,
+	agencies []*gtfsrt.Agency,
+	homeLat, homeLon float64,
 ) *Handler {
 	return &Handler{
 		registry:     registry,
@@ -40,6 +46,9 @@ func NewHandler(
 		notesRefresh: notesRefresh,
 		tileHandler:  tileHandler,
 		frontend:     frontend,
+		agencies:     agencies,
+		homeLat:      homeLat,
+		homeLon:      homeLon,
 	}
 }
 
@@ -66,6 +75,10 @@ func (h *Handler) Router() http.Handler {
 	r.Post("/api/v1/notes", h.createNote)
 	r.Patch("/api/v1/notes/{id}", h.updateNote)
 	r.Delete("/api/v1/notes/{id}", h.deleteNote)
+
+	r.Get("/api/v1/transit/agencies", h.getTransitAgencies)
+	r.Get("/api/v1/transit/agencies/{agencyID}/routes", h.getTransitRoutes)
+	r.Get("/api/v1/transit/agencies/{agencyID}/routes/{routeID}/stops", h.getTransitStops)
 
 	r.Get("/tiles/{z}/{x}/{y}", h.getTile)
 

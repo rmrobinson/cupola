@@ -489,7 +489,8 @@ button {
   margin-top: 2px;
 }
 
-.config-empty {
+.config-empty,
+.config-loading {
   margin: 0;
   font-size: 11px;
   opacity: 0.45;
@@ -638,6 +639,97 @@ button {
   display: block;
   margin-top: 2px;
 }
+
+/* ── Transit arrivals widget ───────────────────────────────────────────── */
+
+.widget-transit {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 6px;
+}
+
+.transit-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.transit-route {
+  font-size: 1.1rem;
+  font-weight: 700;
+  background: rgba(255,255,255,0.12);
+  border-radius: 4px;
+  padding: 1px 7px;
+}
+
+.transit-stop {
+  font-size: 11px;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transit-empty,
+.transit-no-config {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.45;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.transit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.arrival-row {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 12px;
+}
+
+.arrival-mins {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #74b9ff;
+}
+
+.arrival-headsign {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.arrival-time {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.55;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.arrival-delay {
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: rgba(255,255,255,0.5);
+}
+
+.delay-late  { color: #fc4a1a; }
+.delay-early { color: #a8ff78; }
 
 /* ── Clock widget ──────────────────────────────────────────────────────── */
 

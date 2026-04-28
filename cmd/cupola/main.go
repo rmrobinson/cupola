@@ -19,6 +19,8 @@ import (
 	ecowittcollector "github.com/rmrobinson/cupola/internal/collector/ecowitt"
 	"github.com/rmrobinson/cupola/internal/collector/envcanada"
 	flagcollector "github.com/rmrobinson/cupola/internal/collector/flag"
+	"github.com/rmrobinson/cupola/internal/collector/gtfs"
+	"github.com/rmrobinson/cupola/internal/collector/gtfsrt"
 	notescollector "github.com/rmrobinson/cupola/internal/collector/notes"
 	rsscollector "github.com/rmrobinson/cupola/internal/collector/rss"
 	"github.com/rmrobinson/cupola/internal/config"
@@ -108,6 +110,47 @@ func main() {
 
 	subManager := store.NewSubscriptionManager()
 
+	// Transit: GTFS-RT collectors need subManager, so registration is here.
+	// transitAgencies is also passed to the HTTP handler for the catalog API.
+	var transitAgencies []*gtfsrt.Agency
+	if t := cfg.Collectors.Transit; t != nil && len(t.Agencies) > 0 {
+		rtInterval := t.RTPollInterval.Duration
+		if rtInterval == 0 {
+			rtInterval = 30 * time.Second
+		}
+		staticInterval := t.StaticRefreshInterval.Duration
+		if staticInterval == 0 {
+			staticInterval = 24 * time.Hour
+		}
+
+		for _, ac := range t.Agencies {
+			if len(ac.GTFSStaticURLs) == 0 {
+				log.Printf("transit: agency %s: skipping — no gtfs_static_urls", ac.ID)
+				continue
+			}
+			if len(ac.GTFSRTTripUpdatesURLs) == 0 {
+				log.Printf("transit: agency %s: skipping — no gtfs_rt_trip_updates_urls", ac.ID)
+				continue
+			}
+			transitAgencies = append(transitAgencies, &gtfsrt.Agency{
+				ID:                   ac.ID,
+				StaticURLs:           ac.GTFSStaticURLs,
+				TripUpdatesURLs:      ac.GTFSRTTripUpdatesURLs,
+				VehiclePositionsURLs: ac.GTFSRTVehiclePositionsURLs,
+				AlertsURL:            ac.GTFSRTAlertsURL,
+				Schedule:             gtfs.New(),
+			})
+		}
+		if len(transitAgencies) > 0 {
+			log.Printf("transit: registering %d agencies (rt=%s, static=%s)",
+				len(transitAgencies), rtInterval, staticInterval)
+			arr, veh, alt := gtfsrt.NewCollectors(transitAgencies, subManager, stateStore, rtInterval, staticInterval)
+			registry.Register(arr)
+			registry.Register(veh)
+			registry.Register(alt)
+		}
+	}
+
 	// ctx is shared by collectors, the HTTP server's BaseContext, and tile extraction.
 	// Cancelling it signals SSE connections and collector goroutines to stop cleanly.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -129,7 +172,8 @@ func main() {
 		}
 	}
 
-	handler := api.NewHandler(registry, stateStore, sqliteStore, subManager, notesCol.Refresh, tileHandler, webFS)
+	handler := api.NewHandler(registry, stateStore, sqliteStore, subManager, notesCol.Refresh, tileHandler, webFS,
+		transitAgencies, cfg.Location.Lat, cfg.Location.Lon)
 
 	port := cfg.Server.Port
 	if port == 0 {

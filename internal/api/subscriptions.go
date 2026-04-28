@@ -27,6 +27,7 @@ func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.subs.Register(req.SessionID, req.WidgetID, domain.DomainType(req.Domain), req.Params)
+	h.registry.NotifySubscription(domain.DomainType(req.Domain))
 	w.WriteHeader(http.StatusNoContent)
 }
 
