@@ -36,3 +36,20 @@ type TrafficCamera struct {
 	SnapshotURL string    `json:"snapshot_url"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
+
+type TrafficRoadConditions struct {
+	StateBase
+	Conditions []TrafficRoadCondition `json:"conditions"`
+}
+
+func (TrafficRoadConditions) DomainType() DomainType { return DomainTrafficRoadConditions }
+
+type TrafficRoadCondition struct {
+	LocationDescription string    `json:"location_description"`
+	Conditions          []string  `json:"conditions"`
+	Visibility          string    `json:"visibility,omitempty"`
+	Drifting            string    `json:"drifting,omitempty"`
+	Region              string    `json:"region"`
+	RoadwayName         string    `json:"roadway_name"`
+	LastUpdated         time.Time `json:"last_updated"`
+}

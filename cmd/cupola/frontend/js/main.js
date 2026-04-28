@@ -121,6 +121,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const isKiosk = params.get('kiosk') === '1';
   const kioskProfileId = params.get('profile');
 
+  window.CupolaConfig = {};
+  fetch('/api/v1/config')
+    .then(r => r.json())
+    .then(cfg => { window.CupolaConfig = cfg; })
+    .catch(() => {});
+
   Stream.connect();
   Horizon.start();
 

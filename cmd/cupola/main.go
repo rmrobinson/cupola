@@ -23,6 +23,7 @@ import (
 	"github.com/rmrobinson/cupola/internal/collector/gtfsrt"
 	notescollector "github.com/rmrobinson/cupola/internal/collector/notes"
 	rsscollector "github.com/rmrobinson/cupola/internal/collector/rss"
+	"github.com/rmrobinson/cupola/internal/collector/traffic511"
 	"github.com/rmrobinson/cupola/internal/config"
 	"github.com/rmrobinson/cupola/internal/store"
 	"github.com/rmrobinson/cupola/internal/tiles"
@@ -101,6 +102,15 @@ func main() {
 	// RSS feeds.
 	if len(cfg.Collectors.RSSFeeds) > 0 {
 		registry.Register(rsscollector.New(cfg.Collectors.RSSFeeds, stateStore))
+	}
+
+	// ON511 traffic: incidents, cameras, and road conditions.
+	if t := cfg.Collectors.Traffic511; t != nil && t.Enabled {
+		inc, cam, road := traffic511.NewCollectors(0, stateStore)
+		registry.Register(inc)
+		registry.Register(cam)
+		registry.Register(road)
+		log.Printf("traffic511: registered incidents, cameras, and road conditions collectors")
 	}
 
 	webFS, err := fs.Sub(frontendFS, "frontend")

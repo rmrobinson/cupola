@@ -59,6 +59,7 @@ func (h *Handler) Router() http.Handler {
 	r.Use(middleware.Recoverer)
 	r.Use(corsMiddleware)
 
+	r.Get("/api/v1/config", h.getConfig)
 	r.Get("/api/v1/domains", h.getDomains)
 	r.Get("/api/v1/state/{domain}", h.getState)
 	r.Get("/api/v1/stream", h.getStream)
