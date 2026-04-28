@@ -1,0 +1,58 @@
+package domain
+
+import "time"
+
+type WeatherCurrent struct {
+	StateBase
+	Temperature   float64 `json:"temperature"`
+	FeelsLike     float64 `json:"feels_like"`
+	Humidity      float64 `json:"humidity"`
+	WindSpeed     float64 `json:"wind_speed"`
+	WindDirection int     `json:"wind_direction"`
+	WindGust      float64 `json:"wind_gust"`
+	Pressure      float64 `json:"pressure"`
+	Precipitation float64 `json:"precipitation"`
+	UV            float64 `json:"uv"`
+	Visibility    float64 `json:"visibility"`
+	Condition     string  `json:"condition"`
+}
+
+func (WeatherCurrent) DomainType() DomainType { return DomainWeatherCurrent }
+
+type WeatherForecast struct {
+	StateBase
+	Periods []ForecastPeriod `json:"periods"`
+}
+
+func (WeatherForecast) DomainType() DomainType { return DomainWeatherForecast }
+
+type ForecastPeriod struct {
+	StartsAt     time.Time `json:"starts_at"`
+	EndsAt       time.Time `json:"ends_at"`
+	Label        string    `json:"label"`
+	High         *float64  `json:"high,omitempty"`
+	Low          *float64  `json:"low,omitempty"`
+	Condition    string    `json:"condition"`
+	PrecipChance int       `json:"precip_chance"`
+	PrecipAmount float64   `json:"precip_amount"`
+	WindSpeed    float64   `json:"wind_speed"`
+	WindDirection int      `json:"wind_direction"`
+	Summary      string    `json:"summary"`
+}
+
+type WeatherAlerts struct {
+	StateBase
+	Alerts []WeatherAlert `json:"alerts"`
+}
+
+func (WeatherAlerts) DomainType() DomainType { return DomainWeatherAlerts }
+
+type WeatherAlert struct {
+	ID        string        `json:"id"`
+	Title     string        `json:"title"`
+	Severity  AlertSeverity `json:"severity"`
+	Onset     time.Time     `json:"onset"`
+	Expires   time.Time     `json:"expires"`
+	Summary   string        `json:"summary"`
+	SourceURL string        `json:"source_url"`
+}

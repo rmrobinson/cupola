@@ -1,0 +1,25 @@
+/* Widget grid: 12 columns landscape, 4 columns portrait.
+   Column span / row span are set inline by main.js from profile widget pos data.
+   Drag-and-drop resize/reorder is wired in Phase 8. */
+
+.widget-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-auto-rows: 60px;
+  gap: 10px;
+  width: 100%;
+}
+
+.widget-cell {
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Portrait / mobile: 4-column grid */
+@media (max-width: 767px) {
+  .widget-grid {
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 56px;
+    gap: 8px;
+  }
+}

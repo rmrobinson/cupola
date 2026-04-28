@@ -1,0 +1,167 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"io/fs"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/rmrobinson/cupola/internal/api"
+	"github.com/rmrobinson/cupola/internal/collector"
+	"github.com/rmrobinson/cupola/internal/collector/astro"
+	ecowittcollector "github.com/rmrobinson/cupola/internal/collector/ecowitt"
+	"github.com/rmrobinson/cupola/internal/collector/envcanada"
+	flagcollector "github.com/rmrobinson/cupola/internal/collector/flag"
+	notescollector "github.com/rmrobinson/cupola/internal/collector/notes"
+	rsscollector "github.com/rmrobinson/cupola/internal/collector/rss"
+	"github.com/rmrobinson/cupola/internal/config"
+	"github.com/rmrobinson/cupola/internal/store"
+	"github.com/rmrobinson/cupola/internal/tiles"
+)
+
+func main() {
+	cfgPath := flag.String("config", "config.yaml", "path to config file")
+	flag.Parse()
+
+	cfg, err := config.Load(*cfgPath)
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+	log.Printf("cupola starting for %s (%.4f, %.4f)", cfg.Location.Name, cfg.Location.Lat, cfg.Location.Lon)
+
+	sqliteStore, err := store.NewSQLiteStore(cfg.Server.DataDir)
+	if err != nil {
+		log.Fatalf("open sqlite: %v", err)
+	}
+
+	registry := collector.NewRegistry()
+	stateStore := store.NewStateStore()
+
+	notesCol := notescollector.New(sqliteStore, stateStore)
+	registry.Register(notesCol)
+
+	// Ephem: always active — pure local computation, no network.
+	registry.Register(astro.New(cfg.Location.Lat, cfg.Location.Lon, cfg.Location.Timezone, stateStore))
+
+	// Environment Canada forecast + alerts via coordinate-based RSS feeds.
+	// No station discovery needed — the EC server resolves lat/lon to the nearest station.
+	if c := cfg.Collectors.WeatherEnvCanada; c != nil && c.Enabled {
+		fcInterval := c.PollIntervalForecast.Duration
+		if fcInterval == 0 {
+			fcInterval = time.Hour
+		}
+		alertInterval := c.PollIntervalAlerts.Duration
+		if alertInterval == 0 {
+			alertInterval = 15 * time.Minute
+		}
+		log.Printf("envcanada: registering RSS collectors for %.3f,%.3f",
+			cfg.Location.Lat, cfg.Location.Lon)
+		registry.Register(envcanada.NewForecastCollector(cfg.Location.Lat, cfg.Location.Lon, fcInterval, stateStore))
+		registry.Register(envcanada.NewAlertsCollector(cfg.Location.Lat, cfg.Location.Lon, alertInterval, stateStore))
+	}
+
+	// Canada flag status: HTML scrape of canada.ca.
+	if c := cfg.Collectors.FlagCanada; c != nil && c.Enabled {
+		interval := c.PollInterval.Duration
+		if interval == 0 {
+			interval = 4 * time.Hour
+		}
+		registry.Register(flagcollector.NewCanadaWithURL(c.URL, cfg.Location.Lat, cfg.Location.Lon, interval, stateStore))
+	}
+
+	// Ecowitt GW2000 local weather station.
+	if c := cfg.Collectors.WeatherEcowitt; c != nil && c.Enabled && c.URL != "" {
+		interval := c.PollInterval.Duration
+		if interval == 0 {
+			interval = time.Minute
+		}
+		registry.Register(ecowittcollector.New(c.URL, interval, stateStore))
+	}
+
+	// Space Weather Canada solar activity (current + forecast).
+	if c := cfg.Collectors.SolarEnvCanada; c != nil && c.Enabled {
+		interval := c.PollInterval.Duration
+		if interval == 0 {
+			interval = time.Hour
+		}
+		cur, fc := envcanada.NewSolarCollectors(cfg.Location.Lat, cfg.Location.Lon, interval, stateStore, c.Region)
+		registry.Register(cur)
+		registry.Register(fc)
+	}
+
+	// RSS feeds.
+	if len(cfg.Collectors.RSSFeeds) > 0 {
+		registry.Register(rsscollector.New(cfg.Collectors.RSSFeeds, stateStore))
+	}
+
+	webFS, err := fs.Sub(frontendFS, "frontend")
+	if err != nil {
+		log.Fatalf("frontend fs: %v", err)
+	}
+
+	subManager := store.NewSubscriptionManager()
+
+	// ctx is shared by collectors, the HTTP server's BaseContext, and tile extraction.
+	// Cancelling it signals SSE connections and collector goroutines to stop cleanly.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Tiles: use cached file if present; extract from build.protomaps.com on first run.
+	// Extraction blocks startup (first-run only). On error, /tiles returns 404.
+	var tileHandler *tiles.Handler
+	if cfg.Tiles.CachePath != "" {
+		radiusKM := cfg.Tiles.RadiusKM
+		if radiusKM == 0 {
+			radiusKM = 50
+		}
+		h, err := tiles.New(ctx, cfg.Tiles.CachePath, cfg.Location.Lat, cfg.Location.Lon, radiusKM)
+		if err != nil {
+			log.Printf("tiles: %v — tile serving disabled", err)
+		} else {
+			tileHandler = h
+		}
+	}
+
+	handler := api.NewHandler(registry, stateStore, sqliteStore, subManager, notesCol.Refresh, tileHandler, webFS)
+
+	port := cfg.Server.Port
+	if port == 0 {
+		port = 8080
+	}
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: handler.Router(),
+		BaseContext: func(_ net.Listener) context.Context { return ctx },
+	}
+
+	if err := registry.StartAll(ctx); err != nil {
+		log.Fatalf("start collectors: %v", err)
+	}
+
+	go func() {
+		log.Printf("listening on %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("shutting down")
+	cancel() // unblocks SSE handlers and collector goroutines
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("shutdown: %v", err)
+	}
+}

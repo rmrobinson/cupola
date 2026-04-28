@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cupola</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/grid.css">
+  <link rel="stylesheet" href="/css/horizon.css">
+</head>
+<body>
+  <div id="horizon-bg"></div>
+  <div id="alert-banner" class="alert-banner hidden"></div>
+  <div id="landing" class="landing hidden"></div>
+  <div id="canvas" class="canvas hidden">
+    <div id="canvas-toolbar" class="canvas-toolbar">
+      <button id="btn-add-widget" class="btn-small" title="Add widget">+ Widget</button>
+    </div>
+    <div id="widget-grid" class="widget-grid"></div>
+  </div>
+  <div id="widget-picker" class="widget-picker hidden"></div>
+  <!-- load order: stream → subscriptions → widgets → profile → picker → grid → main -->
+  <script src="/js/stream.js"></script>
+  <script src="/js/subscriptions.js"></script>
+  <script src="/js/widgets/clock.js"></script>
+  <script src="/js/widgets/weather-current.js"></script>
+  <script src="/js/widgets/weather-forecast.js"></script>
+  <script src="/js/widgets/moon-phase.js"></script>
+  <script src="/js/widgets/sunrise-sunset.js"></script>
+  <script src="/js/widgets/solar-activity.js"></script>
+  <script src="/js/widgets/solar-forecast.js"></script>
+  <script src="/js/widgets/flag-status.js"></script>
+  <script src="/js/widgets/shared-notes.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/widget-picker.js"></script>
+  <script src="/js/grid.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>
