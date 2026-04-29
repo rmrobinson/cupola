@@ -12,12 +12,13 @@
 
   // WHO/Health Canada UV risk scale
   function uvRisk(uv) {
-    if (!uv || uv <= 0)  return null;
+    if (uv == null) return null;
+    if (uv <= 0)  return { label: 'None',      color: 'rgba(255,255,255,0.35)', pct: 0 };
     if (uv <= 2)  return { label: 'Low',       color: '#57d9a3', pct: uv/11*100 };
-    if (uv <= 5)  return { label: 'Moderate',   color: '#f7b733', pct: uv/11*100 };
-    if (uv <= 7)  return { label: 'High',       color: '#fc7b1a', pct: uv/11*100 };
-    if (uv <= 10) return { label: 'Very High',  color: '#e53935', pct: uv/11*100 };
-    return              { label: 'Extreme',     color: '#9c27b0', pct: 100 };
+    if (uv <= 5)  return { label: 'Moderate',  color: '#f7b733', pct: uv/11*100 };
+    if (uv <= 7)  return { label: 'High',      color: '#fc7b1a', pct: uv/11*100 };
+    if (uv <= 10) return { label: 'Very High', color: '#e53935', pct: uv/11*100 };
+    return              { label: 'Extreme',    color: '#9c27b0', pct: 100 };
   }
 
   function render(container, data) {
