@@ -47,8 +47,14 @@ const Grid = (() => {
     const cell = grid.querySelector(`[data-widget-id="${widgetId}"]`);
     if (cell) {
       clearInterval(Number(cell.dataset.tickInterval));
-      Subscriptions.remove(widgetId);
-      if (def) Stream.off(def.domain, cell._streamHandler);
+      if (def) {
+        const domainList = def.domains ? def.domains : [def.domain];
+        const isMulti = !!def.domains;
+        domainList.forEach(d => Subscriptions.remove(isMulti ? `${widgetId}:${d}` : widgetId));
+      } else {
+        Subscriptions.remove(widgetId);
+      }
+      (cell._streamHandlers || []).forEach(({ domain, handler }) => Stream.off(domain, handler));
       cell.remove();
     }
     scheduleSave();
@@ -114,15 +120,22 @@ const Grid = (() => {
 
     // currentState is kept current by the SSE handler so the config panel
     // can re-render the widget after a settings change.
-    let currentState = null;
+    // For multi-domain widgets (def.domains), currentState is a stateMap object.
+    const domainList = def.domains ? def.domains : [def.domain];
+    const isMulti = !!def.domains;
+    let currentState = isMulti ? {} : null;
 
     const onConfigSave = () => {
-      // Re-register subscription with updated params so parameterised collectors
+      // Re-register subscription(s) with updated params so parameterised collectors
       // (e.g. transit arrivals) start fetching the newly-selected stop immediately.
       if (def.subscriptionParams) {
-        Subscriptions.create(wc.id, def.domain, def.subscriptionParams(wc.config));
+        domainList.forEach(d => {
+          const subId = isMulti ? `${wc.id}:${d}` : wc.id;
+          Subscriptions.create(subId, d, def.subscriptionParams(wc.config));
+        });
       }
-      if (currentState) def.render(content, currentState, wc.config);
+      const hasState = isMulti ? Object.keys(currentState).length > 0 : !!currentState;
+      if (hasState) def.render(content, currentState, wc.config);
       configPanel.classList.add('hidden');
       scheduleSave();
     };
@@ -140,29 +153,48 @@ const Grid = (() => {
       });
     }
 
-    let state = null;
-    try {
-      const r = await fetch(`/api/v1/state/${def.domain}`);
-      if (r.ok) state = await r.json();
-    } catch {}
-    currentState = state;
+    // Fetch initial state for all domains.
+    const stateMap = {};
+    for (const d of domainList) {
+      try {
+        const r = await fetch(`/api/v1/state/${d}`);
+        if (r.ok) stateMap[d] = await r.json();
+      } catch {}
+    }
+    currentState = isMulti ? stateMap : (stateMap[domainList[0]] || null);
 
-    const params = def.subscriptionParams ? def.subscriptionParams(wc.config) : null;
-    Subscriptions.create(wc.id, def.domain, params);
+    // Create subscriptions for all domains.
+    domainList.forEach(d => {
+      const subId = isMulti ? `${wc.id}:${d}` : wc.id;
+      const params = def.subscriptionParams ? def.subscriptionParams(wc.config) : null;
+      Subscriptions.create(subId, d, params);
+    });
 
-    if (state) {
-      def.render(content, state, wc.config);
+    const hasState = isMulti ? Object.keys(stateMap).length > 0 : !!currentState;
+    if (hasState) {
+      def.render(content, currentState, wc.config);
     } else {
-      renderUnavailable(content, def.domain);
+      renderUnavailable(content, domainList[0]);
     }
 
-    const handler = (data) => {
-      currentState = data || null;
-      if (!data) { renderUnavailable(content, def.domain); return; }
-      def.onUpdate(content, data, wc.config);
-    };
-    cell._streamHandler = handler;
-    Stream.on(def.domain, handler);
+    // Set up stream handlers for all domains.
+    const streamHandlers = [];
+    domainList.forEach(d => {
+      const handler = isMulti
+        ? (data) => {
+            stateMap[d] = data || null;
+            currentState = stateMap;
+            def.onUpdate(content, stateMap, wc.config);
+          }
+        : (data) => {
+            currentState = data || null;
+            if (!data) { renderUnavailable(content, d); return; }
+            def.onUpdate(content, data, wc.config);
+          };
+      streamHandlers.push({ domain: d, handler });
+      Stream.on(d, handler);
+    });
+    cell._streamHandlers = streamHandlers;
 
     return cell;
   }
@@ -198,7 +230,8 @@ const Grid = (() => {
         return `<label class="config-row"><span>${esc(f.label)}</span><select name="${esc(f.key)}">${opts}</select></label>`;
       }
       const inputType = f.type === 'number' ? 'number' : 'text';
-      return `<label class="config-row"><span>${esc(f.label)}</span><input type="${inputType}" name="${esc(f.key)}" value="${esc(val)}"></label>`;
+      const ph = typeof f.placeholder === 'function' ? f.placeholder() : (f.placeholder ?? '');
+      return `<label class="config-row"><span>${esc(f.label)}</span><input type="${inputType}" name="${esc(f.key)}" value="${esc(val)}"${ph !== '' ? ` placeholder="${esc(String(ph))}"` : ''}></label>`;
     }).join('');
 
     panel.innerHTML = `
@@ -223,7 +256,8 @@ const Grid = (() => {
         if (f.type === 'boolean') {
           wc.config[f.key] = data.get(f.key) === 'on';
         } else if (f.type === 'number') {
-          wc.config[f.key] = Number(data.get(f.key));
+          const raw = data.get(f.key);
+          wc.config[f.key] = raw === '' ? null : Number(raw);
         } else {
           wc.config[f.key] = data.get(f.key) ?? '';
         }

@@ -71,14 +71,16 @@ func (c *VehiclesCollector) fetch() {
 				}
 
 				routeID := vp.GetTrip().GetRouteId()
+				routeName, routeTypeInt := ag.Schedule.RouteNameAndType(routeID)
 				v := domain.TransitVehicle{
-					AgencyID:  ag.ID,
-					VehicleID: vid,
-					RouteID:   routeID,
-					RouteName: ag.Schedule.RouteName(routeID),
-					Lat:       lat,
-					Lon:       lon,
-					UpdatedAt: time.Unix(int64(vp.GetTimestamp()), 0),
+					AgencyID:    ag.ID,
+					VehicleID:   vid,
+					RouteID:     routeID,
+					RouteName:   routeName,
+					VehicleType: gtfsRouteTypeToVehicleType(routeTypeInt),
+					Lat:         lat,
+					Lon:         lon,
+					UpdatedAt:   time.Unix(int64(vp.GetTimestamp()), 0),
 				}
 
 				if b := pos.GetBearing(); b != 0 {
@@ -99,4 +101,21 @@ func (c *VehiclesCollector) fetch() {
 		StateBase: domain.StateBase{UpdatedAt: time.Now()},
 		Vehicles:  vehicles,
 	})
+}
+
+func gtfsRouteTypeToVehicleType(t int) string {
+	switch t {
+	case 0:
+		return "lrt"   // tram / light rail / streetcar
+	case 1:
+		return "metro" // subway / metro
+	case 2:
+		return "train" // intercity / commuter rail
+	case 3:
+		return "bus"   // bus
+	case 11:
+		return "bus"   // trolleybus
+	default:
+		return "bus"
+	}
 }

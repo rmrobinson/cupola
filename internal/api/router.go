@@ -84,6 +84,7 @@ func (h *Handler) Router() http.Handler {
 	r.Get("/api/v1/transit/agencies/{agencyID}/routes", h.getTransitRoutes)
 	r.Get("/api/v1/transit/agencies/{agencyID}/routes/{routeID}/stops", h.getTransitStops)
 
+	r.Get("/tiles/local.pmtiles", h.getTileFile)
 	r.Get("/tiles/{z}/{x}/{y}", h.getTile)
 
 	if h.frontend != nil {

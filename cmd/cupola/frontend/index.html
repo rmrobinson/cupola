@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/css/main.css">
   <link rel="stylesheet" href="/css/grid.css">
   <link rel="stylesheet" href="/css/horizon.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
   <div id="horizon-bg"></div>
@@ -19,6 +20,9 @@
     <div id="widget-grid" class="widget-grid"></div>
   </div>
   <div id="widget-picker" class="widget-picker hidden"></div>
+  <!-- Map libraries: loaded before widgets so radar-map.js can reference L and protomapsL -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/protomaps-leaflet@5.1.0/dist/protomaps-leaflet.js"></script>
   <!-- load order: stream → subscriptions → widgets → profile → picker → grid → main -->
   <script src="/js/stream.js"></script>
   <script src="/js/subscriptions.js"></script>
@@ -34,6 +38,7 @@
   <script src="/js/widgets/traffic-incidents.js"></script>
   <script src="/js/widgets/traffic-cameras.js"></script>
   <script src="/js/widgets/traffic-road-conditions.js"></script>
+  <script src="/js/widgets/radar-map.js"></script>
   <script src="/js/widgets/shared-notes.js"></script>
   <script src="/js/profile.js"></script>
   <script src="/js/widget-picker.js"></script>

@@ -18,8 +18,9 @@ import (
 // If the file is absent on first call to New, it is extracted from
 // build.protomaps.com using the configured bounding box.
 type Handler struct {
-	server   *pmtiles.Server
-	tileName string // pmtiles filename without extension, e.g. "local"
+	server    *pmtiles.Server
+	tileName  string // pmtiles filename without extension, e.g. "local"
+	cachePath string // absolute path to the .pmtiles file, for direct serving
 }
 
 // New creates a tile Handler. If cachePath does not exist, it synchronously
@@ -46,10 +47,11 @@ func New(ctx context.Context, cachePath string, lat, lon, radiusKM float64, sour
 		log.Printf("[tiles] using cached file: %s", cachePath)
 	}
 
-	absDir, err := filepath.Abs(filepath.Dir(cachePath))
+	absCachePath, err := filepath.Abs(cachePath)
 	if err != nil {
-		return nil, fmt.Errorf("tiles dir: %w", err)
+		return nil, fmt.Errorf("tiles cache path: %w", err)
 	}
+	absDir := filepath.Dir(absCachePath)
 
 	tileName := strings.TrimSuffix(filepath.Base(cachePath), ".pmtiles")
 	logger := log.New(os.Stderr, "[tiles] ", 0)
@@ -60,7 +62,13 @@ func New(ctx context.Context, cachePath string, lat, lon, radiusKM float64, sour
 	}
 	server.Start()
 
-	return &Handler{server: server, tileName: tileName}, nil
+	return &Handler{server: server, tileName: tileName, cachePath: absCachePath}, nil
+}
+
+// ServeFile serves the raw .pmtiles file with HTTP range-request support,
+// as required by the protomaps-leaflet browser client.
+func (h *Handler) ServeFile(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, h.cachePath)
 }
 
 // ServeHTTP translates /tiles/{z}/{x}/{y} into /{tileName}/{z}/{x}/{y}.mvt

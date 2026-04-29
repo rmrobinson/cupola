@@ -23,6 +23,7 @@ type Route struct {
 	AgencyID  string
 	ShortName string
 	LongName  string
+	Type      int // GTFS route_type (0=tram/LRT, 1=metro, 2=rail, 3=bus, etc.)
 }
 
 // Stop holds the display fields from stops.txt.
@@ -142,6 +143,25 @@ func (s *Schedule) RouteName(routeID string) string {
 	return routeID
 }
 
+// RouteNameAndType returns the display name and GTFS route_type for routeID
+// in a single lock acquisition. Falls back to the raw ID and type 3 (bus)
+// when the route is not found.
+func (s *Schedule) RouteNameAndType(routeID string) (name string, routeType int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if r, ok := s.routes[routeID]; ok {
+		n := r.ShortName
+		if n == "" {
+			n = r.LongName
+		}
+		if n == "" {
+			n = routeID
+		}
+		return n, r.Type
+	}
+	return routeID, 3
+}
+
 // StopName returns the display name for stopID, falling back to the raw ID.
 func (s *Schedule) StopName(stopID string) string {
 	s.mu.RLock()
@@ -190,11 +210,13 @@ func mergeZip(url string, routes map[string]Route, stops map[string]Stop, trips 
 				if id == "" {
 					return
 				}
+				routeType, _ := strconv.Atoi(col(row, h, "route_type"))
 				routes[id] = Route{
 					ID:        id,
 					AgencyID:  col(row, h, "agency_id"),
 					ShortName: col(row, h, "route_short_name"),
 					LongName:  col(row, h, "route_long_name"),
+					Type:      routeType,
 				}
 			})
 		case "stops.txt":

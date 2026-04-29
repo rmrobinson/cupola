@@ -38,15 +38,16 @@ type TransitVehicles struct {
 func (TransitVehicles) DomainType() DomainType { return DomainTransitVehicles }
 
 type TransitVehicle struct {
-	AgencyID  string   `json:"agency_id"`
-	VehicleID string   `json:"vehicle_id"`
-	RouteID   string   `json:"route_id"`
-	RouteName string   `json:"route_name"`
-	Lat       float64  `json:"lat"`
-	Lon       float64  `json:"lon"`
-	Bearing   *float64 `json:"bearing,omitempty"`
-	Speed     *float64 `json:"speed,omitempty"`
-	UpdatedAt time.Time `json:"updated_at"`
+	AgencyID    string    `json:"agency_id"`
+	VehicleID   string    `json:"vehicle_id"`
+	RouteID     string    `json:"route_id"`
+	RouteName   string    `json:"route_name"`
+	VehicleType string    `json:"vehicle_type,omitempty"` // "bus", "lrt", "train", "metro"
+	Lat         float64   `json:"lat"`
+	Lon         float64   `json:"lon"`
+	Bearing     *float64  `json:"bearing,omitempty"`
+	Speed       *float64  `json:"speed,omitempty"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type TransitAlerts struct {
