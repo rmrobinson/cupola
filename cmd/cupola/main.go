@@ -174,7 +174,7 @@ func main() {
 		if radiusKM == 0 {
 			radiusKM = 50
 		}
-		h, err := tiles.New(ctx, cfg.Tiles.CachePath, cfg.Location.Lat, cfg.Location.Lon, radiusKM)
+		h, err := tiles.New(ctx, cfg.Tiles.CachePath, cfg.Location.Lat, cfg.Location.Lon, radiusKM, cfg.Tiles.SourceKey)
 		if err != nil {
 			log.Printf("tiles: %v — tile serving disabled", err)
 		} else {

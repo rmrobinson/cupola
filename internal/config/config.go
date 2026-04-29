@@ -45,6 +45,7 @@ type ServerConfig struct {
 type TilesConfig struct {
 	RadiusKM  float64 `yaml:"radius_km"`
 	CachePath string  `yaml:"cache_path"`
+	SourceKey string  `yaml:"source_key"` // e.g. "20251215.pmtiles"; auto-discovered if empty
 }
 
 type CollectorsConfig struct {
