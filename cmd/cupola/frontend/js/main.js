@@ -5,6 +5,16 @@
  * Exposes: Widgets registry (consumed by grid.js)
  */
 
+// ── Config ────────────────────────────────────────────────────────────────────
+// Fetch home lat/lon at script-load time so the promise is already in flight
+// before DOMContentLoaded. launchCanvas awaits it, guaranteeing distance-sort
+// widgets have coordinates on their first render.
+window.CupolaConfig = {};
+const _configReady = fetch('/api/v1/config')
+  .then(r => r.json())
+  .then(cfg => { window.CupolaConfig = cfg; })
+  .catch(() => {});
+
 // ── Widget Registry ──────────────────────────────────────────────────────────
 
 // Consumed by grid.js via window.CupolaWidgets (populated by widget files).
@@ -121,12 +131,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const isKiosk = params.get('kiosk') === '1';
   const kioskProfileId = params.get('profile');
 
-  window.CupolaConfig = {};
-  fetch('/api/v1/config')
-    .then(r => r.json())
-    .then(cfg => { window.CupolaConfig = cfg; })
-    .catch(() => {});
-
   Stream.connect();
   Horizon.start();
 
@@ -147,7 +151,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-function launchCanvas(profile) {
+async function launchCanvas(profile) {
+  await _configReady;
+
   const canvas = document.getElementById('canvas');
   document.getElementById('landing').classList.add('hidden');
   canvas.classList.remove('hidden');

@@ -1,11 +1,14 @@
 (function () {
   window.CupolaWidgets = window.CupolaWidgets || [];
 
+  // Camera images have Cache-Control: max-age=20 at the source; refresh at the
+  // same cadence so the widget shows near-live snapshots between SSE updates.
+  const REFRESH_MS = 20_000;
+
   function esc(s) {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  // Returns cameras sorted by distance from a lat/lon, or all cameras if no location set.
   function sortedCameras(cameras, lat, lon) {
     if (!lat || !lon) return cameras;
     return cameras.slice().sort((a, b) => dist(a, lat, lon) - dist(b, lat, lon));
@@ -17,7 +20,34 @@
     return dlat * dlat + dlon * dlon;
   }
 
+  // ── Image auto-refresh ────────────────────────────────────────────────────
+  // Store the interval on the container element so each render call replaces
+  // the previous timer. Note: if the widget is removed from the grid, the
+  // timer will keep firing harmlessly against the detached DOM until page
+  // reload — a grid-level destroy() hook would be needed to eliminate this.
+
+  function startRefresh(container) {
+    stopRefresh(container);
+    container._camRefreshId = setInterval(() => {
+      const ts = Date.now();
+      container.querySelectorAll('img[data-src]').forEach(img => {
+        img.src = img.dataset.src + '?t=' + ts;
+      });
+    }, REFRESH_MS);
+  }
+
+  function stopRefresh(container) {
+    if (container._camRefreshId) {
+      clearInterval(container._camRefreshId);
+      container._camRefreshId = null;
+    }
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   function render(container, state, config) {
+    stopRefresh(container);
+
     const cameraID = (config?.camera_id || '').trim();
     const allCams = state?.cameras || [];
 
@@ -33,10 +63,12 @@
       }
       container.innerHTML = `
         <div class="widget-traffic-camera">
-          <img class="camera-snapshot" src="${esc(cam.snapshot_url)}"
+          <img class="camera-snapshot" data-src="${esc(cam.snapshot_url)}"
+               src="${esc(cam.snapshot_url)}"
                alt="${esc(cam.name)}" loading="lazy">
           <div class="camera-label">${esc(cam.name)}</div>
         </div>`;
+      startRefresh(container);
       return;
     }
 
@@ -64,12 +96,14 @@
           ${cameras.map(cameraThumb).join('')}
         </div>
       </div>`;
+    startRefresh(container);
   }
 
   function cameraThumb(cam) {
     return `
       <div class="camera-thumb">
-        <img src="${esc(cam.snapshot_url)}" alt="${esc(cam.name)}" loading="lazy">
+        <img data-src="${esc(cam.snapshot_url)}" src="${esc(cam.snapshot_url)}"
+             alt="${esc(cam.name)}" loading="lazy">
         <div class="camera-thumb-label">${esc(cam.name)}</div>
       </div>`;
   }

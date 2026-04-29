@@ -114,9 +114,17 @@
     const selRegs = Array.isArray(cfg.regions) ? cfg.regions : (cfg.region ? [cfg.region] : []);
     const maxSeg  = cfg.max_segments != null ? cfg.max_segments : 10;
 
-    const regionOpts = regions.map(rg =>
-      `<option value="${esc(rg)}"${selRegs.includes(rg) ? ' selected' : ''}>${esc(rg)}</option>`
-    ).join('');
+    const regionSection = regions.length > 0
+      ? `<label class="config-row config-row-multiselect">
+          <span>Regions</span>
+          <select name="regions" multiple size="${Math.min(regions.length, 6)}">
+            ${regions.map(rg => `<option value="${esc(rg)}"${selRegs.includes(rg) ? ' selected' : ''}>${esc(rg)}</option>`).join('')}
+          </select>
+        </label>`
+      : `<div class="config-row">
+          <span>Regions</span>
+          <span class="config-empty" style="font-size:11px">No data yet — try again shortly</span>
+        </div>`;
 
     panel.innerHTML = `
       <form class="config-form config-form-wide">
@@ -124,10 +132,7 @@
           <span>Road filter</span>
           <input type="text" name="road" value="${esc(road)}" placeholder="e.g. 401">
         </label>
-        <label class="config-row config-row-multiselect">
-          <span>Regions</span>
-          <select name="regions" multiple size="${Math.min(regions.length, 6)}">${regionOpts}</select>
-        </label>
+        ${regionSection}
         <label class="config-row">
           <span>Max segments</span>
           <input type="number" name="max_segments" min="1" max="100" value="${esc(maxSeg)}">
@@ -147,7 +152,7 @@
       const data = new FormData(e.target);
       wc.config = {
         road:         data.get('road') || '',
-        regions:      data.getAll('regions'),
+        regions:      data.getAll('regions'),   // empty array when select absent or nothing selected
         max_segments: Number(data.get('max_segments')) || 10,
       };
       onSave();

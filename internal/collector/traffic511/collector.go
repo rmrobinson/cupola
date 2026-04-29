@@ -48,8 +48,13 @@ func (c *IncidentsCollector) Domain() domain.DomainType { return domain.DomainTr
 
 func (c *IncidentsCollector) Start(ctx context.Context) error {
 	go func() {
-		if err := c.fetch(); err != nil {
+		if err := c.fetch(ctx); err != nil {
 			log.Printf("[511on.incidents] initial fetch: %v", err)
+			c.stateStore.PublishSystem(store.SystemEvent{
+				CollectorID: c.ID(), Status: "error", Message: err.Error(),
+			})
+		} else {
+			c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
 		}
 		t := time.NewTicker(c.interval)
 		defer t.Stop()
@@ -58,7 +63,7 @@ func (c *IncidentsCollector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				if err := c.fetch(); err != nil {
+				if err := c.fetch(ctx); err != nil {
 					log.Printf("[511on.incidents] fetch: %v", err)
 					c.stateStore.PublishSystem(store.SystemEvent{
 						CollectorID: c.ID(), Status: "error", Message: err.Error(),
@@ -93,8 +98,8 @@ type on511Event struct {
 	Severity          string  `json:"Severity"`
 }
 
-func (c *IncidentsCollector) fetch() error {
-	body, err := getJSON(eventsURL)
+func (c *IncidentsCollector) fetch(ctx context.Context) error {
+	body, err := getJSON(ctx, eventsURL)
 	if err != nil {
 		return err
 	}
@@ -174,8 +179,13 @@ func (c *CamerasCollector) Domain() domain.DomainType { return domain.DomainTraf
 
 func (c *CamerasCollector) Start(ctx context.Context) error {
 	go func() {
-		if err := c.fetch(); err != nil {
+		if err := c.fetch(ctx); err != nil {
 			log.Printf("[511on.cameras] initial fetch: %v", err)
+			c.stateStore.PublishSystem(store.SystemEvent{
+				CollectorID: c.ID(), Status: "error", Message: err.Error(),
+			})
+		} else {
+			c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
 		}
 		t := time.NewTicker(c.interval)
 		defer t.Stop()
@@ -184,7 +194,7 @@ func (c *CamerasCollector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				if err := c.fetch(); err != nil {
+				if err := c.fetch(ctx); err != nil {
 					log.Printf("[511on.cameras] fetch: %v", err)
 					c.stateStore.PublishSystem(store.SystemEvent{
 						CollectorID: c.ID(), Status: "error", Message: err.Error(),
@@ -212,16 +222,16 @@ type on511CameraView struct {
 }
 
 type on511Camera struct {
-	ID       int               `json:"Id"`
-	Roadway  string            `json:"Roadway"`
-	Location string            `json:"Location"`
-	Latitude float64           `json:"Latitude"`
-	Longitude float64          `json:"Longitude"`
-	Views    []on511CameraView `json:"Views"`
+	ID        int               `json:"Id"`
+	Roadway   string            `json:"Roadway"`
+	Location  string            `json:"Location"`
+	Latitude  float64           `json:"Latitude"`
+	Longitude float64           `json:"Longitude"`
+	Views     []on511CameraView `json:"Views"`
 }
 
-func (c *CamerasCollector) fetch() error {
-	body, err := getJSON(camerasURL)
+func (c *CamerasCollector) fetch(ctx context.Context) error {
+	body, err := getJSON(ctx, camerasURL)
 	if err != nil {
 		return err
 	}
@@ -281,8 +291,13 @@ func (c *RoadConditionsCollector) Domain() domain.DomainType { return domain.Dom
 
 func (c *RoadConditionsCollector) Start(ctx context.Context) error {
 	go func() {
-		if err := c.fetch(); err != nil {
+		if err := c.fetch(ctx); err != nil {
 			log.Printf("[511on.road_conditions] initial fetch: %v", err)
+			c.stateStore.PublishSystem(store.SystemEvent{
+				CollectorID: c.ID(), Status: "error", Message: err.Error(),
+			})
+		} else {
+			c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
 		}
 		t := time.NewTicker(c.interval)
 		defer t.Stop()
@@ -291,7 +306,7 @@ func (c *RoadConditionsCollector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				if err := c.fetch(); err != nil {
+				if err := c.fetch(ctx); err != nil {
 					log.Printf("[511on.road_conditions] fetch: %v", err)
 					c.stateStore.PublishSystem(store.SystemEvent{
 						CollectorID: c.ID(), Status: "error", Message: err.Error(),
@@ -321,8 +336,8 @@ type on511RoadCondition struct {
 	LastUpdated         int64    `json:"LastUpdated"`
 }
 
-func (c *RoadConditionsCollector) fetch() error {
-	body, err := getJSON(roadCondURL)
+func (c *RoadConditionsCollector) fetch(ctx context.Context) error {
+	body, err := getJSON(ctx, roadCondURL)
 	if err != nil {
 		return err
 	}
@@ -361,18 +376,23 @@ func (c *RoadConditionsCollector) fetch() error {
 
 // ── Shared HTTP helper ────────────────────────────────────────────────────────
 
-func getJSON(url string) ([]byte, error) {
-	resp, err := client.Get(url)
+func getJSON(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request %s: %w", url, err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("get %s: %w", url, err)
 	}
-	body, readErr := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if readErr != nil {
-		return nil, fmt.Errorf("read body: %w", readErr)
-	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, io.LimitReader(resp.Body, 512)) //nolint:errcheck
 		return nil, fmt.Errorf("get %s: status %d", url, resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read body from %s: %w", url, err)
 	}
 	return body, nil
 }

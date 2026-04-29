@@ -19,6 +19,7 @@
     hazard:       'Hazard',
   };
 
+  // Fallback sort order used only when CupolaConfig has no home coordinates.
   const SEV_ORDER = { major: 0, moderate: 1, minor: 2 };
 
   function dist2(lat1, lon1, lat2, lon2) {
