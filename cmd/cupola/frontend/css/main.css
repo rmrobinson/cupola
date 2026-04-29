@@ -1024,13 +1024,13 @@ button {
 
 .flag-icon {
   position: relative;
-  width: 48px;
-  height: 64px;
+  width: 64px;
+  height: 80px;
 }
 
 .flag-pole {
   position: absolute;
-  left: 4px;
+  left: 5px;
   top: 0;
   bottom: 0;
   width: 3px;
@@ -1040,17 +1040,26 @@ button {
 
 .flag-cloth {
   position: absolute;
-  left: 7px;
-  top: 4px;
-  width: 36px;
-  height: 22px;
-  background: linear-gradient(135deg, #c0392b 50%, #fff 50%);
-  border-radius: 0 2px 2px 0;
+  left: 8px;
+  top: 5px;
+  width: 48px;
+  height: 30px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 0 3px 3px 0;
   transition: top 0.5s;
 }
 
+.flag-cloth-emoji {
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  line-height: 1;
+}
+
 .flag-cloth-half {
-  top: 36px;
+  top: 44px;
 }
 
 .flag-status-label {

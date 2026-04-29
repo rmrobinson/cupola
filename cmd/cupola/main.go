@@ -183,7 +183,7 @@ func main() {
 	}
 
 	handler := api.NewHandler(registry, stateStore, sqliteStore, subManager, notesCol.Refresh, tileHandler, webFS,
-		transitAgencies, cfg.Location.Lat, cfg.Location.Lon)
+		transitAgencies, cfg.Location.Lat, cfg.Location.Lon, cfg.Location.CountryCode)
 
 	port := cfg.Server.Port
 	if port == 0 {

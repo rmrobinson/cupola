@@ -25,6 +25,7 @@ type Handler struct {
 	agencies     []*gtfsrt.Agency
 	homeLat      float64
 	homeLon      float64
+	countryCode  string
 }
 
 func NewHandler(
@@ -37,6 +38,7 @@ func NewHandler(
 	frontend fs.FS,
 	agencies []*gtfsrt.Agency,
 	homeLat, homeLon float64,
+	countryCode string,
 ) *Handler {
 	return &Handler{
 		registry:     registry,
@@ -49,6 +51,7 @@ func NewHandler(
 		agencies:     agencies,
 		homeLat:      homeLat,
 		homeLon:      homeLon,
+		countryCode:  countryCode,
 	}
 }
 

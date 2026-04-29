@@ -30,10 +30,11 @@ type Config struct {
 }
 
 type LocationConfig struct {
-	Name     string  `yaml:"name"`
-	Lat      float64 `yaml:"lat"`
-	Lon      float64 `yaml:"lon"`
-	Timezone string  `yaml:"timezone"`
+	Name        string  `yaml:"name"`
+	Lat         float64 `yaml:"lat"`
+	Lon         float64 `yaml:"lon"`
+	Timezone    string  `yaml:"timezone"`
+	CountryCode string  `yaml:"country_code"` // ISO 3166-1 alpha-2, e.g. "CA"
 }
 
 type ServerConfig struct {
