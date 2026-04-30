@@ -16,6 +16,7 @@ import (
 	"github.com/rmrobinson/cupola/internal/api"
 	"github.com/rmrobinson/cupola/internal/collector"
 	"github.com/rmrobinson/cupola/internal/collector/astro"
+	"github.com/rmrobinson/cupola/internal/collector/dump1090"
 	ecowittcollector "github.com/rmrobinson/cupola/internal/collector/ecowitt"
 	"github.com/rmrobinson/cupola/internal/collector/envcanada"
 	flagcollector "github.com/rmrobinson/cupola/internal/collector/flag"
@@ -102,6 +103,20 @@ func main() {
 	// RSS feeds.
 	if len(cfg.Collectors.RSSFeeds) > 0 {
 		registry.Register(rsscollector.New(cfg.Collectors.RSSFeeds, stateStore))
+	}
+
+	// ADS-B aircraft via local dump1090 or readsb instance.
+	if a := cfg.Collectors.AircraftDump1090; a != nil && a.Enabled && a.URL != "" {
+		interval := a.PollInterval.Duration
+		if interval == 0 {
+			interval = 5 * time.Second
+		}
+		radiusKM := a.RadiusKM
+		if radiusKM == 0 {
+			radiusKM = 250
+		}
+		log.Printf("dump1090: registering collector for %s (radius=%.0fkm)", a.URL, radiusKM)
+		registry.Register(dump1090.New(a.URL, interval, cfg.Location.Lat, cfg.Location.Lon, radiusKM, stateStore))
 	}
 
 	// ON511 traffic: incidents, cameras, and road conditions.

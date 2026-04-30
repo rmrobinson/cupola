@@ -1347,3 +1347,57 @@ button {
 .road-cond-caution { border-left: 3px solid rgba(180,180,30,0.7); padding-left: 7px; }
 
 .map-emoji-icon { background: none !important; border: none !important; box-shadow: none !important; font-size: 18px; line-height: 20px; text-align: center; }
+
+/* ── Aircraft widget ───────────────────────────────────────────────────────── */
+
+.widget-aircraft {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.ac-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ac-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 12px;
+}
+
+.ac-label {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ac-alt {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ac-spd {
+  opacity: 0.55;
+  white-space: nowrap;
+}
+
+.ac-track {
+  margin-right: 2px;
+}
+
+.ac-ground {
+  font-size: 10px;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

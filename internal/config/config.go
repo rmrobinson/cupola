@@ -106,6 +106,7 @@ type Dump1090Config struct {
 	Enabled      bool     `yaml:"enabled"`
 	URL          string   `yaml:"url"`
 	PollInterval Duration `yaml:"poll_interval"`
+	RadiusKM     float64  `yaml:"radius_km"` // filter to this radius; 0 = no filter (default 250)
 }
 
 type HouseConfig struct {
