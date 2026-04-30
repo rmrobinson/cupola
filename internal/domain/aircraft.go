@@ -13,6 +13,7 @@ type AircraftTarget struct {
 	ICAO      string    `json:"icao"`
 	Callsign  *string   `json:"callsign,omitempty"`
 	Flight    *string   `json:"flight,omitempty"`
+	Category  string    `json:"category,omitempty"` // ICAO ADS-B emitter category, e.g. "A3"
 	Lat       float64   `json:"lat"`
 	Lon       float64   `json:"lon"`
 	AltFt     int       `json:"alt_ft"`

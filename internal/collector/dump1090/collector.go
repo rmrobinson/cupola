@@ -71,14 +71,15 @@ type aircraftResponse struct {
 
 // aircraftJSON handles both dump1090-fa/readsb and dump1090-mutability formats.
 type aircraftJSON struct {
-	Hex     string  `json:"hex"`
-	Flight  string  `json:"flight"`
-	Squawk  string  `json:"squawk"`
-	Lat     float64 `json:"lat"`
-	Lon     float64 `json:"lon"`
-	Track   float64 `json:"track"`
-	VertRate *int   `json:"vert_rate"`  // mutability
-	BaroRate *int   `json:"baro_rate"`  // fa/readsb
+	Hex      string  `json:"hex"`
+	Flight   string  `json:"flight"`
+	Squawk   string  `json:"squawk"`
+	Category string  `json:"category"` // ICAO ADS-B emitter category, e.g. "A3"
+	Lat      float64 `json:"lat"`
+	Lon      float64 `json:"lon"`
+	Track    float64 `json:"track"`
+	VertRate *int    `json:"vert_rate"` // mutability
+	BaroRate *int    `json:"baro_rate"` // fa/readsb
 	Seen     float64 `json:"seen"`
 	SeenPos  float64 `json:"seen_pos"`
 
@@ -153,6 +154,7 @@ func (c *Collector) fetch() {
 		alt, onGround := a.altFt()
 		t := domain.AircraftTarget{
 			ICAO:      strings.ToUpper(strings.TrimSpace(a.Hex)),
+			Category:  a.Category,
 			Lat:       a.Lat,
 			Lon:       a.Lon,
 			AltFt:     alt,

@@ -1347,6 +1347,7 @@ button {
 .road-cond-caution { border-left: 3px solid rgba(180,180,30,0.7); padding-left: 7px; }
 
 .map-emoji-icon { background: none !important; border: none !important; box-shadow: none !important; font-size: 18px; line-height: 20px; text-align: center; }
+.aircraft-svg-icon { background: none !important; border: none !important; box-shadow: none !important; }
 
 /* ── Aircraft widget ───────────────────────────────────────────────────────── */
 
