@@ -104,6 +104,7 @@ const Grid = (() => {
     initResize(resizeHandle, cell, wc);
 
     cell.addEventListener('dragstart', e => {
+      if (!e.target.closest('.drag-handle')) { e.preventDefault(); return; }
       _draggedId = wc.id;
       e.dataTransfer.effectAllowed = 'move';
       setTimeout(() => cell.classList.add('drag-source'), 0);

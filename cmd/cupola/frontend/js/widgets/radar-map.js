@@ -65,6 +65,8 @@
       let marker;
       if (inc.type === 'construction') {
         marker = L.marker([inc.lat, inc.lon], { icon: emojiIcon('🚧') });
+      } else if (inc.type === 'collision') {
+        marker = L.marker([inc.lat, inc.lon], { icon: emojiIcon('🚗') });
       } else {
         const color = INC_COLORS[inc.severity] || '#95a5a6';
         marker = L.circleMarker([inc.lat, inc.lon], {
