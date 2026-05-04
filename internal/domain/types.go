@@ -26,6 +26,7 @@ const (
 	DomainWaterwayConditions   DomainType = "waterway.conditions"
 	DomainMunicipalEvents      DomainType = "municipal.events"
 	DomainMunicipalAlerts      DomainType = "municipal.alerts"
+	DomainWasteCollection      DomainType = "waste.collection"
 )
 
 // DomainState is the common interface satisfied by all domain state types.

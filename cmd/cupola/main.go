@@ -24,6 +24,7 @@ import (
 	"github.com/rmrobinson/cupola/internal/collector/gtfsrt"
 	notescollector "github.com/rmrobinson/cupola/internal/collector/notes"
 	rsscollector "github.com/rmrobinson/cupola/internal/collector/rss"
+	wastecollector "github.com/rmrobinson/cupola/internal/collector/wastecollection"
 	"github.com/rmrobinson/cupola/internal/collector/traffic511"
 	"github.com/rmrobinson/cupola/internal/config"
 	"github.com/rmrobinson/cupola/internal/store"
@@ -174,6 +175,13 @@ func main() {
 			registry.Register(veh)
 			registry.Register(alt)
 		}
+	}
+
+	// Waste collection schedule from a local JSON file.
+	if w := cfg.Collectors.WasteCollection; w != nil && w.Enabled && w.DataPath != "" {
+		ws := wastecollector.ParseWeekday(w.WeekStart)
+		log.Printf("waste.collection: registering collector (data=%s week_start=%s)", w.DataPath, ws)
+		registry.Register(wastecollector.New(w.DataPath, ws, stateStore))
 	}
 
 	// ctx is shared by collectors, the HTTP server's BaseContext, and tile extraction.

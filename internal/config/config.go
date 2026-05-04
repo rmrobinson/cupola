@@ -61,6 +61,7 @@ type CollectorsConfig struct {
 	Waterways        []WaterwayConfig        `yaml:"waterways"`
 	Municipal        []MunicipalConfig       `yaml:"municipal"`
 	IMAP             *IMAPConfig             `yaml:"imap"`
+	WasteCollection  *WasteCollectionConfig  `yaml:"waste_collection"`
 }
 
 type EcowittConfig struct {
@@ -142,6 +143,12 @@ type MunicipalConfig struct {
 	URL          string   `yaml:"url"`
 	PollInterval Duration `yaml:"poll_interval"`
 	Domain       string   `yaml:"domain"`
+}
+
+type WasteCollectionConfig struct {
+	Enabled   bool   `yaml:"enabled"`
+	DataPath  string `yaml:"data_path"`
+	WeekStart string `yaml:"week_start"` // "sunday" (default), "monday", ..., "saturday"
 }
 
 type IMAPConfig struct {

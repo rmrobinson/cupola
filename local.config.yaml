@@ -102,6 +102,11 @@ collectors:
       poll_interval: 10m
       domain: municipal.alerts
 
+  waste_collection:
+    enabled: true
+    data_path: "data/kitchener_waste_collection_zone_b1_thursdays_2026.json"
+    week_start: sunday
+
   imap:
     enabled: false   # enable in phase 2 (IMAP dispatcher)
     host: "imap.example.com"

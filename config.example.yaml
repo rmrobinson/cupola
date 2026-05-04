@@ -105,6 +105,13 @@ collectors:
       poll_interval: 10m
       domain: municipal.alerts
 
+  waste_collection:
+    enabled: true
+    data_path: "data/waste_schedule.json"
+    # week_start controls when the widget switches to the next week's entry.
+    # Defaults to "sunday". Other values: monday, tuesday, ..., saturday.
+    week_start: sunday
+
   imap:
     enabled: false   # enable in phase 2 (IMAP dispatcher)
     host: "imap.example.com"

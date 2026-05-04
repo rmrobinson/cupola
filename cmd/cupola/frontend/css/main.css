@@ -1414,3 +1414,48 @@ button {
   font-size: 10px;
   margin-left: 1px;
 }
+
+/* ── Waste collection widget ─────────────────────────────────────────────── */
+
+.widget-waste-collection {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  padding: 10px 14px;
+}
+
+.waste-date {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.waste-today .waste-date {
+  opacity: 1;
+  color: #ffd54f;
+}
+
+.waste-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.waste-pill {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.waste-no-collection {
+  opacity: 0.4;
+  font-size: 12px;
+  font-style: italic;
+}
