@@ -19,8 +19,9 @@ const WidgetPicker = (() => {
 
   function render(availDomains, onPick) {
     const all = window.CupolaWidgets || [];
-    const available = all.filter(w => isAvailable(w, availDomains));
-    const unavailable = all.filter(w => !isAvailable(w, availDomains));
+    const byLabel = (a, b) => humanLabel(a.type).localeCompare(humanLabel(b.type));
+    const available = all.filter(w => isAvailable(w, availDomains)).sort(byLabel);
+    const unavailable = all.filter(w => !isAvailable(w, availDomains)).sort(byLabel);
 
     const picker = document.getElementById('widget-picker');
     picker.innerHTML = `
@@ -37,6 +38,9 @@ const WidgetPicker = (() => {
     picker.addEventListener('click', e => {
       if (e.target === picker) hide();
     });
+
+    const onKey = e => { if (e.key === 'Escape') hide(); };
+    document.addEventListener('keydown', onKey, { once: true });
 
     picker.querySelectorAll('.picker-item:not(.unavailable)').forEach(btn => {
       btn.addEventListener('click', () => {
