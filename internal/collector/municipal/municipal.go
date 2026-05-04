@@ -2,10 +2,7 @@ package municipal
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"sync"
 	"time"
 
@@ -14,14 +11,16 @@ import (
 	"github.com/rmrobinson/cupola/internal/store"
 )
 
-// EventsParser parses an HTTP response body into municipal events.
+// EventsParser fetches and parses municipal events from the given URL.
+// Implementations handle their own HTTP requests, allowing for GET, POST, or
+// multi-step fetches as needed by the source.
 type EventsParser interface {
-	Parse(r io.Reader) ([]domain.MunicipalEvent, error)
+	Parse(url string) ([]domain.MunicipalEvent, error)
 }
 
-// AlertsParser parses an HTTP response body into municipal alerts.
+// AlertsParser fetches and parses municipal alerts from the given URL.
 type AlertsParser interface {
-	Parse(r io.Reader) ([]domain.MunicipalAlert, error)
+	Parse(url string) ([]domain.MunicipalAlert, error)
 }
 
 var (
@@ -119,19 +118,9 @@ func (c *EventsCollector) runSource(ctx context.Context, s eventsSource) {
 }
 
 func (c *EventsCollector) fetchSource(s eventsSource) error {
-	client := &http.Client{Timeout: 20 * time.Second}
-	resp, err := client.Get(s.cfg.URL)
+	events, err := s.parser.Parse(s.cfg.URL)
 	if err != nil {
-		return fmt.Errorf("get %s: %w", s.cfg.URL, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("get %s: status %d", s.cfg.URL, resp.StatusCode)
-	}
-
-	events, err := s.parser.Parse(resp.Body)
-	if err != nil {
-		return fmt.Errorf("parse %s: %w", s.cfg.URL, err)
+		return err
 	}
 	for i := range events {
 		events[i].SourceID = s.cfg.ID
@@ -234,19 +223,9 @@ func (c *AlertsCollector) runSource(ctx context.Context, s alertsSource) {
 }
 
 func (c *AlertsCollector) fetchSource(s alertsSource) error {
-	client := &http.Client{Timeout: 20 * time.Second}
-	resp, err := client.Get(s.cfg.URL)
+	alerts, err := s.parser.Parse(s.cfg.URL)
 	if err != nil {
-		return fmt.Errorf("get %s: %w", s.cfg.URL, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("get %s: status %d", s.cfg.URL, resp.StatusCode)
-	}
-
-	alerts, err := s.parser.Parse(resp.Body)
-	if err != nil {
-		return fmt.Errorf("parse %s: %w", s.cfg.URL, err)
+		return err
 	}
 	for i := range alerts {
 		alerts[i].SourceID = s.cfg.ID
