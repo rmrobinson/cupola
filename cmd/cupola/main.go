@@ -25,8 +25,10 @@ import (
 	notescollector "github.com/rmrobinson/cupola/internal/collector/notes"
 	rsscollector "github.com/rmrobinson/cupola/internal/collector/rss"
 	wastecollector "github.com/rmrobinson/cupola/internal/collector/wastecollection"
+	municipalcollector "github.com/rmrobinson/cupola/internal/collector/municipal"
 	"github.com/rmrobinson/cupola/internal/collector/traffic511"
 	"github.com/rmrobinson/cupola/internal/config"
+	"github.com/rmrobinson/cupola/internal/domain"
 	"github.com/rmrobinson/cupola/internal/store"
 	"github.com/rmrobinson/cupola/internal/tiles"
 )
@@ -174,6 +176,30 @@ func main() {
 			registry.Register(arr)
 			registry.Register(veh)
 			registry.Register(alt)
+		}
+	}
+
+	// Municipal collectors: one EventsCollector and/or one AlertsCollector,
+	// each aggregating across all configured parsers for that domain.
+	if len(cfg.Collectors.Municipal) > 0 {
+		var eventsCfgs, alertsCfgs []config.MunicipalConfig
+		for _, mc := range cfg.Collectors.Municipal {
+			switch mc.Domain {
+			case string(domain.DomainMunicipalEvents):
+				eventsCfgs = append(eventsCfgs, mc)
+			case string(domain.DomainMunicipalAlerts):
+				alertsCfgs = append(alertsCfgs, mc)
+			default:
+				log.Printf("municipal: unknown domain %q for source %s — skipping", mc.Domain, mc.ID)
+			}
+		}
+		if len(eventsCfgs) > 0 {
+			log.Printf("municipal.events: registering %d source(s)", len(eventsCfgs))
+			registry.Register(municipalcollector.NewEventsCollector(eventsCfgs, stateStore))
+		}
+		if len(alertsCfgs) > 0 {
+			log.Printf("municipal.alerts: registering %d source(s)", len(alertsCfgs))
+			registry.Register(municipalcollector.NewAlertsCollector(alertsCfgs, stateStore))
 		}
 	}
 
