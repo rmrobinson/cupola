@@ -1364,7 +1364,7 @@ button {
 
 .ac-row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto auto auto;
   align-items: center;
   gap: 8px;
   padding: 4px 2px;
@@ -1401,4 +1401,16 @@ button {
   opacity: 0.5;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.ac-dist {
+  opacity: 0.4;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.ac-dist-unit {
+  font-size: 10px;
+  margin-left: 1px;
 }
