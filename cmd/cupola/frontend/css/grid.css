@@ -15,11 +15,25 @@
   min-width: 0;
 }
 
-/* Portrait / mobile: 4-column grid */
+/* Tablet portrait: 4-column grid */
 @media (max-width: 767px) {
   .widget-grid {
     grid-template-columns: repeat(4, 1fr);
     grid-auto-rows: 56px;
     gap: 8px;
+  }
+}
+
+/* Phone: single-column, auto row height so widgets are not clipped */
+@media (max-width: 479px) {
+  .widget-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    gap: 8px;
+  }
+  .widget-cell {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+    min-height: 140px;
   }
 }

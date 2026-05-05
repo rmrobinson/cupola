@@ -3,11 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0a1e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Cupola</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon.svg">
   <link rel="stylesheet" href="/css/main.css">
   <link rel="stylesheet" href="/css/grid.css">
   <link rel="stylesheet" href="/css/horizon.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/js/vendor/leaflet.css">
 </head>
 <body>
   <div id="horizon-bg"></div>
@@ -21,8 +26,8 @@
   </div>
   <div id="widget-picker" class="widget-picker hidden"></div>
   <!-- Map libraries: loaded before widgets so radar-map.js can reference L and protomapsL -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/protomaps-leaflet@5.1.0/dist/protomaps-leaflet.js"></script>
+  <script src="/js/vendor/leaflet.js"></script>
+  <script src="/js/vendor/protomaps-leaflet.js"></script>
   <!-- load order: stream → subscriptions → overlays → widgets → profile → picker → grid → main -->
   <script src="/js/stream.js"></script>
   <script src="/js/subscriptions.js"></script>
@@ -51,5 +56,10 @@
   <script src="/js/widget-picker.js"></script>
   <script src="/js/grid.js"></script>
   <script src="/js/main.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
 </body>
 </html>

@@ -1,0 +1,4 @@
+/cupola
+cmd/cupola/frontend/js/vendor/
+data/
+*.log

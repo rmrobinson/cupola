@@ -9,8 +9,12 @@ Cupola is a self-hosted, location-aware ambient dashboard. A single Go binary se
 ## Build & Run
 
 ```bash
-# Build the binary
-go build ./cmd/cupola
+# Download frontend vendor dependencies (Leaflet, protomaps-leaflet)
+make vendor-frontend
+
+# Build the binary (runs vendor-frontend automatically if needed)
+make build
+# or: go build ./cmd/cupola
 
 # Run with a config file
 ./cupola -config config.yaml
@@ -24,6 +28,8 @@ go test ./internal/collector/envcanada/...
 # Lint (golangci-lint expected)
 golangci-lint run ./...
 ```
+
+Frontend vendor libraries (`frontend/js/vendor/`) are downloaded by `make vendor-frontend` and are gitignored. Run `make vendor-frontend` again to upgrade them; bump the version variables in `Makefile`.
 
 The frontend is static HTML/CSS/JS — no build step. Serve from `frontend/` via the Go binary (embedded or from disk).
 

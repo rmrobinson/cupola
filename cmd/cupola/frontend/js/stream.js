@@ -18,14 +18,31 @@ const Stream = (() => {
   const failing = new Set();      // collector IDs currently in error state
   const connectHandlers = [];     // called each time a connection opens
   let es = null;
+  let _lastDataAt = null;         // timestamp of last received SSE message
+  let _everConnected = false;     // true after first successful open
+  let _offline = false;           // true while SSE is down after first connect
+  let _offlineTimer = null;
 
   function connect() {
     if (es) es.close();
     es = new EventSource(`/api/v1/stream?session_id=${SESSION_ID}`);
-    es.onopen = () => { connectHandlers.forEach(fn => fn()); };
+    es.onopen = () => {
+      _everConnected = true;
+      if (_offline) {
+        _offline = false;
+        if (_offlineTimer) { clearInterval(_offlineTimer); _offlineTimer = null; }
+        _syncBanner();
+      }
+      connectHandlers.forEach(fn => fn());
+    };
     es.onmessage = onMessage;
     es.onerror = () => {
       es.close();
+      if (_everConnected && !_offline) {
+        _offline = true;
+        _syncBanner();
+        _offlineTimer = setInterval(_syncBanner, 30_000);
+      }
       setTimeout(connect, 3000);
     };
   }
@@ -35,6 +52,7 @@ const Stream = (() => {
   }
 
   function onMessage(e) {
+    _lastDataAt = Date.now();
     let evt;
     try { evt = JSON.parse(e.data); } catch { return; }
     if (evt.domain === 'system') { handleSystem(evt); return; }
@@ -47,14 +65,27 @@ const Stream = (() => {
     } else {
       failing.delete(evt.collector_id);
     }
+    _syncBanner();
+  }
+
+  function _syncBanner() {
     const banner = document.getElementById('alert-banner');
     if (!banner) return;
-    if (failing.size === 0) {
-      banner.textContent = '';
-      banner.classList.add('hidden');
-    } else {
+    if (_offline) {
+      const ago = _lastDataAt
+        ? (() => {
+            const mins = Math.round((Date.now() - _lastDataAt) / 60_000);
+            return mins < 1 ? 'moments ago' : `${mins} min ago`;
+          })()
+        : 'unknown';
+      banner.textContent = `Offline — last data: ${ago}`;
+      banner.classList.remove('hidden');
+    } else if (failing.size > 0) {
       banner.textContent = 'Source unavailable: ' + [...failing].join(', ');
       banner.classList.remove('hidden');
+    } else {
+      banner.textContent = '';
+      banner.classList.add('hidden');
     }
   }
 
