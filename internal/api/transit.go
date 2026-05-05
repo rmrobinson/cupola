@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -75,6 +76,61 @@ func (h *Handler) getTransitStops(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(out, func(i, j int) bool { return out[i].DistanceKm < out[j].DistanceKm })
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
+}
+
+type geoJSONMultiLineString struct {
+	Type        string        `json:"type"`
+	Coordinates [][][2]float64 `json:"coordinates"`
+}
+
+type routeShapeResponse struct {
+	RouteID  string                 `json:"route_id"`
+	Color    string                 `json:"color"`
+	Geometry geoJSONMultiLineString `json:"geometry"`
+}
+
+func (h *Handler) getTransitRouteShape(w http.ResponseWriter, r *http.Request) {
+	ag := h.findAgency(chi.URLParam(r, "agencyID"))
+	if ag == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !ag.Schedule.HasShapes() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "no shape data available"})
+		return
+	}
+	routeID := chi.URLParam(r, "routeID")
+	lines, color := ag.Schedule.ShapesForRoute(routeID)
+	if len(lines) == 0 {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Convert [lat,lon] pairs to GeoJSON [lon,lat] order.
+	coords := make([][][2]float64, len(lines))
+	for i, line := range lines {
+		coords[i] = make([][2]float64, len(line))
+		for j, pt := range line {
+			coords[i][j] = [2]float64{pt[1], pt[0]} // lon, lat
+		}
+	}
+
+	cssColor := ""
+	if color != "" {
+		cssColor = "#" + strings.ToUpper(color)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(routeShapeResponse{
+		RouteID: routeID,
+		Color:   cssColor,
+		Geometry: geoJSONMultiLineString{
+			Type:        "MultiLineString",
+			Coordinates: coords,
+		},
+	})
 }
 
 func (h *Handler) findAgency(id string) *gtfsrt.Agency {

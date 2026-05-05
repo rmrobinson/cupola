@@ -44,6 +44,7 @@
     const incidentLayer = L.layerGroup().addTo(map);
     const vehicleLayer  = L.layerGroup().addTo(map);
     const aircraftLayer = L.layerGroup().addTo(map);
+    const routeLayer    = L.layerGroup().addTo(map);
 
     // ResizeObserver handles two problems in one:
     // 1. Leaflet is initialised before the cell is appended to the DOM grid, so
@@ -53,7 +54,21 @@
     const ro = new ResizeObserver(() => map.invalidateSize());
     ro.observe(mapDiv);
 
-    return { map, ro, incidentLayer, vehicleLayer, aircraftLayer };
+    return { map, ro, incidentLayer, vehicleLayer, aircraftLayer, routeLayer };
+  }
+
+  function updateRoutes(layerGroup, overlays, config) {
+    layerGroup.clearLayers();
+    if (config?.layer_routes === false) return;
+    for (const ovl of overlays) {
+      if (ovl.type !== 'polyline' || !ovl.coordinates?.length) continue;
+      // GeoJSON coordinates are [lon, lat]; Leaflet expects [lat, lon].
+      const color = ovl.color || '#3b82f6';
+      for (const line of ovl.coordinates) {
+        const latLngs = line.map(([lon, lat]) => [lat, lon]);
+        L.polyline(latLngs, { color, weight: 3, opacity: 0.85 }).addTo(layerGroup);
+      }
+    }
   }
 
   function updateIncidents(layerGroup, incidents, config) {
@@ -77,13 +92,20 @@
     }
   }
 
-  function updateVehicles(layerGroup, vehicles, config) {
+  function updateVehicles(layerGroup, vehicles, config, activeOverlays) {
     layerGroup.clearLayers();
     if (!vehicles?.length || config?.layer_transit === false) return;
+    // Build a set of "agencyId:routeId" keys for routes that have an active overlay.
+    const activeRoutes = new Set(
+      (activeOverlays || [])
+        .filter(o => o.type === 'polyline' && o.agencyId && o.routeId)
+        .map(o => `${o.agencyId}:${o.routeId}`)
+    );
     for (const v of vehicles) {
       if (!v.lat || !v.lon) continue;
-      const emoji = VEHICLE_EMOJI[v.vehicle_type] || '🚌';
-      L.marker([v.lat, v.lon], { icon: emojiIcon(emoji) }).bindPopup(
+      const emoji  = VEHICLE_EMOJI[v.vehicle_type] || '🚌';
+      const dimmed = activeRoutes.size > 0 && !activeRoutes.has(`${v.agency_id}:${v.route_id}`);
+      L.marker([v.lat, v.lon], { icon: emojiIcon(emoji), opacity: dimmed ? 0.5 : 1.0 }).bindPopup(
         `<b>Route ${esc(v.route_name)}</b><br>Vehicle ${esc(v.vehicle_id)}<br>${esc(v.agency_id)}`
       ).addTo(layerGroup);
     }
@@ -196,6 +218,10 @@
       return;
     }
     if (container._radarMap) {
+      // Unsubscribe from overlay registry before tearing down the old map instance.
+      if (container._radarMap._overlayCb) {
+        window.CupolaOverlays?.unsubscribeMap(container._radarMap._overlayCb);
+      }
       container._radarMap.ro.disconnect();
       container._radarMap.map.remove();
       container._radarMap = null;
@@ -206,8 +232,23 @@
     container._radarMap = inst;
 
     const sm = stateMap || {};
+    // Assign _lastVehicles before subscribing to overlays: subscribeMap fires
+    // the callback synchronously, which calls updateVehicles and needs the data.
+    inst._lastVehicles = sm['transit.vehicles']?.vehicles;
+
+    // Subscribe to the overlay registry; callback fires immediately with current
+    // overlays and again whenever providers register or unregister.
+    const overlayCb = (overlays) => {
+      inst._activeOverlays = overlays;
+      updateRoutes(inst.routeLayer, overlays, config);
+      // Re-render vehicles so dimming reflects the current set of visible routes.
+      updateVehicles(inst.vehicleLayer, inst._lastVehicles, config, overlays);
+    };
+    inst._overlayCb = overlayCb;
+    window.CupolaOverlays?.subscribeMap(overlayCb); // calls overlayCb immediately
+
     updateIncidents(inst.incidentLayer, sm['traffic.incidents']?.incidents, config);
-    updateVehicles(inst.vehicleLayer,   sm['transit.vehicles']?.vehicles,   config);
+    // Vehicles are already rendered by the overlayCb fired inside subscribeMap above.
     updateAircraft(inst.aircraftLayer,  sm['aircraft']?.aircraft,           config);
   }
 
@@ -215,8 +256,9 @@
     if (!container._radarMap) { render(container, stateMap, config); return; }
     const inst = container._radarMap;
     const sm = stateMap || {};
+    inst._lastVehicles = sm['transit.vehicles']?.vehicles;
     updateIncidents(inst.incidentLayer, sm['traffic.incidents']?.incidents, config);
-    updateVehicles(inst.vehicleLayer,   sm['transit.vehicles']?.vehicles,   config);
+    updateVehicles(inst.vehicleLayer,   inst._lastVehicles,                 config, inst._activeOverlays);
     updateAircraft(inst.aircraftLayer,  sm['aircraft']?.aircraft,           config);
   }
 
@@ -236,12 +278,17 @@
           { value: 'black',     label: 'Black' },
           { value: 'white',     label: 'White' },
         ] },
-      { key: 'layer_incidents', label: 'Show incidents',   type: 'boolean', default: true },
-      { key: 'layer_transit',   label: 'Show transit',     type: 'boolean', default: true },
-      { key: 'layer_aircraft',  label: 'Show aircraft',    type: 'boolean', default: true },
+      { key: 'layer_incidents', label: 'Show incidents',      type: 'boolean', default: true },
+      { key: 'layer_transit',   label: 'Show transit',        type: 'boolean', default: true },
+      { key: 'layer_aircraft',  label: 'Show aircraft',       type: 'boolean', default: true },
+      { key: 'layer_routes',    label: 'Show transit routes', type: 'boolean', default: true },
     ],
     subscriptionParams: () => null,
     render,
     onUpdate,
+    onRemove(container) {
+      const cb = container._radarMap?._overlayCb;
+      if (cb) window.CupolaOverlays?.unsubscribeMap(cb);
+    },
   });
 })();

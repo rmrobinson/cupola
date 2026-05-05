@@ -23,9 +23,10 @@
   <!-- Map libraries: loaded before widgets so radar-map.js can reference L and protomapsL -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/protomaps-leaflet@5.1.0/dist/protomaps-leaflet.js"></script>
-  <!-- load order: stream → subscriptions → widgets → profile → picker → grid → main -->
+  <!-- load order: stream → subscriptions → overlays → widgets → profile → picker → grid → main -->
   <script src="/js/stream.js"></script>
   <script src="/js/subscriptions.js"></script>
+  <script src="/js/overlays.js"></script>
   <script src="/js/widgets/transit.js"></script>
   <script src="/js/widgets/clock.js"></script>
   <script src="/js/widgets/weather-current.js"></script>

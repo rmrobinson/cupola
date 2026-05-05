@@ -1,4 +1,5 @@
 (function () {
+  'use strict';
   window.CupolaWidgets = window.CupolaWidgets || [];
 
   function stopKey(config) {
@@ -7,6 +8,112 @@
     const stop_id = (config?.stop_id || '').trim();
     return agency && route && stop_id ? `${agency}:${route}:${stop_id}` : null;
   }
+
+  // ── Route overlay helpers ─────────────────────────────────────────────────
+
+  const SHAPE_RETRY_DELAY_MS = 60_000;
+
+  async function fetchShape(container, config) {
+    if (!config.agency || !config.route) return false;
+
+    // Clear shape cache if the route selection changed since the last fetch.
+    if (container._shapeRouteKey !== config.route) {
+      container._shapeData          = null;
+      container._shapeUnavailable   = false;
+      container._shapeRouteKey      = null;
+      container._shapeFetchFailedAt = null;
+    }
+
+    if (container._shapeUnavailable) return false;
+    if (container._shapeData) return true;
+
+    // Backoff: don't hammer the server after a transient failure.
+    if (container._shapeFetchFailedAt &&
+        Date.now() - container._shapeFetchFailedAt < SHAPE_RETRY_DELAY_MS) {
+      return false;
+    }
+
+    try {
+      const url = `/api/v1/transit/agencies/${encodeURIComponent(config.agency)}/routes/${encodeURIComponent(config.route)}/shape`;
+      const r = await fetch(url);
+      if (r.status === 404) {
+        container._shapeUnavailable = true;
+        return false;
+      }
+      if (!r.ok) {
+        container._shapeFetchFailedAt = Date.now();
+        return false;
+      }
+      container._shapeData          = await r.json();
+      container._shapeRouteKey      = config.route;
+      container._shapeFetchFailedAt = null;
+      return true;
+    } catch {
+      container._shapeFetchFailedAt = Date.now();
+      return false;
+    }
+  }
+
+  async function syncOverlay(container, config) {
+    const widgetId = container.dataset.widgetId;
+    if (!widgetId) return;
+    const ovl = window.CupolaOverlays;
+    if (!ovl) return;
+
+    if (!config.show_route || !ovl.hasMap()) {
+      ovl.unregister(widgetId);
+      return;
+    }
+
+    const ok = await fetchShape(container, config);
+    if (!ok) {
+      ovl.unregister(widgetId);
+      if (container._shapeUnavailable && config.show_route) {
+        config.show_route = false;
+        container._saveConfig?.();
+      }
+      return;
+    }
+
+    const shape = container._shapeData;
+    ovl.register(widgetId, {
+      type:        'polyline',
+      color:       shape.color || '',
+      coordinates: shape.geometry.coordinates,
+      agencyId:    config.agency,
+      routeId:     config.route,
+    });
+  }
+
+  function setupAvailCb(container, config) {
+    const ovl = window.CupolaOverlays;
+    if (!ovl) return;
+
+    if (container._mapAvailCb) ovl.offMapAvail(container._mapAvailCb);
+
+    // Snapshot map availability before registering so the immediate-fire from
+    // onMapAvail can distinguish "no map yet on page load" from "map was removed".
+    let prevHasMap = ovl.hasMap();
+
+    const cb = (hasMap) => {
+      const wasAvail = prevHasMap;
+      prevHasMap = hasMap;
+
+      if (!hasMap && wasAvail && config.show_route) {
+        // Map widget was removed while show_route was active — reset and persist.
+        config.show_route = false;
+        ovl.unregister(container.dataset.widgetId || '');
+        container._saveConfig?.();
+      } else if (hasMap && config.show_route) {
+        syncOverlay(container, config);
+      }
+    };
+
+    container._mapAvailCb = cb;
+    ovl.onMapAvail(cb);
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   function render(container, state, config) {
     const key  = stopKey(config);
@@ -17,6 +124,7 @@
         <div class="widget-transit">
           <p class="transit-no-config">Configure agency, route, and stop ID using &#9881;</p>
         </div>`;
+      setupAvailCb(container, config);
       return;
     }
 
@@ -34,6 +142,9 @@
           : `<div class="transit-list">${arrivals.map(arrivalRow).join('')}</div>`
         }
       </div>`;
+
+    setupAvailCb(container, config);
+    syncOverlay(container, config);
   }
 
   function arrivalRow(a) {
@@ -102,7 +213,17 @@
     const selStop = cfg.stop_id || '';
     const maxT    = cfg.max_trips != null ? cfg.max_trips : 4;
 
-    // Agency options
+    // Determine whether "show route on map" can be enabled.
+    const content      = panel.closest('.widget-inner')?.querySelector('.widget-content');
+    const hasMap       = window.CupolaOverlays?.hasMap() || false;
+    const noShapes     = content?._shapeUnavailable || false;
+    const canShowRoute = hasMap && !noShapes;
+    const showRouteHint = !hasMap
+      ? 'Add a map widget to enable this option'
+      : noShapes
+        ? 'This agency has no route shape data'
+        : '';
+
     const agOpts = agencies.map(a =>
       `<option value="${esc(a.id)}"${a.id === selAg ? ' selected' : ''}>${esc(a.id)}</option>`
     ).join('');
@@ -125,16 +246,20 @@
           <span>Max trips</span>
           <input type="number" name="max_trips" min="1" max="20" value="${esc(maxT)}">
         </label>
+        <label class="config-row" title="${esc(showRouteHint)}">
+          <span>Show route on map</span>
+          <input type="checkbox" name="show_route"${cfg.show_route && canShowRoute ? ' checked' : ''}${!canShowRoute ? ' disabled' : ''}>
+        </label>
         <div class="config-actions">
           <button type="submit" class="btn-small btn-primary">Save</button>
           <button type="button" class="btn-small btn-secondary btn-config-cancel">Cancel</button>
         </div>
       </form>`;
 
-    const form     = panel.querySelector('.config-form');
-    const agSel    = form.querySelector('[name="agency"]');
-    const rtSel    = form.querySelector('[name="route"]');
-    const stopSel  = form.querySelector('[name="stop_id"]');
+    const form    = panel.querySelector('.config-form');
+    const agSel   = form.querySelector('[name="agency"]');
+    const rtSel   = form.querySelector('[name="route"]');
+    const stopSel = form.querySelector('[name="stop_id"]');
 
     panel.querySelector('.btn-config-cancel').addEventListener('click', () => {
       panel.classList.add('hidden');
@@ -184,22 +309,31 @@
     agSel.addEventListener('change', () => loadRoutes(agSel.value, ''));
     rtSel.addEventListener('change', () => loadStops(agSel.value, rtSel.value, ''));
 
-    // Always load routes for the currently-shown agency (handles both saved config
-    // and new widgets where the select defaults to the first agency).
     await loadRoutes(agSel.value, selRt);
 
     form.addEventListener('submit', e => {
       e.preventDefault();
-      const data = new FormData(e.target);
+      const data      = new FormData(e.target);
+      const prevRoute = wc.config?.route || '';
+      const newRoute  = data.get('route') || '';
+      // If the route changed, clear the cached shape so it is re-fetched.
+      if (newRoute !== prevRoute && content) {
+        content._shapeData        = null;
+        content._shapeUnavailable = false;
+        content._shapeRouteKey    = null;
+      }
       wc.config = {
-        agency:    data.get('agency')    || '',
-        route:     data.get('route')     || '',
-        stop_id:   data.get('stop_id')   || '',
-        max_trips: Number(data.get('max_trips')) || 4,
+        agency:     data.get('agency')    || '',
+        route:      newRoute,
+        stop_id:    data.get('stop_id')   || '',
+        max_trips:  Number(data.get('max_trips')) || 4,
+        show_route: data.get('show_route') === 'on',
       };
       onSave();
     });
   }
+
+  // ── Widget definition ─────────────────────────────────────────────────────
 
   window.CupolaWidgets.push({
     type:        'transit',
@@ -213,7 +347,15 @@
       if (!agency || !route || !stop_id) return null;
       return { agency, route, stop_id };
     },
-    render(container, state, config)       { render(container, state, config); },
-    onUpdate(container, data,  config)     { render(container, data,  config); },
+    render(container, state, config)   { render(container, state, config); },
+    onUpdate(container, data, config)  { render(container, data,  config); },
+    onRemove(container, _config) {
+      const widgetId = container.dataset.widgetId;
+      const ovl = window.CupolaOverlays;
+      if (ovl) {
+        if (widgetId) ovl.unregister(widgetId);
+        if (container._mapAvailCb) ovl.offMapAvail(container._mapAvailCb);
+      }
+    },
   });
 })();

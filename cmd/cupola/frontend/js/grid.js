@@ -46,6 +46,7 @@ const Grid = (() => {
 
   function removeWidget(widgetId) {
     const def = getWidgetDef(widgetId);  // capture before profile update
+    const removedWc = (_profile.widgets || []).find(w => w.id === widgetId);
     _profile.widgets = (_profile.widgets || []).filter(w => w.id !== widgetId);
     const grid = document.getElementById('widget-grid');
     const cell = grid.querySelector(`[data-widget-id="${widgetId}"]`);
@@ -55,6 +56,10 @@ const Grid = (() => {
         const domainList = def.domains ? def.domains : [def.domain];
         const isMulti = !!def.domains;
         domainList.forEach(d => Subscriptions.remove(isMulti ? `${widgetId}:${d}` : widgetId));
+        if (def.onRemove) {
+          const content = cell.querySelector('.widget-content');
+          if (content) def.onRemove(content, removedWc?.config);
+        }
       } else {
         Subscriptions.remove(widgetId);
       }
@@ -177,6 +182,14 @@ const Grid = (() => {
       const params = def.subscriptionParams ? def.subscriptionParams(wc.config) : null;
       Subscriptions.create(subId, d, params);
     });
+
+    // Stamp widget identity and an inline-save hook onto the content element.
+    // Widgets read these to access their own ID and trigger a profile save
+    // without going through the config panel (e.g. "show route on map").
+    // _saveConfig is a function property on the element, not a dataset string,
+    // because dataset values are string-only and can't hold a function reference.
+    content.dataset.widgetId = wc.id;
+    content._saveConfig = scheduleSave;
 
     const hasState = isMulti ? Object.keys(stateMap).length > 0 : !!currentState;
     if (hasState) {
