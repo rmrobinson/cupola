@@ -41,6 +41,19 @@
     const mins = Math.floor((new Date(t) - Date.now()) / 60000);
     const when = mins <= 0 ? 'Now' : mins === 1 ? '1 min' : `${mins} min`;
 
+    const isRealtime = a.predicted != null;
+    let minsCls = '';
+    let timeCls = '';
+    if (isRealtime) {
+      const delaySecs = a.delay != null
+        ? a.delay
+        : (new Date(a.predicted) - new Date(a.scheduled)) / 1000;
+      if (delaySecs <= 0)  minsCls = ' rt-ontime';
+      else if (delaySecs < 60) minsCls = ' rt-slight-delay';
+      else                 minsCls = ' rt-late';
+      timeCls = ' rt';
+    }
+
     let delayHtml = '';
     if (a.delay != null && a.delay !== 0) {
       const sign = a.delay > 0 ? '+' : '';
@@ -51,9 +64,9 @@
 
     return `
       <div class="arrival-row">
-        <span class="arrival-mins">${esc(when)}</span>
+        <span class="arrival-mins${minsCls}">${esc(when)}</span>
         <span class="arrival-headsign">${esc(a.headsign || '—')}</span>
-        <span class="arrival-time">${fmtTime(t)}</span>
+        <span class="arrival-time${timeCls}">${fmtTime(t)}</span>
         ${delayHtml}
       </div>`;
   }
