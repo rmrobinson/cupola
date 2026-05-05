@@ -12,6 +12,11 @@ type WeatherCurrent struct {
 	WindGust      float64 `json:"wind_gust"`
 	Pressure      float64 `json:"pressure"`
 	Precipitation float64 `json:"precipitation"`
+	RainEvent   float64 `json:"rain_event"`   // mm since last dry period
+	RainDaily   float64 `json:"rain_daily"`   // mm past 24h
+	RainWeekly  float64 `json:"rain_weekly"`  // mm this week
+	RainMonthly float64 `json:"rain_monthly"` // mm this month
+	RainYearly  float64 `json:"rain_yearly"`  // mm this year
 	UV            float64 `json:"uv"`
 	Visibility    float64 `json:"visibility"`
 	Condition     string  `json:"condition"`

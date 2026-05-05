@@ -869,6 +869,108 @@ button {
 .fp-low  { color: #74b9ff; margin-left: 4px; }
 .fp-pop  { opacity: 0.6; white-space: nowrap; }
 
+/* ── Rainfall widget ────────────────────────────────────────────────────── */
+
+.widget-rainfall {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rf-current {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rf-rate {
+  font-size: clamp(1.8rem, 5vw, 3rem);
+  font-weight: 200;
+  line-height: 1;
+}
+
+.rf-rate-unit {
+  font-size: 0.9rem;
+  opacity: 0.6;
+  margin-left: 3px;
+}
+
+.rf-intensity-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transition: color 0.5s;
+}
+
+.rf-bar {
+  height: 5px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.rf-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s, background 0.5s;
+}
+
+.rf-forecast {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 8px;
+}
+
+.rf-forecast-title {
+  font-size: 0.7rem;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+
+.rf-period {
+  display: grid;
+  grid-template-columns: 5rem 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.rf-period-label { font-weight: 600; font-size: 10px; }
+
+.rf-period-bar-wrap {
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.rf-period-bar {
+  height: 100%;
+  background: #74b9ff;
+  border-radius: 2px;
+  transition: width 0.5s;
+}
+
+.rf-period-pop { opacity: 0.6; white-space: nowrap; font-size: 10px; }
+.rf-period-amt { opacity: 0.45; white-space: nowrap; font-size: 10px; min-width: 3rem; text-align: right; }
+
+.rf-no-rain {
+  font-size: 11px;
+  opacity: 0.4;
+  font-style: italic;
+  margin-top: 4px;
+}
+
 /* ── Moon phase widget ─────────────────────────────────────────────────── */
 
 .widget-moon {

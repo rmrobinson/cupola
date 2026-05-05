@@ -115,19 +115,29 @@ type wh25Item struct {
 //   0x15 → solar radiation (Klux)
 //   0x17 → UV index
 //
-// piezoRain:
+// piezoRain IDs confirmed from device at /get_livedata_info:
 //   0x0E → rain rate (mm/Hr)
+//   0x0D → rain event (mm)
+//   0x7C → rain past 24h (mm)
+//   0x11 → rain weekly (mm)
+//   0x12 → rain monthly (mm)
+//   0x13 → rain yearly (mm)
 
 const (
-	idOutdoorTemp = "0x02"
-	idHumidity    = "0x07"
-	idDewPoint    = "0x03"
-	idWindDir     = "0x0A"
-	idWindSpeed   = "0x0B"
-	idWindGust    = "0x0C"
-	idSolar       = "0x15"
-	idUVI         = "0x17"
+	idOutdoorTemp  = "0x02"
+	idHumidity     = "0x07"
+	idDewPoint     = "0x03"
+	idWindDir      = "0x0A"
+	idWindSpeed    = "0x0B"
+	idWindGust     = "0x0C"
+	idSolar        = "0x15"
+	idUVI          = "0x17"
 	idRainRate    = "0x0E"
+	idRainEvent   = "0x0D"
+	idRainDaily   = "0x7C"
+	idRainWeekly  = "0x11"
+	idRainMonthly = "0x12"
+	idRainYearly  = "0x13"
 )
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
@@ -165,6 +175,7 @@ func (c *Collector) fetch() error {
 	wind := parseVal(common[idWindSpeed])
 	solar := parseVal(common[idSolar]) // Klux
 
+	rainRate := parseVal(piezo[idRainRate])
 	state := domain.WeatherCurrent{
 		StateBase:     domain.StateBase{UpdatedAt: time.Now()},
 		Temperature:   temp,
@@ -173,8 +184,13 @@ func (c *Collector) fetch() error {
 		WindGust:      parseVal(common[idWindGust]),
 		WindDirection: int(parseVal(common[idWindDir])),
 		UV:            parseVal(common[idUVI]),
-		Precipitation: parseVal(piezo[idRainRate]),
-		Condition:     deriveCondition(solar, parseVal(piezo[idRainRate])),
+		Precipitation: rainRate,
+		RainEvent:     parseVal(piezo[idRainEvent]),
+		RainDaily:     parseVal(piezo[idRainDaily]),
+		RainWeekly:    parseVal(piezo[idRainWeekly]),
+		RainMonthly:   parseVal(piezo[idRainMonthly]),
+		RainYearly:    parseVal(piezo[idRainYearly]),
+		Condition:     deriveCondition(solar, rainRate),
 		FeelsLike:     feelsLike(temp, hum, wind),
 	}
 
