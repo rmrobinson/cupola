@@ -9,6 +9,10 @@ const Grid = (() => {
   let _onSave = null;
   let _draggedId = null;
   let _saveTimer = null;
+  let _dragFromHandle = false;
+
+  // Reset flag if a mousedown on a handle is abandoned without starting a drag.
+  document.addEventListener('mouseup', () => { _dragFromHandle = false; });
 
   // ── Public API ────────────────────────────────────────────────────────
 
@@ -103,8 +107,11 @@ const Grid = (() => {
 
     initResize(resizeHandle, cell, wc);
 
+    chrome.querySelector('.drag-handle').addEventListener('mousedown', () => { _dragFromHandle = true; });
+
     cell.addEventListener('dragstart', e => {
-      if (!e.target.closest('.drag-handle')) { e.preventDefault(); return; }
+      if (!_dragFromHandle) { e.preventDefault(); return; }
+      _dragFromHandle = false;
       _draggedId = wc.id;
       e.dataTransfer.effectAllowed = 'move';
       setTimeout(() => cell.classList.add('drag-source'), 0);

@@ -3,6 +3,8 @@
  * Fetches GET /api/v1/domains on open to determine which widgets can be added.
  */
 const WidgetPicker = (() => {
+  let _keyHandler = null;
+
   function show(onPick) {
     fetch('/api/v1/domains')
       .then(r => r.ok ? r.json() : { domains: [] })
@@ -39,8 +41,9 @@ const WidgetPicker = (() => {
       if (e.target === picker) hide();
     });
 
-    const onKey = e => { if (e.key === 'Escape') hide(); };
-    document.addEventListener('keydown', onKey, { once: true });
+    if (_keyHandler) document.removeEventListener('keydown', _keyHandler);
+    _keyHandler = e => { if (e.key === 'Escape') hide(); };
+    document.addEventListener('keydown', _keyHandler);
 
     picker.querySelectorAll('.picker-item:not(.unavailable)').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -71,6 +74,10 @@ const WidgetPicker = (() => {
 
   function hide() {
     document.getElementById('widget-picker').classList.add('hidden');
+    if (_keyHandler) {
+      document.removeEventListener('keydown', _keyHandler);
+      _keyHandler = null;
+    }
   }
 
   function humanLabel(type) {
