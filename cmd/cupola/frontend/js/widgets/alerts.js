@@ -8,6 +8,13 @@
     watch:     { bg: 'rgba(200,180,30,0.3)', text: '#ffe066',  label: 'Watch'     },
     info:      { bg: 'rgba(100,160,220,0.3)',text: '#74b9ff',  label: 'Info'      },
   };
+
+  // Maps alert_type values to the emoji shown at the polygon centroid on the map.
+  const ALERT_TYPE_EMOJI = {
+    'power-outage': '⚡',
+    'water-outage': '💧',
+  };
+
   const SOURCE_LABEL = {
     'weather.alerts':   'Weather',
     'transit.alerts':   'Transit',
@@ -52,6 +59,58 @@
     return items;
   }
 
+  // ── Map overlay integration ───────────────────────────────────────────────
+
+  function syncOutageOverlays(container, stateMap) {
+    const ovl = window.CupolaOverlays;
+    if (!ovl) return;
+
+    const widgetId = container.dataset.widgetId;
+    if (!widgetId) return;
+
+    // prev: id → change-detection key (string) for already-registered overlays.
+    const prev = container._outageOverlayMap || new Map();
+
+    // Build the desired set. Empty when no map widget is present.
+    const next = new Map(); // id → { overlay, changeKey }
+    if (ovl.hasMap()) {
+      const alerts = stateMap?.['municipal.alerts']?.alerts || [];
+      for (const a of alerts) {
+        if (!a.polygon?.length) continue;
+        const color = SEVERITY_COLOR[a.severity]?.text || '#74b9ff';
+        const emoji = ALERT_TYPE_EMOJI[a.alert_type] || null;
+        const overlayId = `${widgetId}:${a.id}`;
+        const changeKey = `${color}|${emoji || ''}|${a.title}|${a.description || ''}`;
+        next.set(overlayId, {
+          overlay: { type: 'polygon', color, emoji, coordinates: a.polygon, label: a.title, description: a.description || '' },
+          changeKey,
+        });
+      }
+    }
+
+    // Unregister overlays that are no longer present.
+    for (const id of prev.keys()) {
+      if (!next.has(id)) ovl.unregister(id);
+    }
+    // Register new overlays or re-register changed ones.
+    for (const [id, { overlay, changeKey }] of next) {
+      if (prev.get(id) !== changeKey) ovl.register(id, overlay);
+    }
+
+    container._outageOverlayMap = new Map([...next].map(([id, { changeKey }]) => [id, changeKey]));
+  }
+
+  function setupMapAvailCb(container, stateMap) {
+    const ovl = window.CupolaOverlays;
+    if (!ovl) return;
+
+    if (container._mapAvailCb) ovl.offMapAvail(container._mapAvailCb);
+
+    const cb = () => syncOutageOverlays(container, stateMap);
+    container._mapAvailCb = cb;
+    ovl.onMapAvail(cb);
+  }
+
   function render(container, stateMap, config) {
     if (!stateMap || Object.keys(stateMap).length === 0) {
       container.innerHTML = `<div class="widget-unavailable"><span class="widget-unavailable-label">Source unavailable</span><span style="font-size:10px;opacity:.5">alerts</span></div>`;
@@ -91,6 +150,9 @@
     }).join('');
 
     container.innerHTML = `<div class="widget-alerts">${cards}</div>`;
+
+    setupMapAvailCb(container, stateMap);
+    syncOutageOverlays(container, stateMap);
   }
 
   window.CupolaWidgets.push({
@@ -103,7 +165,14 @@
       { key: 'showMunicipal', label: 'Municipal alerts', type: 'boolean', default: true },
     ],
     subscriptionParams: () => null,
-    render(container, stateMap, config)  { render(container, stateMap, config); },
+    render(container, stateMap, config)   { render(container, stateMap, config); },
     onUpdate(container, stateMap, config) { render(container, stateMap, config); },
+    onRemove(container) {
+      const ovl = window.CupolaOverlays;
+      if (!ovl) return;
+      const prev = container._outageOverlayMap || new Map();
+      for (const id of prev.keys()) ovl.unregister(id);
+      if (container._mapAvailCb) ovl.offMapAvail(container._mapAvailCb);
+    },
   });
 })();

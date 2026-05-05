@@ -45,6 +45,7 @@
     const vehicleLayer  = L.layerGroup().addTo(map);
     const aircraftLayer = L.layerGroup().addTo(map);
     const routeLayer    = L.layerGroup().addTo(map);
+    const outageLayer   = L.layerGroup().addTo(map);
 
     // ResizeObserver handles two problems in one:
     // 1. Leaflet is initialised before the cell is appended to the DOM grid, so
@@ -54,7 +55,7 @@
     const ro = new ResizeObserver(() => map.invalidateSize());
     ro.observe(mapDiv);
 
-    return { map, ro, incidentLayer, vehicleLayer, aircraftLayer, routeLayer };
+    return { map, ro, incidentLayer, vehicleLayer, aircraftLayer, routeLayer, outageLayer };
   }
 
   function updateRoutes(layerGroup, overlays, config) {
@@ -67,6 +68,38 @@
       for (const line of ovl.coordinates) {
         const latLngs = line.map(([lon, lat]) => [lat, lon]);
         L.polyline(latLngs, { color, weight: 3, opacity: 0.85 }).addTo(layerGroup);
+      }
+    }
+  }
+
+  function polygonCentroid(coords) {
+    // coords are [lon, lat] GeoJSON pairs; returns Leaflet [lat, lon].
+    // Exclude the closing duplicate vertex present in GeoJSON rings (first === last).
+    const pts = coords.length > 1 &&
+      coords[0][0] === coords[coords.length - 1][0] &&
+      coords[0][1] === coords[coords.length - 1][1]
+      ? coords.slice(0, -1) : coords;
+    let sumLon = 0, sumLat = 0;
+    for (const [lon, lat] of pts) { sumLon += lon; sumLat += lat; }
+    const n = pts.length || 1;
+    return [sumLat / n, sumLon / n];
+  }
+
+  function updateOutages(layerGroup, overlays, config) {
+    layerGroup.clearLayers();
+    if (config?.layer_outages === false) return;
+    for (const ovl of overlays) {
+      if (ovl.type !== 'polygon' || !ovl.coordinates?.length) continue;
+      const color = ovl.color || '#ffc060';
+      const latLngs = ovl.coordinates.map(([lon, lat]) => [lat, lon]);
+      const popup = `<b>${esc(ovl.label || '')}</b>${ovl.description ? '<br>' + esc(ovl.description) : ''}`;
+      L.polygon(latLngs, {
+        color, weight: 2, opacity: 0.85, fillColor: color, fillOpacity: 0.15,
+      }).bindPopup(popup).addTo(layerGroup);
+
+      if (ovl.emoji) {
+        const center = polygonCentroid(ovl.coordinates);
+        L.marker(center, { icon: emojiIcon(ovl.emoji) }).bindPopup(popup).addTo(layerGroup);
       }
     }
   }
@@ -241,6 +274,7 @@
     const overlayCb = (overlays) => {
       inst._activeOverlays = overlays;
       updateRoutes(inst.routeLayer, overlays, config);
+      updateOutages(inst.outageLayer, overlays, config);
       // Re-render vehicles so dimming reflects the current set of visible routes.
       updateVehicles(inst.vehicleLayer, inst._lastVehicles, config, overlays);
     };
@@ -282,6 +316,7 @@
       { key: 'layer_transit',   label: 'Show transit',        type: 'boolean', default: true },
       { key: 'layer_aircraft',  label: 'Show aircraft',       type: 'boolean', default: true },
       { key: 'layer_routes',    label: 'Show transit routes', type: 'boolean', default: true },
+      { key: 'layer_outages',   label: 'Show alert overlays', type: 'boolean', default: true },
     ],
     subscriptionParams: () => null,
     render,

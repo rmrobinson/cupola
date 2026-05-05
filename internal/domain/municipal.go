@@ -40,6 +40,8 @@ type MunicipalAlert struct {
 	AlertType   string        `json:"alert_type"`
 	Severity    AlertSeverity `json:"severity"`
 	Area        *string       `json:"area,omitempty"`
+	// Polygon is a closed ring of [lon, lat] pairs (GeoJSON order) describing the affected area.
+	Polygon     [][]float64   `json:"polygon,omitempty"`
 	StartsAt    *time.Time    `json:"starts_at,omitempty"`
 	EndsAt      *time.Time    `json:"ends_at,omitempty"`
 	URL         *string       `json:"url,omitempty"`
