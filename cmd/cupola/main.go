@@ -30,6 +30,8 @@ import (
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/grcaflood"
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/kitchenersnow"
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/kitchenerutilities"
+	waterwaycollector "github.com/rmrobinson/cupola/internal/collector/waterway"
+	_ "github.com/rmrobinson/cupola/internal/collector/waterway/grca"
 	"github.com/rmrobinson/cupola/internal/collector/traffic511"
 	"github.com/rmrobinson/cupola/internal/config"
 	"github.com/rmrobinson/cupola/internal/domain"
@@ -185,6 +187,8 @@ func main() {
 
 	// Municipal collectors: one EventsCollector and/or one AlertsCollector,
 	// each aggregating across all configured parsers for that domain.
+	// munAlertsCollector is captured so the waterway collector can promote alerts into it.
+	var munAlertsCollector *municipalcollector.AlertsCollector
 	if len(cfg.Collectors.Municipal) > 0 {
 		var eventsCfgs, alertsCfgs []config.MunicipalConfig
 		for _, mc := range cfg.Collectors.Municipal {
@@ -203,8 +207,27 @@ func main() {
 		}
 		if len(alertsCfgs) > 0 {
 			log.Printf("municipal.alerts: registering %d source(s)", len(alertsCfgs))
-			registry.Register(municipalcollector.NewAlertsCollector(alertsCfgs, stateStore))
+			munAlertsCollector = municipalcollector.NewAlertsCollector(alertsCfgs, stateStore)
+			registry.Register(munAlertsCollector)
 		}
+	}
+
+	// Waterway collector: GRCA gauge + reservoir data, with optional alert promotion.
+	// If alert_on is configured but no municipal.alerts collector exists, create an empty
+	// one so promoted alerts have a domain owner.
+	if len(cfg.Collectors.Waterways) > 0 {
+		if munAlertsCollector == nil {
+			for _, wc := range cfg.Collectors.Waterways {
+				if len(wc.AlertOn) > 0 {
+					log.Printf("municipal.alerts: creating collector for waterway alert promotion")
+					munAlertsCollector = municipalcollector.NewAlertsCollector(nil, stateStore)
+					registry.Register(munAlertsCollector)
+					break
+				}
+			}
+		}
+		log.Printf("waterway: registering %d source(s)", len(cfg.Collectors.Waterways))
+		registry.Register(waterwaycollector.NewCollector(cfg.Collectors.Waterways, stateStore, munAlertsCollector))
 	}
 
 	// Waste collection schedule from a local JSON file.

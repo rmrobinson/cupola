@@ -1631,3 +1631,129 @@ button {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
+
+/* ── Waterway widget ───────────────────────────────────────────────────────── */
+
+.widget-waterway {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 4px;
+  height: 100%;
+  padding: 8px 12px;
+}
+
+.ww-gauge {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.05);
+  border-radius: 0 6px 6px 0;
+  padding: 6px 10px;
+  min-width: 0;
+}
+
+.ww-gauge.ww-gauge-alert.advisory-warning {
+  border-left-color: #ff9800;
+  background: rgba(255,152,0,0.12);
+}
+
+.ww-gauge.ww-gauge-alert.advisory-emergency {
+  border-left-color: #f44336;
+  background: rgba(244,67,54,0.14);
+}
+
+.ww-gauge.ww-gauge-alert.advisory-watch {
+  border-left-color: #ffeb3b;
+  background: rgba(255,235,59,0.10);
+}
+
+.ww-gauge-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ww-gauge-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ww-name {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ww-waterway {
+  font-size: 10px;
+  opacity: 0.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ww-advisory-badge {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.ww-advisory-badge.advisory-warning   { background: rgba(255,152,0,0.3);  color: #ffb74d; }
+.ww-advisory-badge.advisory-emergency { background: rgba(244,67,54,0.3);  color: #ef9a9a; }
+.ww-advisory-badge.advisory-watch     { background: rgba(255,235,59,0.2); color: #fff176; }
+.ww-advisory-badge.advisory-advisory  { background: rgba(33,150,243,0.2); color: #90caf9; }
+
+.ww-metrics {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.ww-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-end;
+}
+
+.ww-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.5;
+}
+
+.ww-value {
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.ww-no-data {
+  font-size: 11px;
+  opacity: 0.35;
+}
+
+.widget-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 12px;
+  opacity: 0.4;
+}

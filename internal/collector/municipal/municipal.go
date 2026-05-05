@@ -241,6 +241,17 @@ func (c *AlertsCollector) fetchSource(s alertsSource) error {
 	return nil
 }
 
+// SetSourceAlerts replaces the alert set for the given sourceID and publishes
+// the merged state. Used by external collectors (e.g. waterway) to inject
+// promoted alerts without owning the municipal.alerts domain.
+func (c *AlertsCollector) SetSourceAlerts(sourceID string, alerts []domain.MunicipalAlert) {
+	c.mu.Lock()
+	c.items[sourceID] = alerts
+	state := c.buildState()
+	c.mu.Unlock()
+	c.stateStore.Set(state)
+}
+
 func (c *AlertsCollector) buildState() domain.MunicipalAlerts {
 	var all []domain.MunicipalAlert
 	for _, alerts := range c.items {
