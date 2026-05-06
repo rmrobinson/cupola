@@ -19,19 +19,24 @@ const (
 	camerasURL  = "https://511on.ca/api/v2/get/Cameras?format=json&lang=en"
 	roadCondURL = "https://511on.ca/api/v3/get/RoadConditions?format=json&lang=en"
 
-	defaultInterval = 2 * time.Minute
+	defaultIncidentInterval = 15 * time.Minute
+	defaultCameraInterval   = 24 * time.Hour
 )
 
 var client = &http.Client{Timeout: 30 * time.Second}
 
 // NewCollectors returns incidents, cameras, and road-conditions collectors for ON511.
-func NewCollectors(interval time.Duration, stateStore *store.StateStore) (*IncidentsCollector, *CamerasCollector, *RoadConditionsCollector) {
-	if interval == 0 {
-		interval = defaultInterval
+// incidentInterval applies to both incidents and road conditions; cameraInterval applies to cameras.
+func NewCollectors(incidentInterval, cameraInterval time.Duration, stateStore *store.StateStore) (*IncidentsCollector, *CamerasCollector, *RoadConditionsCollector) {
+	if incidentInterval == 0 {
+		incidentInterval = defaultIncidentInterval
 	}
-	return &IncidentsCollector{interval: interval, stateStore: stateStore},
-		&CamerasCollector{interval: interval, stateStore: stateStore},
-		&RoadConditionsCollector{interval: interval, stateStore: stateStore}
+	if cameraInterval == 0 {
+		cameraInterval = defaultCameraInterval
+	}
+	return &IncidentsCollector{interval: incidentInterval, stateStore: stateStore},
+		&CamerasCollector{interval: cameraInterval, stateStore: stateStore},
+		&RoadConditionsCollector{interval: incidentInterval, stateStore: stateStore}
 }
 
 // ── Incidents ─────────────────────────────────────────────────────────────────

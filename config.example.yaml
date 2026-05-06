@@ -51,6 +51,8 @@ collectors:
   traffic_511:
     enabled: true
     provinces: [ON]
+    poll_interval_incidents: 15m
+    poll_interval_cameras: 24h
 
   aircraft_dump1090:
     enabled: true

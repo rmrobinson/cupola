@@ -50,6 +50,8 @@ collectors:
   traffic_511:
     enabled: true
     provinces: [ON]
+    poll_interval_incidents: 15m
+    poll_interval_cameras: 24h
 
   aircraft_dump1090:
     enabled: true
@@ -62,12 +64,6 @@ collectors:
   #   enabled: true
   #   url: "http://localhost:9000"
   #   poll_interval: 30s
-
-  rss_feeds:
-    - id: region_of_waterloo
-      url: "https://example.com/rss"
-      category: municipal
-      poll_interval: 15m
 
   flag_canada:
     enabled: true

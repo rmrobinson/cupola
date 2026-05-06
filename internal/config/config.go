@@ -99,8 +99,10 @@ type TransitConfig struct {
 }
 
 type Traffic511Config struct {
-	Enabled   bool     `yaml:"enabled"`
-	Provinces []string `yaml:"provinces"`
+	Enabled                 bool     `yaml:"enabled"`
+	Provinces               []string `yaml:"provinces"`
+	PollIntervalIncidents   Duration `yaml:"poll_interval_incidents"`
+	PollIntervalCameras     Duration `yaml:"poll_interval_cameras"`
 }
 
 type Dump1090Config struct {

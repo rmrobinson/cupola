@@ -136,7 +136,7 @@ func main() {
 
 	// ON511 traffic: incidents, cameras, and road conditions.
 	if t := cfg.Collectors.Traffic511; t != nil && t.Enabled {
-		inc, cam, road := traffic511.NewCollectors(0, stateStore)
+		inc, cam, road := traffic511.NewCollectors(t.PollIntervalIncidents.Duration, t.PollIntervalCameras.Duration, stateStore)
 		registry.Register(inc)
 		registry.Register(cam)
 		registry.Register(road)
