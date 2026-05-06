@@ -19,23 +19,37 @@
     hazard:       'Hazard',
   };
 
+  const SEVERITIES = ['major', 'moderate', 'minor'];
+
   // Fallback sort order used only when CupolaConfig has no home coordinates.
   const SEV_ORDER = { major: 0, moderate: 1, minor: 2 };
 
-  function dist2(lat1, lon1, lat2, lon2) {
-    const dlat = lat1 - lat2, dlon = lon1 - lon2;
-    return dlat * dlat + dlon * dlon;
+  function haversineKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
   function render(container, state, config) {
     const maxN = config?.max_items > 0 ? Number(config.max_items) : 10;
+    const sevFilter = Array.isArray(config?.severities) && config.severities.length > 0
+      ? config.severities : null;
+    const radiusKm = config?.radius_km > 0 ? Number(config.radius_km) : null;
     const homeLat = window.CupolaConfig?.lat;
     const homeLon = window.CupolaConfig?.lon;
     const incidents = (state?.incidents || [])
+      .filter(i => !sevFilter || sevFilter.includes(i.severity))
+      .filter(i => !radiusKm || !homeLat || !homeLon ||
+                   haversineKm(homeLat, homeLon, i.lat, i.lon) <= radiusKm)
       .slice()
       .sort((a, b) => {
         if (homeLat && homeLon) {
-          return dist2(a.lat, a.lon, homeLat, homeLon) - dist2(b.lat, b.lon, homeLat, homeLon);
+          return haversineKm(homeLat, homeLon, a.lat, a.lon) -
+                 haversineKm(homeLat, homeLon, b.lat, b.lon);
         }
         return (SEV_ORDER[a.severity] ?? 3) - (SEV_ORDER[b.severity] ?? 3);
       })
@@ -84,13 +98,56 @@
       </div>`;
   }
 
+  function buildConfig(panel, wc, onSave) {
+    const cfg      = wc.config || {};
+    const maxN     = cfg.max_items != null ? cfg.max_items : 10;
+    const selSevs  = Array.isArray(cfg.severities) ? cfg.severities : [];
+    const radiusKm = cfg.radius_km != null ? cfg.radius_km : '';
+
+    panel.innerHTML = `
+      <form class="config-form config-form-wide">
+        <label class="config-row">
+          <span>Radius (km)</span>
+          <input type="number" name="radius_km" min="1" max="500" value="${esc(radiusKm)}" placeholder="all">
+        </label>
+        <label class="config-row config-row-multiselect">
+          <span>Severities</span>
+          <select name="severities" multiple size="${SEVERITIES.length}">
+            ${SEVERITIES.map(s => `<option value="${esc(s)}"${selSevs.includes(s) ? ' selected' : ''}>${esc(s.charAt(0).toUpperCase() + s.slice(1))}</option>`).join('')}
+          </select>
+        </label>
+        <label class="config-row">
+          <span>Max incidents</span>
+          <input type="number" name="max_items" min="1" max="100" value="${esc(maxN)}">
+        </label>
+        <div class="config-actions">
+          <button type="submit" class="btn-small btn-primary">Save</button>
+          <button type="button" class="btn-small btn-secondary btn-config-cancel">Cancel</button>
+        </div>
+      </form>`;
+
+    panel.querySelector('.btn-config-cancel').addEventListener('click', () => {
+      panel.classList.add('hidden');
+    });
+
+    panel.querySelector('.config-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const data = new FormData(e.target);
+      const rawRadius = data.get('radius_km');
+      wc.config = {
+        radius_km:  rawRadius !== '' ? Number(rawRadius) : null,
+        severities: data.getAll('severities'),
+        max_items:  Number(data.get('max_items')) || 10,
+      };
+      onSave();
+    });
+  }
+
   window.CupolaWidgets.push({
     type:        'traffic-incidents',
     domain:      'traffic.incidents',
     defaultSize: { w: 3, h: 5 },
-    configSchema: [
-      { key: 'max_items', label: 'Max incidents', type: 'number', default: 10 },
-    ],
+    buildConfig,
     subscriptionParams: () => ({ province: 'ON' }),
     render(container, state, config)      { render(container, state, config); },
     onUpdate(container, data, config)     { render(container, data, config); },

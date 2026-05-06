@@ -480,7 +480,8 @@ button {
 .config-row input:focus,
 .config-row select:focus { border-color: rgba(255,255,255,0.4); }
 
-.config-row select option { background: #1a1a2e; }
+.config-row select option { background: #1a1a2e; color: #fff; }
+.config-row select option:checked { background: rgba(255,255,255,0.2); color: #fff; }
 
 .config-form-wide .config-row input[type="text"],
 .config-form-wide .config-row input[type="number"] {
