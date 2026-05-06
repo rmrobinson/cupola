@@ -49,6 +49,12 @@ func main() {
 	}
 	log.Printf("cupola starting for %s (%.4f, %.4f)", cfg.Location.Name, cfg.Location.Lat, cfg.Location.Lon)
 
+	loc, err := time.LoadLocation(cfg.Location.Timezone)
+	if err != nil {
+		log.Printf("invalid timezone %q, using UTC: %v", cfg.Location.Timezone, err)
+		loc = time.UTC
+	}
+
 	sqliteStore, err := store.NewSQLiteStore(cfg.Server.DataDir)
 	if err != nil {
 		log.Fatalf("open sqlite: %v", err)
@@ -178,7 +184,7 @@ func main() {
 		if len(transitAgencies) > 0 {
 			log.Printf("transit: registering %d agencies (rt=%s, static=%s)",
 				len(transitAgencies), rtInterval, staticInterval)
-			arr, veh, alt := gtfsrt.NewCollectors(transitAgencies, subManager, stateStore, rtInterval, staticInterval)
+			arr, veh, alt := gtfsrt.NewCollectors(transitAgencies, subManager, stateStore, rtInterval, staticInterval, cfg.Server.DataDir, sqliteStore, loc)
 			registry.Register(arr)
 			registry.Register(veh)
 			registry.Register(alt)

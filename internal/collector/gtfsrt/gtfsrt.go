@@ -5,6 +5,7 @@ package gtfsrt
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -26,14 +27,19 @@ type Agency struct {
 }
 
 // NewCollectors creates the three transit domain collectors sharing the given
-// agencies. Static GTFS data is loaded synchronously before returning so all
-// three collectors have route/stop names from the first poll.
+// agencies. Static GTFS data is loaded (from network or disk cache) synchronously
+// before returning so all three collectors have route/stop names from the first poll.
+// loc is used to convert wall-clock time to the agency's local time for calendar
+// queries; pass time.UTC when the timezone is unknown.
 func NewCollectors(
 	agencies []*Agency,
 	subs *store.SubscriptionManager,
 	state *store.StateStore,
 	rtInterval time.Duration,
 	staticInterval time.Duration,
+	cacheDir string,
+	db *store.SQLiteStore,
+	loc *time.Location,
 ) (*ArrivalsCollector, *VehiclesCollector, *AlertsCollector) {
 	if rtInterval == 0 {
 		rtInterval = 30 * time.Second
@@ -41,11 +47,14 @@ func NewCollectors(
 	if staticInterval == 0 {
 		staticInterval = 24 * time.Hour
 	}
+	if loc == nil {
+		loc = time.UTC
+	}
 
 	for _, ag := range agencies {
-		if err := ag.Schedule.Load(ag.ID, ag.StaticURLs); err != nil {
+		if err := gtfs.LoadAndPersist(ag.Schedule, ag.ID, ag.StaticURLs, cacheDir, db); err != nil {
 			// Non-fatal: collectors will still work, just without display names.
-			fmt.Printf("[gtfsrt] %s: initial static load: %v\n", ag.ID, err)
+			log.Printf("[gtfsrt] %s: initial static load: %v", ag.ID, err)
 		}
 	}
 
@@ -55,6 +64,10 @@ func NewCollectors(
 		state:          state,
 		rtInterval:     rtInterval,
 		staticInterval: staticInterval,
+		cacheDir:       cacheDir,
+		db:             db,
+		loc:            loc,
+		inFallback:     make(map[string]bool),
 		wake:           make(chan struct{}, 1),
 	}
 	veh := &VehiclesCollector{agencies: agencies, state: state, interval: rtInterval}

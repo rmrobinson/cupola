@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rmrobinson/cupola/internal/store"
 )
 
 // Route holds the display fields from routes.txt.
@@ -45,10 +47,11 @@ type Stop struct {
 
 // Trip holds the display fields from trips.txt.
 type Trip struct {
-	ID       string
-	RouteID  string
-	Headsign string
-	ShapeID  string // shape_id from trips.txt; empty if feed omits it
+	ID        string
+	RouteID   string
+	Headsign  string
+	ShapeID   string // shape_id from trips.txt; empty if feed omits it
+	ServiceID string // service_id from trips.txt; used for calendar-based filtering
 }
 
 // Schedule holds parsed GTFS static data merged from one or more feed ZIPs.
@@ -77,15 +80,29 @@ func New() *Schedule {
 // Load downloads and merges all provided feed ZIP URLs into the schedule.
 // On success the existing data is atomically replaced.
 func (s *Schedule) Load(agencyID string, urls []string) error {
+	blobs := make([][]byte, 0, len(urls))
+	for _, url := range urls {
+		data, err := downloadZip(url)
+		if err != nil {
+			return fmt.Errorf("%s feed %s: %w", agencyID, url, err)
+		}
+		blobs = append(blobs, data)
+	}
+	return s.parseFromBlobs(agencyID, blobs)
+}
+
+// parseFromBlobs merges raw GTFS ZIP bytes into the schedule, atomically
+// replacing the existing in-memory data on success.
+func (s *Schedule) parseFromBlobs(agencyID string, blobs [][]byte) error {
 	routes := make(map[string]Route)
 	stops := make(map[string]Stop)
 	trips := make(map[string]Trip)
 	routeStops := make(map[string][]string)
 	shapes := make(map[string][]ShapePoint)
 
-	for _, url := range urls {
-		if err := mergeZip(url, routes, stops, trips, routeStops, shapes); err != nil {
-			return fmt.Errorf("%s feed %s: %w", agencyID, url, err)
+	for _, data := range blobs {
+		if err := mergeZipBytes(data, routes, stops, trips, routeStops, shapes, nil); err != nil {
+			return fmt.Errorf("%s: %w", agencyID, err)
 		}
 	}
 
@@ -270,21 +287,28 @@ func buildRouteShapes(trips map[string]Trip) map[string][]string {
 
 // ── internals ────────────────────────────────────────────────────────────────
 
-func mergeZip(url string, routes map[string]Route, stops map[string]Stop, trips map[string]Trip, routeStops map[string][]string, shapes map[string][]ShapePoint) error {
+// downloadZip fetches a GTFS ZIP archive from url and returns the raw bytes.
+func downloadZip(url string) ([]byte, error) {
 	client := &http.Client{Timeout: 90 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("read body: %w", err)
+		return nil, fmt.Errorf("read body: %w", err)
 	}
+	return data, nil
+}
 
+// mergeZipBytes parses a raw GTFS ZIP and merges its contents into the provided
+// maps. When td is non-nil, timetable rows (stop_times, services, exceptions)
+// are also collected in the same pass for SQLite persistence.
+func mergeZipBytes(data []byte, routes map[string]Route, stops map[string]Stop, trips map[string]Trip, routeStops map[string][]string, shapes map[string][]ShapePoint, td *timetableData) error {
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return fmt.Errorf("unzip: %w", err)
@@ -332,10 +356,11 @@ func mergeZip(url string, routes map[string]Route, stops map[string]Stop, trips 
 					return
 				}
 				trips[id] = Trip{
-					ID:       id,
-					RouteID:  col(row, h, "route_id"),
-					Headsign: col(row, h, "trip_headsign"),
-					ShapeID:  col(row, h, "shape_id"),
+					ID:        id,
+					RouteID:   col(row, h, "route_id"),
+					Headsign:  col(row, h, "trip_headsign"),
+					ShapeID:   col(row, h, "shape_id"),
+					ServiceID: col(row, h, "service_id"),
 				}
 			})
 		case "shapes.txt":
@@ -349,6 +374,37 @@ func mergeZip(url string, routes map[string]Route, stops map[string]Stop, trips 
 				seq, _ := strconv.Atoi(col(row, h, "shape_pt_sequence"))
 				shapes[shapeID] = append(shapes[shapeID], ShapePoint{Lat: lat, Lon: lon, Sequence: seq})
 			})
+		case "calendar.txt":
+			if td != nil {
+				parseErr = parseCSV(f, func(h map[string]int, row []string) {
+					svcID := col(row, h, "service_id")
+					if svcID == "" {
+						return
+					}
+					td.services = append(td.services, store.GTFSService{
+						ServiceID:   svcID,
+						WeekdayMask: buildWeekdayMask(row, h),
+						StartDate:   col(row, h, "start_date"),
+						EndDate:     col(row, h, "end_date"),
+					})
+				})
+			}
+		case "calendar_dates.txt":
+			if td != nil {
+				parseErr = parseCSV(f, func(h map[string]int, row []string) {
+					svcID := col(row, h, "service_id")
+					date := col(row, h, "date")
+					excType := col(row, h, "exception_type")
+					if svcID == "" || date == "" || excType == "" {
+						return
+					}
+					td.exceptions = append(td.exceptions, store.GTFSServiceException{
+						ServiceID: svcID,
+						Date:      date,
+						Added:     excType == "1",
+					})
+				})
+			}
 		}
 		if parseErr != nil {
 			return fmt.Errorf("%s: %w", f.Name, parseErr)
@@ -357,6 +413,7 @@ func mergeZip(url string, routes map[string]Route, stops map[string]Stop, trips 
 
 	// Second pass: build route→stop mapping from stop_times.txt.
 	// Requires trips to be loaded first (first pass above).
+	// When td is non-nil, timetable rows are also collected in this same pass.
 	newStops := make(map[string]map[string]struct{}) // route_id → set of stop_ids
 	for _, f := range zr.File {
 		if f.Name != "stop_times.txt" {
@@ -376,6 +433,27 @@ func mergeZip(url string, routes map[string]Route, stops map[string]Stop, trips 
 				newStops[t.RouteID] = make(map[string]struct{})
 			}
 			newStops[t.RouteID][stopID] = struct{}{}
+
+			if td != nil {
+				depStr := col(row, h, "departure_time")
+				if depStr == "" {
+					return
+				}
+				depSecs, ok := parseDepartureSecs(depStr)
+				if !ok {
+					return
+				}
+				seq, _ := strconv.Atoi(col(row, h, "stop_sequence"))
+				td.stopTimes = append(td.stopTimes, store.GTFSStopTime{
+					RouteID:       t.RouteID,
+					TripID:        tripID,
+					StopID:        stopID,
+					Headsign:      t.Headsign,
+					ServiceID:     t.ServiceID,
+					StopSequence:  seq,
+					DepartureSecs: depSecs,
+				})
+			}
 		}); err != nil {
 			return fmt.Errorf("stop_times.txt: %w", err)
 		}
