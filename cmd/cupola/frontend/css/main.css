@@ -765,10 +765,18 @@ button {
 }
 
 .clock-time {
+  display: flex;
+  align-items: baseline;
   font-size: clamp(1.6rem, 5vw, 3rem);
   font-weight: 200;
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
+}
+
+.clock-sec {
+  font-size: 0.55em;
+  opacity: 0.5;
+  letter-spacing: 0;
 }
 
 .clock-date {

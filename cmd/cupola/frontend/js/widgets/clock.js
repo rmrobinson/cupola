@@ -23,10 +23,11 @@
       // when render() is called before the cell is inserted into the DOM).
       const update = () => {
         const now = new Date();
-        timeEl.textContent = now.toLocaleTimeString(undefined, {
-          hour: '2-digit', minute: '2-digit', second: '2-digit',
-          hour12: h12, timeZone: tz,
+        const hm  = now.toLocaleTimeString(undefined, {
+          hour: '2-digit', minute: '2-digit', hour12: h12, timeZone: tz,
         });
+        const sec = String(now.getSeconds()).padStart(2, '0');
+        timeEl.innerHTML = `<span class="clock-hm">${hm}</span><span class="clock-sec">:${sec}</span>`;
         dateEl.textContent = now.toLocaleDateString(undefined, {
           weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
           timeZone: tz,
