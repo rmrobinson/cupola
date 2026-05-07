@@ -38,8 +38,9 @@ type LocationConfig struct {
 }
 
 type ServerConfig struct {
-	Port    int    `yaml:"port"`
-	DataDir string `yaml:"data_dir"`
+	Port      int      `yaml:"port"`
+	DataDir   string   `yaml:"data_dir"`
+	CSPImgSrc []string `yaml:"csp_img_src"` // extra external image sources for Content-Security-Policy img-src
 }
 
 type TilesConfig struct {
@@ -49,7 +50,7 @@ type TilesConfig struct {
 }
 
 type CollectorsConfig struct {
-	WeatherEcowitt   *EcowittConfig         `yaml:"weather_ecowitt"`
+	WeatherEcowitt   *EcowittConfig          `yaml:"weather_ecowitt"`
 	WeatherEnvCanada *EnvCanadaWeatherConfig `yaml:"weather_envcanada"`
 	SolarEnvCanada   *EnvCanadaSolarConfig   `yaml:"solar_envcanada"`
 	Transit          *TransitConfig          `yaml:"transit"`
@@ -73,7 +74,7 @@ type EcowittConfig struct {
 type EnvCanadaWeatherConfig struct {
 	Enabled              bool     `yaml:"enabled"`
 	StationCode          string   `yaml:"station_code"` // optional: bypass auto-discovery
-	Province             string   `yaml:"province"`      // required when station_code is set
+	Province             string   `yaml:"province"`     // required when station_code is set
 	PollIntervalForecast Duration `yaml:"poll_interval_forecast"`
 	PollIntervalAlerts   Duration `yaml:"poll_interval_alerts"`
 }
@@ -85,11 +86,11 @@ type EnvCanadaSolarConfig struct {
 }
 
 type TransitAgencyConfig struct {
-	ID                       string   `yaml:"id"`
-	GTFSStaticURLs           []string `yaml:"gtfs_static_urls"`
-	GTFSRTTripUpdatesURLs    []string `yaml:"gtfs_rt_trip_updates_urls"`
+	ID                         string   `yaml:"id"`
+	GTFSStaticURLs             []string `yaml:"gtfs_static_urls"`
+	GTFSRTTripUpdatesURLs      []string `yaml:"gtfs_rt_trip_updates_urls"`
 	GTFSRTVehiclePositionsURLs []string `yaml:"gtfs_rt_vehicle_positions_urls"`
-	GTFSRTAlertsURL          string   `yaml:"gtfs_rt_alerts_url"`
+	GTFSRTAlertsURL            string   `yaml:"gtfs_rt_alerts_url"`
 }
 
 type TransitConfig struct {
@@ -99,10 +100,10 @@ type TransitConfig struct {
 }
 
 type Traffic511Config struct {
-	Enabled                 bool     `yaml:"enabled"`
-	Provinces               []string `yaml:"provinces"`
-	PollIntervalIncidents   Duration `yaml:"poll_interval_incidents"`
-	PollIntervalCameras     Duration `yaml:"poll_interval_cameras"`
+	Enabled               bool     `yaml:"enabled"`
+	Provinces             []string `yaml:"provinces"`
+	PollIntervalIncidents Duration `yaml:"poll_interval_incidents"`
+	PollIntervalCameras   Duration `yaml:"poll_interval_cameras"`
 }
 
 type Dump1090Config struct {
@@ -127,7 +128,7 @@ type RSSFeedConfig struct {
 
 type FlagCanadaConfig struct {
 	Enabled      bool     `yaml:"enabled"`
-	URL          string   `yaml:"url"`          // override default half-masting page URL
+	URL          string   `yaml:"url"` // override default half-masting page URL
 	PollInterval Duration `yaml:"poll_interval"`
 }
 

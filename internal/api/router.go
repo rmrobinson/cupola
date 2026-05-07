@@ -3,6 +3,8 @@ package api
 import (
 	"io/fs"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -26,6 +28,7 @@ type Handler struct {
 	homeLat      float64
 	homeLon      float64
 	countryCode  string
+	cspImgSrc    []string
 }
 
 func NewHandler(
@@ -39,6 +42,7 @@ func NewHandler(
 	agencies []*gtfsrt.Agency,
 	homeLat, homeLon float64,
 	countryCode string,
+	cspImgSrc []string,
 ) *Handler {
 	return &Handler{
 		registry:     registry,
@@ -52,6 +56,7 @@ func NewHandler(
 		homeLat:      homeLat,
 		homeLon:      homeLon,
 		countryCode:  countryCode,
+		cspImgSrc:    cspImgSrc,
 	}
 }
 
@@ -61,6 +66,7 @@ func (h *Handler) Router() http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(corsMiddleware)
+	r.Use(h.securityHeadersMiddleware)
 
 	r.Get("/api/v1/config", h.getConfig)
 	r.Get("/api/v1/domains", h.getDomains)
@@ -93,6 +99,58 @@ func (h *Handler) Router() http.Handler {
 	}
 
 	return r
+}
+
+func (h *Handler) securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; "+
+				"script-src 'self'; "+
+				"style-src 'self' 'unsafe-inline'; "+
+				"img-src "+h.cspImgSrcDirective()+"; "+
+				"connect-src 'self'; "+
+				"worker-src 'self'; "+
+				"manifest-src 'self'; "+
+				"base-uri 'self'; "+
+				"object-src 'none'; "+
+				"frame-ancestors 'self'")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "same-origin")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (h *Handler) cspImgSrcDirective() string {
+	sources := []string{"'self'", "data:", "blob:"}
+	seen := map[string]bool{
+		"'self'": true,
+		"data:":  true,
+		"blob:":  true,
+	}
+	for _, raw := range h.cspImgSrc {
+		src := normalizeCSPSource(raw)
+		if src == "" || seen[src] {
+			continue
+		}
+		sources = append(sources, src)
+		seen[src] = true
+	}
+	return strings.Join(sources, " ")
+}
+
+func normalizeCSPSource(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || strings.ContainsAny(raw, " \t\r\n;") {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
 }
 
 func corsMiddleware(next http.Handler) http.Handler {

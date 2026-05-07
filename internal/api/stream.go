@@ -46,7 +46,7 @@ func (h *Handler) getStream(w http.ResponseWriter, r *http.Request) {
 		unsub()
 		if sessionID != "" {
 			if dropped := h.subs.CloseSession(sessionID); dropped > 0 {
-				log.Printf("session %s disconnected: dropped %d subscriptions", sessionID[:8], dropped)
+				log.Printf("session %s disconnected: dropped %d subscriptions", sessionLogPrefix(sessionID), dropped)
 			}
 		}
 	}()
@@ -104,4 +104,11 @@ func (h *Handler) writeSSEUpdate(w http.ResponseWriter, u store.Update) error {
 	}
 	_, err = fmt.Fprintf(w, "data: %s\n\n", payload)
 	return err
+}
+
+func sessionLogPrefix(sessionID string) string {
+	if len(sessionID) <= 8 {
+		return sessionID
+	}
+	return sessionID[:8]
 }

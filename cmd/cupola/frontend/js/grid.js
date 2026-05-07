@@ -7,16 +7,12 @@
 const Grid = (() => {
   let _profile = null;
   let _onSave = null;
-  let _draggedId = null;
   let _saveTimer = null;
-  let _dragFromHandle = false;
-
-  // Reset flag if a mousedown on a handle is abandoned without starting a drag.
-  document.addEventListener('mouseup', () => { _dragFromHandle = false; });
 
   // ── Public API ────────────────────────────────────────────────────────
 
   async function init(profile, onSave) {
+    destroy();
     _profile = profile;
     _onSave = onSave;
 
@@ -28,7 +24,21 @@ const Grid = (() => {
       const cell = await createCell(wc);
       grid.appendChild(cell);
     }
-    initDragDrop(grid);
+  }
+
+  function destroy() {
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+    removeDragOverlay();
+
+    const grid = document.getElementById('widget-grid');
+    if (!grid) return;
+    grid.querySelectorAll('.widget-cell').forEach(cell => {
+      const wc = (_profile?.widgets || []).find(w => w.id === cell.dataset.widgetId);
+      const def = wc ? getDefByType(wc.type) : null;
+      cleanupCell(cell, wc, def);
+    });
+    grid.innerHTML = '';
   }
 
   function addWidget(wc) {
@@ -51,19 +61,7 @@ const Grid = (() => {
     const grid = document.getElementById('widget-grid');
     const cell = grid.querySelector(`[data-widget-id="${widgetId}"]`);
     if (cell) {
-      clearInterval(Number(cell.dataset.tickInterval));
-      if (def) {
-        const domainList = def.domains ? def.domains : [def.domain];
-        const isMulti = !!def.domains;
-        domainList.forEach(d => Subscriptions.remove(isMulti ? `${widgetId}:${d}` : widgetId));
-        if (def.onRemove) {
-          const content = cell.querySelector('.widget-content');
-          if (content) def.onRemove(content, removedWc?.config);
-        }
-      } else {
-        Subscriptions.remove(widgetId);
-      }
-      (cell._streamHandlers || []).forEach(({ domain, handler }) => Stream.off(domain, handler));
+      cleanupCell(cell, removedWc, def);
       cell.remove();
     }
     scheduleSave();
@@ -79,7 +77,6 @@ const Grid = (() => {
     cell.dataset.widgetId = wc.id;
     cell.dataset.widgetType = wc.type;
     setCellPos(cell, wc.pos);
-    cell.setAttribute('draggable', 'true');
 
     const inner = document.createElement('div');
     inner.className = 'widget-inner';
@@ -112,23 +109,7 @@ const Grid = (() => {
 
     initResize(resizeHandle, cell, wc);
 
-    chrome.querySelector('.drag-handle').addEventListener('mousedown', () => { _dragFromHandle = true; });
-
-    cell.addEventListener('dragstart', e => {
-      if (!_dragFromHandle) { e.preventDefault(); return; }
-      _dragFromHandle = false;
-      _draggedId = wc.id;
-      e.dataTransfer.effectAllowed = 'move';
-      setTimeout(() => {
-        cell.classList.add('drag-source');
-        showDragOverlay(document.getElementById('widget-grid'), wc);
-      }, 0);
-    });
-    cell.addEventListener('dragend', () => {
-      _draggedId = null;
-      cell.classList.remove('drag-source');
-      removeDragOverlay();
-    });
+    chrome.querySelector('.drag-handle').addEventListener('pointerdown', e => startPointerDrag(e, cell, wc));
 
     if (!def) {
       content.innerHTML = `<div class="widget-unavailable"><span class="widget-unavailable-label">Unknown widget type: ${esc(wc.type)}</span></div>`;
@@ -293,27 +274,50 @@ const Grid = (() => {
 
   // ── Drag-and-drop ─────────────────────────────────────────────────────
 
-  function initDragDrop(grid) {
-    grid.addEventListener('dragover', e => {
-      if (!_draggedId) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      updateDragOverlay(e, grid);
-    });
+  function startPointerDrag(e, cell, wc) {
+    if (e.button != null && e.button !== 0) return;
+    e.preventDefault();
+    const grid = document.getElementById('widget-grid');
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let moved = false;
 
-    grid.addEventListener('drop', e => {
-      if (!_draggedId) return;
-      e.preventDefault();
+    const onMove = ev => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (!moved && Math.hypot(dx, dy) < 4) return;
+      if (!moved) {
+        moved = true;
+        cell.classList.add('drag-source');
+        showDragOverlay(grid, wc);
+      }
+      updateDragOverlay(ev, grid);
+    };
+    const onUp = ev => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onCancel);
+      if (moved) {
+        const pos = posFromEvent(ev, grid);
+        wc.pos.col = pos.col;
+        wc.pos.row = pos.row;
+        setCellPos(cell, wc.pos);
+        scheduleSave();
+      }
+      cell.classList.remove('drag-source');
       removeDragOverlay();
-      const pos = posFromEvent(e, grid);
-      const wc = _profile.widgets.find(w => w.id === _draggedId);
-      if (!wc) return;
-      wc.pos.col = pos.col;
-      wc.pos.row = pos.row;
-      const cell = grid.querySelector(`[data-widget-id="${_draggedId}"]`);
-      if (cell) setCellPos(cell, wc.pos);
-      scheduleSave();
-    });
+    };
+    const onCancel = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onCancel);
+      cell.classList.remove('drag-source');
+      removeDragOverlay();
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onCancel);
   }
 
   function showDragOverlay(grid, wc) {
@@ -392,9 +396,10 @@ const Grid = (() => {
   // ── Resize ────────────────────────────────────────────────────────────
 
   function initResize(handle, cell, wc) {
-    handle.addEventListener('mousedown', e => {
+    handle.addEventListener('pointerdown', e => {
       e.preventDefault();
       e.stopPropagation();
+      handle.setPointerCapture?.(e.pointerId);
       const grid = document.getElementById('widget-grid');
       const cols = (grid.dataset.layout === 'portrait') ? 4 : 12;
       const rect = grid.getBoundingClientRect();
@@ -409,12 +414,14 @@ const Grid = (() => {
         setCellPos(cell, wc.pos);
       };
       const onUp = () => {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.removeEventListener('pointercancel', onUp);
         scheduleSave();
       };
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+      document.addEventListener('pointercancel', onUp);
     });
   }
 
@@ -475,5 +482,23 @@ const Grid = (() => {
     }, 400);
   }
 
-  return { init, addWidget, removeWidget };
+  function cleanupCell(cell, wc, def) {
+    clearInterval(Number(cell.dataset.tickInterval));
+    const widgetId = cell.dataset.widgetId;
+    if (def) {
+      const domainList = def.domains ? def.domains : [def.domain];
+      const isMulti = !!def.domains;
+      domainList.forEach(d => Subscriptions.remove(isMulti ? `${widgetId}:${d}` : widgetId));
+      if (def.onRemove) {
+        const content = cell.querySelector('.widget-content');
+        if (content) def.onRemove(content, wc?.config);
+      }
+    } else if (widgetId) {
+      Subscriptions.remove(widgetId);
+    }
+    (cell._streamHandlers || []).forEach(({ domain, handler }) => Stream.off(domain, handler));
+    cell._streamHandlers = [];
+  }
+
+  return { init, addWidget, removeWidget, destroy };
 })();

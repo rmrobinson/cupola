@@ -13,7 +13,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// SQLiteStore persists profiles and notes. It is not used for time-series data.
+// SQLiteStore persists profiles, notes, and cached GTFS timetable data. It is
+// not used for sensor or alert time-series data.
 type SQLiteStore struct {
 	db *sql.DB
 }
@@ -77,8 +78,6 @@ func (s *SQLiteStore) migrate() error {
 		// Prevents duplicate rows when an agency uses multiple overlapping ZIPs.
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_gst_unique
 			ON gtfs_stop_times (agency_id, trip_id, stop_sequence)`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_gse_unique
-			ON gtfs_service_exceptions (agency_id, service_id, date)`,
 		`CREATE TABLE IF NOT EXISTS gtfs_services (
 			agency_id    TEXT    NOT NULL,
 			service_id   TEXT    NOT NULL,
@@ -93,6 +92,8 @@ func (s *SQLiteStore) migrate() error {
 			date       TEXT    NOT NULL,
 			added      INTEGER NOT NULL
 		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_gse_unique
+			ON gtfs_service_exceptions (agency_id, service_id, date)`,
 		`CREATE INDEX IF NOT EXISTS idx_gse
 			ON gtfs_service_exceptions (agency_id, service_id, date)`,
 	}

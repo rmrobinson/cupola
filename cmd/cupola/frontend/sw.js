@@ -1,6 +1,5 @@
-const CACHE_VERSION = '2026-05-05';
+const CACHE_VERSION = 'runtime-v1';
 const STATIC_CACHE = `cupola-static-${CACHE_VERSION}`;
-const API_CACHE    = `cupola-api-${CACHE_VERSION}`;
 
 const PRECACHE = [
   '/',
@@ -10,6 +9,7 @@ const PRECACHE = [
   '/css/grid.css',
   '/css/horizon.css',
   '/js/stream.js',
+  '/js/app-ui.js',
   '/js/subscriptions.js',
   '/js/overlays.js',
   '/js/profile.js',
@@ -53,7 +53,7 @@ self.addEventListener('activate', evt => {
   evt.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys.filter(k => k !== STATIC_CACHE && k !== API_CACHE)
+        keys.filter(k => k !== STATIC_CACHE)
             .map(k => caches.delete(k))
       ))
       .then(() => self.clients.claim())
@@ -66,35 +66,25 @@ self.addEventListener('fetch', evt => {
 
   const { pathname } = new URL(request.url);
 
-  // SSE stream: network-only — cannot be cached or replayed
-  if (pathname === '/api/v1/stream') return;
-
+  // Live API responses must not be replayed from cache on a situational dashboard.
   if (pathname.startsWith('/api/')) {
-    evt.respondWith(networkFirst(request));
-  } else {
-    evt.respondWith(cacheFirst(request));
+    return;
   }
+  if (pathname.startsWith('/tiles/')) {
+    return;
+  }
+
+  evt.respondWith(networkFirstStatic(request));
 });
 
-async function networkFirst(request) {
-  const cache = await caches.open(API_CACHE);
+async function networkFirstStatic(request) {
+  const cache = await caches.open(STATIC_CACHE);
   try {
     const response = await fetch(request);
     if (response.ok) cache.put(request, response.clone());
     return response;
   } catch {
     return (await cache.match(request))
-      ?? new Response('{}', { headers: { 'Content-Type': 'application/json' } });
+      ?? new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
   }
-}
-
-async function cacheFirst(request) {
-  const cached = await caches.match(request);
-  if (cached) return cached;
-  const response = await fetch(request);
-  if (response.ok) {
-    const cache = await caches.open(STATIC_CACHE);
-    cache.put(request, response.clone());
-  }
-  return response;
 }

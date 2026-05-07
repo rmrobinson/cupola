@@ -8,6 +8,10 @@ location:
 server:
   port: 8181
   data_dir: "./data"
+  csp_img_src:
+    - "https://511on.ca"
+    - "https://511.alberta.ca"
+    - "https://www.drivebc.ca"
 
 tiles:
   radius_km: 50

@@ -25,7 +25,11 @@ const Subscriptions = (() => {
         domain,
         params: params || null,
       }),
-    }).catch(() => {});
+    }).then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    }).catch(err => {
+      AppUI.reportError(`Subscription failed: ${domain}`, err);
+    });
   }
 
   function create(widgetId, domain, params) {
@@ -37,7 +41,11 @@ const Subscriptions = (() => {
     delete active[widgetId];
     return fetch(`/api/v1/subscriptions/${widgetId}`, {
       method: 'DELETE',
-    }).catch(() => {});
+    }).then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    }).catch(err => {
+      AppUI.reportError('Subscription cleanup failed', err);
+    });
   }
 
   return { create, remove };

@@ -46,6 +46,10 @@
     list.querySelectorAll('.btn-note-delete').forEach(btn => {
       btn.addEventListener('click', () =>
         fetch(`/api/v1/notes/${btn.dataset.id}`, { method: 'DELETE' })
+          .then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          })
+          .catch(err => AppUI.reportError('Note delete failed', err))
       );
     });
 
@@ -87,12 +91,17 @@
       const body   = editor.querySelector('.note-f-body').value;
       const pinned = editor.querySelector('.note-f-pinned').checked;
       const url    = id ? `/api/v1/notes/${id}` : '/api/v1/notes';
-      await fetch(url, {
-        method:  id ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ title, body, pinned }),
-      });
-      editor.classList.add('hidden');
+      try {
+        const res = await fetch(url, {
+          method:  id ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ title, body, pinned }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        editor.classList.add('hidden');
+      } catch (err) {
+        AppUI.reportError('Note save failed', err);
+      }
     });
   }
 

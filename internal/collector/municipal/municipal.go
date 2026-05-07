@@ -98,6 +98,9 @@ func (c *EventsCollector) State() domain.DomainState {
 func (c *EventsCollector) runSource(ctx context.Context, s eventsSource) {
 	if err := c.fetchSource(s); err != nil {
 		log.Printf("[municipal.events] %s initial fetch: %v", s.cfg.ID, err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
+		})
 	}
 	interval := s.cfg.PollInterval.Duration
 	if interval == 0 {
@@ -112,6 +115,11 @@ func (c *EventsCollector) runSource(ctx context.Context, s eventsSource) {
 		case <-t.C:
 			if err := c.fetchSource(s); err != nil {
 				log.Printf("[municipal.events] %s fetch: %v", s.cfg.ID, err)
+				c.stateStore.PublishSystem(store.SystemEvent{
+					CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
+				})
+			} else {
+				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.sourceID(s.cfg.ID), Status: "ok"})
 			}
 		}
 	}
@@ -134,6 +142,10 @@ func (c *EventsCollector) fetchSource(s eventsSource) error {
 	c.stateStore.Set(state)
 	log.Printf("[municipal.events] %s updated: %d events", s.cfg.ID, len(events))
 	return nil
+}
+
+func (c *EventsCollector) sourceID(sourceID string) string {
+	return c.ID() + ":" + sourceID
 }
 
 func (c *EventsCollector) buildState() domain.MunicipalEvents {
@@ -203,6 +215,9 @@ func (c *AlertsCollector) State() domain.DomainState {
 func (c *AlertsCollector) runSource(ctx context.Context, s alertsSource) {
 	if err := c.fetchSource(s); err != nil {
 		log.Printf("[municipal.alerts] %s initial fetch: %v", s.cfg.ID, err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
+		})
 	}
 	interval := s.cfg.PollInterval.Duration
 	if interval == 0 {
@@ -217,6 +232,11 @@ func (c *AlertsCollector) runSource(ctx context.Context, s alertsSource) {
 		case <-t.C:
 			if err := c.fetchSource(s); err != nil {
 				log.Printf("[municipal.alerts] %s fetch: %v", s.cfg.ID, err)
+				c.stateStore.PublishSystem(store.SystemEvent{
+					CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
+				})
+			} else {
+				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.sourceID(s.cfg.ID), Status: "ok"})
 			}
 		}
 	}
@@ -239,6 +259,10 @@ func (c *AlertsCollector) fetchSource(s alertsSource) error {
 	c.stateStore.Set(state)
 	log.Printf("[municipal.alerts] %s updated: %d alerts", s.cfg.ID, len(alerts))
 	return nil
+}
+
+func (c *AlertsCollector) sourceID(sourceID string) string {
+	return c.ID() + ":" + sourceID
 }
 
 // SetSourceAlerts replaces the alert set for the given sourceID and publishes

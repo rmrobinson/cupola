@@ -22,17 +22,17 @@ import (
 	flagcollector "github.com/rmrobinson/cupola/internal/collector/flag"
 	"github.com/rmrobinson/cupola/internal/collector/gtfs"
 	"github.com/rmrobinson/cupola/internal/collector/gtfsrt"
-	notescollector "github.com/rmrobinson/cupola/internal/collector/notes"
-	rsscollector "github.com/rmrobinson/cupola/internal/collector/rss"
-	wastecollector "github.com/rmrobinson/cupola/internal/collector/wastecollection"
 	municipalcollector "github.com/rmrobinson/cupola/internal/collector/municipal"
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/enovapower"
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/grcaflood"
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/kitchenersnow"
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/kitchenerutilities"
+	notescollector "github.com/rmrobinson/cupola/internal/collector/notes"
+	rsscollector "github.com/rmrobinson/cupola/internal/collector/rss"
+	"github.com/rmrobinson/cupola/internal/collector/traffic511"
+	wastecollector "github.com/rmrobinson/cupola/internal/collector/wastecollection"
 	waterwaycollector "github.com/rmrobinson/cupola/internal/collector/waterway"
 	_ "github.com/rmrobinson/cupola/internal/collector/waterway/grca"
-	"github.com/rmrobinson/cupola/internal/collector/traffic511"
 	"github.com/rmrobinson/cupola/internal/config"
 	"github.com/rmrobinson/cupola/internal/domain"
 	"github.com/rmrobinson/cupola/internal/store"
@@ -265,15 +265,15 @@ func main() {
 	}
 
 	handler := api.NewHandler(registry, stateStore, sqliteStore, subManager, notesCol.Refresh, tileHandler, webFS,
-		transitAgencies, cfg.Location.Lat, cfg.Location.Lon, cfg.Location.CountryCode)
+		transitAgencies, cfg.Location.Lat, cfg.Location.Lon, cfg.Location.CountryCode, cfg.Server.CSPImgSrc)
 
 	port := cfg.Server.Port
 	if port == 0 {
 		port = 8080
 	}
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: handler.Router(),
+		Addr:        fmt.Sprintf(":%d", port),
+		Handler:     handler.Router(),
 		BaseContext: func(_ net.Listener) context.Context { return ctx },
 	}
 

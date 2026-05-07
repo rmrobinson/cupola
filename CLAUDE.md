@@ -50,13 +50,13 @@ type Collector interface {
 ```
 Collectors run independently and push normalized state into a central in-memory store. Only one collector may be registered per `DomainType` — enforced at startup. Collectors declared in `config.yaml` are registered; unconfigured collectors are not loaded.
 
-**IMAP dispatcher** (`internal/collector/imap/`): One shared IMAP connection dispatches emails to `EmailHandler` implementations based on sender/subject patterns. Municipal collectors register handlers at startup so only one IMAP credential is needed.
+**IMAP dispatcher**: Planned but not yet implemented. The intended design is one shared IMAP connection dispatching emails to `EmailHandler` implementations based on sender/subject patterns, so only one mailbox credential is needed per site.
 
 **State store**: In-memory, keyed by `DomainType`. The REST API reads from it; the SSE stream pushes updates when state changes.
 
 **Subscription system** (`internal/api/subscriptions.go`): Reference-counted per `(domain, params)` pair. Widgets register on load, deregister on removal. SSE disconnect drops all subscriptions for that session. For parameterized domains (e.g. `transit.arrivals` keyed by `"{agency}:{route}:{stop_id}"`), the backend only fetches data for active subscriptions.
 
-**Persistence** (`internal/store/sqlite.go`): SQLite used only for profile storage and shared notes. No time-series data.
+**Persistence** (`internal/store/sqlite.go`): SQLite stores dashboard profiles, shared notes, and cached GTFS timetable data used for transit static-schedule fallback. It is not used for sensor, alert, or other time-series data.
 
 **Tiles** (`internal/tiles/pmtiles.go`): On startup, checks for a `.pmtiles` cache. If absent, fetches a tile extract from `api.protomaps.com` bounded by `lat/lon ± tiles_radius_km`, saves to disk, and serves at `GET /tiles/{z}/{x}/{y}`. Subsequent starts use the cache.
 

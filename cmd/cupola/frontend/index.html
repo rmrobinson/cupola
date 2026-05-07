@@ -16,7 +16,8 @@
 </head>
 <body>
   <div id="horizon-bg"></div>
-  <div id="alert-banner" class="alert-banner hidden"></div>
+  <div id="alert-banner" class="alert-banner hidden" role="alert" aria-live="assertive"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
   <div id="landing" class="landing hidden"></div>
   <div id="canvas" class="canvas hidden">
     <div id="canvas-toolbar" class="canvas-toolbar">
@@ -29,6 +30,7 @@
   <script src="/js/vendor/leaflet.js"></script>
   <script src="/js/vendor/protomaps-leaflet.js"></script>
   <!-- load order: stream → subscriptions → overlays → widgets → profile → picker → grid → main -->
+  <script src="/js/app-ui.js"></script>
   <script src="/js/stream.js"></script>
   <script src="/js/subscriptions.js"></script>
   <script src="/js/overlays.js"></script>
@@ -56,10 +58,5 @@
   <script src="/js/widget-picker.js"></script>
   <script src="/js/grid.js"></script>
   <script src="/js/main.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    }
-  </script>
 </body>
 </html>

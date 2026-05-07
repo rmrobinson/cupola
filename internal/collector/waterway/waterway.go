@@ -18,8 +18,8 @@ type GaugeSource interface {
 }
 
 var (
-	sourceMu      sync.RWMutex
-	gaugeSources  = map[string]func() GaugeSource{}
+	sourceMu     sync.RWMutex
+	gaugeSources = map[string]func() GaugeSource{}
 )
 
 // RegisterGaugeSource registers a named GaugeSource factory.
@@ -89,6 +89,9 @@ func (c *Collector) State() domain.DomainState {
 func (c *Collector) runSource(ctx context.Context, s sourceEntry) {
 	if err := c.fetchSource(ctx, s); err != nil {
 		log.Printf("[waterway] %s initial fetch: %v", s.cfg.ID, err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
+		})
 	}
 	interval := s.cfg.PollInterval.Duration
 	if interval == 0 {
@@ -103,6 +106,11 @@ func (c *Collector) runSource(ctx context.Context, s sourceEntry) {
 		case <-t.C:
 			if err := c.fetchSource(ctx, s); err != nil {
 				log.Printf("[waterway] %s fetch: %v", s.cfg.ID, err)
+				c.stateStore.PublishSystem(store.SystemEvent{
+					CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
+				})
+			} else {
+				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.sourceID(s.cfg.ID), Status: "ok"})
 			}
 		}
 	}
@@ -126,6 +134,10 @@ func (c *Collector) fetchSource(ctx context.Context, s sourceEntry) error {
 		c.promoteAlerts(s.cfg.ID, gauges, s.cfg.AlertOn)
 	}
 	return nil
+}
+
+func (c *Collector) sourceID(sourceID string) string {
+	return c.ID() + ":" + sourceID
 }
 
 func (c *Collector) promoteAlerts(sourceID string, gauges []domain.WaterwayGauge, alertOn []string) {

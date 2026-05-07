@@ -121,7 +121,11 @@ function saveProfile(profile) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(profile),
-  }).catch(() => {});
+  }).then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  }).catch(err => {
+    AppUI.reportError('Dashboard save failed', err);
+  });
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -132,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const kioskProfileId = params.get('profile');
 
   Stream.connect();
+  AppUI.registerServiceWorker();
   Horizon.start();
 
   // Wire horizon to astro domain
@@ -162,7 +167,8 @@ async function launchCanvas(profile) {
 
   // "+ Widget" button
   const addBtn = document.getElementById('btn-add-widget');
-  if (addBtn) {
+  if (addBtn && !addBtn.dataset.bound) {
+    addBtn.dataset.bound = '1';
     addBtn.addEventListener('click', () => {
       WidgetPicker.show(def => {
         const wc = {

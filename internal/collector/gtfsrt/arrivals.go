@@ -27,9 +27,9 @@ type ArrivalsCollector struct {
 	staticInterval time.Duration
 	cacheDir       string
 	db             *store.SQLiteStore
-	loc            *time.Location       // local timezone for calendar queries
-	inFallback     map[string]bool      // agency_id → currently serving static schedule
-	wake           chan struct{}         // buffered(1): nudges rtLoop to fetch immediately
+	loc            *time.Location  // local timezone for calendar queries
+	inFallback     map[string]bool // agency_id → currently serving static schedule
+	wake           chan struct{}   // buffered(1): nudges rtLoop to fetch immediately
 }
 
 func (c *ArrivalsCollector) ID() string                { return "gtfsrt.arrivals" }
@@ -53,6 +53,7 @@ func (c *ArrivalsCollector) Start(ctx context.Context) error {
 }
 
 func (c *ArrivalsCollector) staticLoop(ctx context.Context) {
+	c.refreshStatic()
 	t := time.NewTicker(c.staticInterval)
 	defer t.Stop()
 	for {
@@ -60,11 +61,15 @@ func (c *ArrivalsCollector) staticLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			for _, ag := range c.agencies {
-				if err := gtfs.LoadAndPersist(ag.Schedule, ag.ID, ag.StaticURLs, c.cacheDir, c.db); err != nil {
-					log.Printf("[gtfsrt] %s: static refresh: %v", ag.ID, err)
-				}
-			}
+			c.refreshStatic()
+		}
+	}
+}
+
+func (c *ArrivalsCollector) refreshStatic() {
+	for _, ag := range c.agencies {
+		if err := gtfs.LoadAndPersist(ag.Schedule, ag.ID, ag.StaticURLs, c.cacheDir, c.db); err != nil {
+			log.Printf("[gtfsrt] %s: static refresh: %v", ag.ID, err)
 		}
 	}
 }

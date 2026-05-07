@@ -4,8 +4,10 @@
  */
 const WidgetPicker = (() => {
   let _keyHandler = null;
+  let _previousFocus = null;
 
   function show(onPick) {
+    _previousFocus = document.activeElement;
     fetch('/api/v1/domains')
       .then(r => r.ok ? r.json() : { domains: [] })
       .then(data => render(new Set(data.domains || []), onPick))
@@ -26,10 +28,13 @@ const WidgetPicker = (() => {
     const unavailable = all.filter(w => !isAvailable(w, availDomains)).sort(byLabel);
 
     const picker = document.getElementById('widget-picker');
+    picker.setAttribute('role', 'dialog');
+    picker.setAttribute('aria-modal', 'true');
+    picker.setAttribute('aria-labelledby', 'widget-picker-title');
     picker.innerHTML = `
       <div class="picker-card">
-        <button class="picker-close" id="btn-picker-close">&times;</button>
-        <h2 class="picker-title">Add widget</h2>
+        <button class="picker-close" id="btn-picker-close" aria-label="Close">&times;</button>
+        <h2 class="picker-title" id="widget-picker-title">Add widget</h2>
         ${sectionHTML('Available', available, false)}
         ${unavailable.length ? sectionHTML('Not available on this instance', unavailable, true) : ''}
       </div>
@@ -42,7 +47,13 @@ const WidgetPicker = (() => {
     });
 
     if (_keyHandler) document.removeEventListener('keydown', _keyHandler);
-    _keyHandler = e => { if (e.key === 'Escape') hide(); };
+    _keyHandler = e => {
+      if (e.key === 'Escape') {
+        hide();
+        return;
+      }
+      if (e.key === 'Tab') trapFocus(e, picker);
+    };
     document.addEventListener('keydown', _keyHandler);
 
     picker.querySelectorAll('.picker-item:not(.unavailable)').forEach(btn => {
@@ -54,6 +65,9 @@ const WidgetPicker = (() => {
         onPick(def);
       });
     });
+
+    const first = picker.querySelector('.picker-item:not(.unavailable), #btn-picker-close');
+    first?.focus();
   }
 
   function sectionHTML(label, defs, isUnavailable) {
@@ -73,10 +87,33 @@ const WidgetPicker = (() => {
   }
 
   function hide() {
-    document.getElementById('widget-picker').classList.add('hidden');
+    const picker = document.getElementById('widget-picker');
+    picker.classList.add('hidden');
+    picker.removeAttribute('role');
+    picker.removeAttribute('aria-modal');
+    picker.removeAttribute('aria-labelledby');
     if (_keyHandler) {
       document.removeEventListener('keydown', _keyHandler);
       _keyHandler = null;
+    }
+    if (_previousFocus && document.contains(_previousFocus)) {
+      _previousFocus.focus();
+    }
+    _previousFocus = null;
+  }
+
+  function trapFocus(e, root) {
+    const focusable = [...root.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+      .filter(el => !el.disabled && el.offsetParent !== null);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
     }
   }
 

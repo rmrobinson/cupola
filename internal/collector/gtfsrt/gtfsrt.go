@@ -5,7 +5,6 @@ package gtfsrt
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
@@ -27,8 +26,8 @@ type Agency struct {
 }
 
 // NewCollectors creates the three transit domain collectors sharing the given
-// agencies. Static GTFS data is loaded (from network or disk cache) synchronously
-// before returning so all three collectors have route/stop names from the first poll.
+// agencies. Static GTFS data is loaded asynchronously from Start so collector
+// construction does not block HTTP startup.
 // loc is used to convert wall-clock time to the agency's local time for calendar
 // queries; pass time.UTC when the timezone is unknown.
 func NewCollectors(
@@ -49,13 +48,6 @@ func NewCollectors(
 	}
 	if loc == nil {
 		loc = time.UTC
-	}
-
-	for _, ag := range agencies {
-		if err := gtfs.LoadAndPersist(ag.Schedule, ag.ID, ag.StaticURLs, cacheDir, db); err != nil {
-			// Non-fatal: collectors will still work, just without display names.
-			log.Printf("[gtfsrt] %s: initial static load: %v", ag.ID, err)
-		}
 	}
 
 	arr := &ArrivalsCollector{

@@ -52,6 +52,9 @@ func (c *Collector) State() domain.DomainState {
 func (c *Collector) runFeed(ctx context.Context, f config.RSSFeedConfig) {
 	if err := c.fetchFeed(f); err != nil {
 		log.Printf("[rss] %s initial fetch: %v", f.ID, err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.sourceID(f.ID), Status: "error", Message: err.Error(),
+		})
 	}
 	interval := f.PollInterval.Duration
 	if interval == 0 {
@@ -66,6 +69,11 @@ func (c *Collector) runFeed(ctx context.Context, f config.RSSFeedConfig) {
 		case <-t.C:
 			if err := c.fetchFeed(f); err != nil {
 				log.Printf("[rss] %s fetch: %v", f.ID, err)
+				c.stateStore.PublishSystem(store.SystemEvent{
+					CollectorID: c.sourceID(f.ID), Status: "error", Message: err.Error(),
+				})
+			} else {
+				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.sourceID(f.ID), Status: "ok"})
 			}
 		}
 	}
@@ -95,6 +103,10 @@ func (c *Collector) fetchFeed(f config.RSSFeedConfig) error {
 	c.stateStore.Set(state)
 	log.Printf("[rss] %s updated: %d items", f.ID, len(items))
 	return nil
+}
+
+func (c *Collector) sourceID(feedID string) string {
+	return c.ID() + ":" + feedID
 }
 
 func (c *Collector) buildState() domain.Feeds {
@@ -136,12 +148,12 @@ type rssItem struct {
 }
 
 type atomEntry struct {
-	ID        string    `xml:"id"`
-	Title     string    `xml:"title"`
-	Link      atomLink  `xml:"link"`
-	Summary   string    `xml:"summary"`
-	Published string    `xml:"published"`
-	Updated   string    `xml:"updated"`
+	ID        string   `xml:"id"`
+	Title     string   `xml:"title"`
+	Link      atomLink `xml:"link"`
+	Summary   string   `xml:"summary"`
+	Published string   `xml:"published"`
+	Updated   string   `xml:"updated"`
 }
 
 type atomLink struct {

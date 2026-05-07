@@ -26,6 +26,27 @@ body {
   backdrop-filter: blur(4px);
 }
 
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 950;
+  max-width: min(360px, calc(100vw - 32px));
+  background: rgba(20, 24, 32, 0.94);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 7px;
+  padding: 10px 12px;
+  font-size: 13px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.toast-error {
+  border-color: rgba(220, 38, 38, 0.55);
+  background: rgba(127, 29, 29, 0.94);
+}
+
 /* ── Landing screen ────────────────────────────────────────────────────── */
 
 .landing {
@@ -398,6 +419,7 @@ button {
   letter-spacing: -2px;
   padding: 0 2px;
   user-select: none;
+  touch-action: none;
 }
 
 .drag-handle:active { cursor: grabbing; }
@@ -530,6 +552,7 @@ button {
   background: rgba(255,255,255,0.2);
   border-radius: 2px;
   cursor: se-resize;
+  touch-action: none;
   z-index: 1;
 }
 
