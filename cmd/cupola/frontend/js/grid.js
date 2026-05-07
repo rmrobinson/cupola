@@ -119,11 +119,15 @@ const Grid = (() => {
       _dragFromHandle = false;
       _draggedId = wc.id;
       e.dataTransfer.effectAllowed = 'move';
-      setTimeout(() => cell.classList.add('drag-source'), 0);
+      setTimeout(() => {
+        cell.classList.add('drag-source');
+        showDragOverlay(document.getElementById('widget-grid'), wc);
+      }, 0);
     });
     cell.addEventListener('dragend', () => {
       _draggedId = null;
       cell.classList.remove('drag-source');
+      removeDragOverlay();
     });
 
     if (!def) {
@@ -294,11 +298,13 @@ const Grid = (() => {
       if (!_draggedId) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
+      updateDragOverlay(e, grid);
     });
 
     grid.addEventListener('drop', e => {
       if (!_draggedId) return;
       e.preventDefault();
+      removeDragOverlay();
       const pos = posFromEvent(e, grid);
       const wc = _profile.widgets.find(w => w.id === _draggedId);
       if (!wc) return;
@@ -310,12 +316,76 @@ const Grid = (() => {
     });
   }
 
+  function showDragOverlay(grid, wc) {
+    removeDragOverlay();
+    const rect = grid.getBoundingClientRect();
+    const cols = (grid.dataset.layout === 'portrait') ? 4 : 12;
+    const cs = getComputedStyle(grid);
+    const rowH    = parseFloat(cs.gridAutoRows) || 60;
+    const rowGap  = parseFloat(cs.rowGap)       || 0;
+    const colGap  = parseFloat(cs.columnGap)    || 0;
+    const rowPitch = rowH + rowGap;
+    const colPitch = (rect.width + colGap) / cols;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'drag-grid-overlay';
+    overlay.style.cssText = [
+      `position:fixed`,
+      `left:${rect.left}px`,
+      `top:${rect.top}px`,
+      `width:${rect.width}px`,
+      `height:${rect.height}px`,
+      `pointer-events:none`,
+      `z-index:50`,
+      `background-image:` +
+        `repeating-linear-gradient(to right,rgba(255,255,255,0.07) 0,rgba(255,255,255,0.07) 1px,transparent 1px,transparent ${colPitch}px),` +
+        `repeating-linear-gradient(to bottom,rgba(255,255,255,0.07) 0,rgba(255,255,255,0.07) 1px,transparent 1px,transparent ${rowPitch}px)`,
+    ].join(';');
+
+    const ghost = document.createElement('div');
+    ghost.id = 'drag-drop-ghost';
+    ghost.className = 'drag-drop-ghost';
+    ghost.style.width  = `${wc.pos.w * colPitch - colGap}px`;
+    ghost.style.height = `${wc.pos.h * rowPitch - rowGap}px`;
+    ghost.style.display = 'none';
+    overlay.appendChild(ghost);
+    document.body.appendChild(overlay);
+  }
+
+  function updateDragOverlay(e, grid) {
+    const ghost = document.getElementById('drag-drop-ghost');
+    if (!ghost) return;
+    const rect = grid.getBoundingClientRect();
+    const cols = (grid.dataset.layout === 'portrait') ? 4 : 12;
+    const cs = getComputedStyle(grid);
+    const rowH    = parseFloat(cs.gridAutoRows) || 60;
+    const rowGap  = parseFloat(cs.rowGap)       || 0;
+    const colGap  = parseFloat(cs.columnGap)    || 0;
+    const rowPitch = rowH + rowGap;
+    const colPitch = (rect.width + colGap) / cols;
+    const col = Math.max(0, Math.min(cols - 1, Math.floor((e.clientX - rect.left) / colPitch)));
+    const row = Math.max(0, Math.floor((e.clientY - rect.top) / rowPitch));
+    ghost.style.left    = `${col * colPitch}px`;
+    ghost.style.top     = `${row * rowPitch}px`;
+    ghost.style.display = '';
+  }
+
+  function removeDragOverlay() {
+    const overlay = document.getElementById('drag-grid-overlay');
+    if (overlay) overlay.remove();
+  }
+
   function posFromEvent(e, grid) {
     const rect = grid.getBoundingClientRect();
     const cols = (grid.dataset.layout === 'portrait') ? 4 : 12;
-    const rowH = parseFloat(getComputedStyle(grid).gridAutoRows) || 60;
-    const col = Math.max(0, Math.min(cols - 1, Math.floor((e.clientX - rect.left) / (rect.width / cols))));
-    const row = Math.max(0, Math.floor((e.clientY - rect.top) / rowH));
+    const cs = getComputedStyle(grid);
+    const rowH    = parseFloat(cs.gridAutoRows) || 60;
+    const rowGap  = parseFloat(cs.rowGap)       || 0;
+    const colGap  = parseFloat(cs.columnGap)    || 0;
+    const rowPitch = rowH + rowGap;
+    const colPitch = (rect.width + colGap) / cols;
+    const col = Math.max(0, Math.min(cols - 1, Math.floor((e.clientX - rect.left) / colPitch)));
+    const row = Math.max(0, Math.floor((e.clientY - rect.top) / rowPitch));
     return { col, row };
   }
 
