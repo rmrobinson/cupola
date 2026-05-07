@@ -142,7 +142,7 @@ func (s *SQLiteStore) QueryUpcomingDepartures(
 	rows, err := s.db.Query(`
 		SELECT st.trip_id, st.headsign, st.departure_secs
 		FROM gtfs_stop_times st
-		JOIN gtfs_services sv
+		LEFT JOIN gtfs_services sv
 		  ON sv.agency_id = st.agency_id AND sv.service_id = st.service_id
 		WHERE st.agency_id = ?
 		  AND st.route_id  = ?
@@ -150,7 +150,8 @@ func (s *SQLiteStore) QueryUpcomingDepartures(
 		  AND st.departure_secs > ?
 		  AND (
 		    (
-		      (sv.weekday_mask & ?) != 0
+		      sv.service_id IS NOT NULL
+		      AND (sv.weekday_mask & ?) != 0
 		      AND sv.start_date <= ?
 		      AND sv.end_date   >= ?
 		      AND NOT EXISTS (

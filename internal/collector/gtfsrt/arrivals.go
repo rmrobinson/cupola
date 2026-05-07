@@ -107,8 +107,27 @@ func (c *ArrivalsCollector) fetch() {
 	now := time.Now().In(c.loc)
 
 	for _, ag := range c.agencies {
-		if !c.fetchRTForAgency(ag, wanted, stops, now) && c.db != nil {
-			c.fetchStaticForAgency(ag, wanted, stops, now)
+		rtOK := c.fetchRTForAgency(ag, wanted, stops, now)
+		if c.db == nil {
+			continue
+		}
+		// For any wanted stop that RT didn't populate, fall back to the static
+		// schedule. This covers both full RT outages and cases where the RT feed
+		// returns HTTP 200 but has no trips for a specific subscribed stop.
+		missing := make(map[string]bool)
+		for k := range wanted {
+			parts := strings.SplitN(k, ":", 3)
+			if len(parts) == 3 && parts[0] == ag.ID {
+				if _, found := stops[k]; !found {
+					missing[k] = true
+				}
+			}
+		}
+		if len(missing) > 0 {
+			// Only log the fallback transition when RT was configured but failed
+			// HTTP-level; per-stop misses on a live feed are silent.
+			logTransition := !rtOK && len(ag.TripUpdatesURLs) > 0
+			c.fetchStaticForAgency(ag, missing, stops, now, logTransition)
 		}
 	}
 
@@ -157,10 +176,10 @@ func (c *ArrivalsCollector) fetchRTForAgency(ag *Agency, wanted map[string]bool,
 }
 
 // fetchStaticForAgency populates stops with schedule-based arrivals from SQLite
-// for every subscribed (route, stop) pair belonging to ag. Called when all RT
-// feeds for the agency are unavailable. Logs once on transition into fallback.
-func (c *ArrivalsCollector) fetchStaticForAgency(ag *Agency, wanted map[string]bool, stops map[string]domain.StopArrivals, now time.Time) {
-	if !c.inFallback[ag.ID] {
+// for every key in wanted that belongs to ag. logTransition controls whether a
+// one-time "switching to static fallback" message is emitted when inFallback transitions.
+func (c *ArrivalsCollector) fetchStaticForAgency(ag *Agency, wanted map[string]bool, stops map[string]domain.StopArrivals, now time.Time, logTransition bool) {
+	if logTransition && !c.inFallback[ag.ID] {
 		log.Printf("[gtfsrt] %s: RT unavailable, switching to static schedule fallback", ag.ID)
 		c.inFallback[ag.ID] = true
 	}
