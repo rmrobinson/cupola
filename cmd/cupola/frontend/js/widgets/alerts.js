@@ -76,7 +76,7 @@
 
   // ── Map overlay integration ───────────────────────────────────────────────
 
-  function syncOutageOverlays(container, stateMap) {
+  function syncOutageOverlays(container, stateMap, config) {
     const ovl = window.CupolaOverlays;
     if (!ovl) return;
 
@@ -88,14 +88,14 @@
 
     // Build the desired set. Empty when no map widget is present.
     const next = new Map(); // id → { overlay, changeKey }
-    if (ovl.hasMap()) {
+    if (ovl.hasMap() && config?.showMunicipal !== false) {
       const alerts = stateMap?.['municipal.alerts']?.alerts || [];
       for (const a of alerts) {
         if (!a.polygon?.length) continue;
         const color = SEVERITY_COLOR[a.severity]?.text || '#74b9ff';
         const emoji = ALERT_TYPE_EMOJI[a.alert_type] || null;
         const overlayId = `${widgetId}:${a.id}`;
-        const changeKey = `${color}|${emoji || ''}|${a.title}|${a.description || ''}`;
+        const changeKey = `${color}|${emoji || ''}|${a.title}|${a.description || ''}|${JSON.stringify(a.polygon)}`;
         next.set(overlayId, {
           overlay: {
             type: 'polygon',
@@ -124,18 +124,21 @@
     container._outageOverlayMap = new Map([...next].map(([id, { changeKey }]) => [id, changeKey]));
   }
 
-  function setupMapAvailCb(container, stateMap) {
+  function setupMapAvailCb(container, stateMap, config) {
     const ovl = window.CupolaOverlays;
     if (!ovl) return;
 
     if (container._mapAvailCb) ovl.offMapAvail(container._mapAvailCb);
 
-    const cb = () => syncOutageOverlays(container, stateMap);
+    const cb = () => syncOutageOverlays(container, stateMap, config);
     container._mapAvailCb = cb;
     ovl.onMapAvail(cb);
   }
 
   function render(container, stateMap, config) {
+    setupMapAvailCb(container, stateMap || {}, config || {});
+    syncOutageOverlays(container, stateMap || {}, config || {});
+
     if (!stateMap || Object.keys(stateMap).length === 0) {
       container.innerHTML = `<div class="widget-unavailable"><span class="widget-unavailable-label">Source unavailable</span><span style="font-size:10px;opacity:.5">alerts</span></div>`;
       return;
@@ -177,9 +180,6 @@
     }).join('');
 
     container.innerHTML = `<div class="widget-alerts">${cards}</div>`;
-
-    setupMapAvailCb(container, stateMap);
-    syncOutageOverlays(container, stateMap);
   }
 
   window.CupolaWidgets.push({
