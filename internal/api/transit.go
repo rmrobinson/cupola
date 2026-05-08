@@ -287,9 +287,6 @@ func validateTransitAgencyConfig(cfg store.TransitAgencyConfig, requireID bool) 
 		if len(cfg.GTFSStaticURLs) == 0 {
 			return errString("enabled agencies require at least one gtfs_static_urls entry")
 		}
-		if len(cfg.GTFSRTTripUpdatesURLs) == 0 {
-			return errString("enabled agencies require at least one gtfs_rt_trip_updates_urls entry")
-		}
 	}
 	urls := make([]string, 0, len(cfg.GTFSStaticURLs)+len(cfg.GTFSRTTripUpdatesURLs)+len(cfg.GTFSRTVehiclePositionsURLs))
 	urls = append(urls, cfg.GTFSStaticURLs...)

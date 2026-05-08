@@ -331,9 +331,6 @@ func validateYAMLTransitAgency(ac config.TransitAgencyConfig) error {
 	if len(ac.GTFSStaticURLs) == 0 {
 		return fmt.Errorf("missing gtfs_static_urls")
 	}
-	if len(ac.GTFSRTTripUpdatesURLs) == 0 {
-		return fmt.Errorf("missing gtfs_rt_trip_updates_urls")
-	}
 	for _, raw := range append(append(normalizeYAMLURLs(ac.GTFSStaticURLs), normalizeYAMLURLs(ac.GTFSRTTripUpdatesURLs)...), normalizeYAMLURLs(ac.GTFSRTVehiclePositionsURLs)...) {
 		if err := validateYAMLTransitURL(raw); err != nil {
 			return err

@@ -142,7 +142,7 @@ const TransitAdmin = (() => {
           <textarea name="gtfs_static_urls" rows="4">${esc((agency?.gtfs_static_urls || []).join('\n'))}</textarea>
         </label>
         <label class="admin-field">
-          <span>Trip updates URLs</span>
+          <span>Trip updates URLs (optional)</span>
           <textarea name="gtfs_rt_trip_updates_urls" rows="4">${esc((agency?.gtfs_rt_trip_updates_urls || []).join('\n'))}</textarea>
         </label>
         <label class="admin-field">
@@ -304,9 +304,6 @@ const TransitAdmin = (() => {
     }
     if (payload.enabled && payload.gtfs_static_urls.length === 0) {
       return 'Enabled agencies require static GTFS URLs.';
-    }
-    if (payload.enabled && payload.gtfs_rt_trip_updates_urls.length === 0) {
-      return 'Enabled agencies require trip updates URLs.';
     }
     const urls = [
       ...payload.gtfs_static_urls,

@@ -46,7 +46,7 @@ collectors:
         gtfs_static_urls:
           - "https://webapps.regionofwaterloo.ca/api/grt-routes/api/staticfeeds/1"  # bus
           - "https://webapps.regionofwaterloo.ca/api/grt-routes/api/staticfeeds/2"  # LRT
-        gtfs_rt_trip_updates_urls:
+        gtfs_rt_trip_updates_urls:  # optional; omit for schedule-only agencies
           - "https://webapps.regionofwaterloo.ca/api/grt-routes/api/tripupdates/1"
           - "https://webapps.regionofwaterloo.ca/api/grt-routes/api/tripupdates/2"
         gtfs_rt_vehicle_positions_urls:
