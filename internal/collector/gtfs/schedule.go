@@ -61,9 +61,9 @@ type Schedule struct {
 	routes      map[string]Route
 	stops       map[string]Stop
 	trips       map[string]Trip
-	routeStops  map[string][]string    // route_id → deduplicated stop_ids
+	routeStops  map[string][]string     // route_id → deduplicated stop_ids
 	shapes      map[string][]ShapePoint // shape_id → ordered points
-	routeShapes map[string][]string    // route_id → ordered unique shape_ids (precomputed index)
+	routeShapes map[string][]string     // route_id → ordered unique shape_ids (precomputed index)
 }
 
 func New() *Schedule {
@@ -157,6 +157,13 @@ func (s *Schedule) AllRoutes() []Route {
 		return ni < nj
 	})
 	return out
+}
+
+// HasRoutes reports whether routes.txt has been loaded into memory.
+func (s *Schedule) HasRoutes() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.routes) > 0
 }
 
 // StopsForRoute returns all stops served by routeID, deduplicated.
@@ -269,7 +276,7 @@ func (s *Schedule) ShapesForRoute(routeID string) ([][][2]float64, string) {
 // direction within most GTFS feeds) with duplicates removed.
 func buildRouteShapes(trips map[string]Trip) map[string][]string {
 	seen := make(map[string]map[string]struct{})
-	out  := make(map[string][]string)
+	out := make(map[string][]string)
 	for _, tr := range trips {
 		if tr.ShapeID == "" {
 			continue

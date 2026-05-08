@@ -13,23 +13,34 @@
 
   const SHAPE_RETRY_DELAY_MS = 60_000;
 
+  function routeKey(config) {
+    const agency = (config?.agency || '').trim();
+    const route = (config?.route || '').trim();
+    return agency && route ? `${agency}:${route}` : null;
+  }
+
+  function shapeStatus(container, key) {
+    container._shapeStatusByRouteKey = container._shapeStatusByRouteKey || {};
+    container._shapeStatusByRouteKey[key] = container._shapeStatusByRouteKey[key] || {
+      data: null,
+      unavailable: false,
+      failedAt: null,
+      notReadyAt: null,
+    };
+    return container._shapeStatusByRouteKey[key];
+  }
+
   async function fetchShape(container, config) {
-    if (!config.agency || !config.route) return false;
+    const key = routeKey(config);
+    if (!key) return false;
 
-    // Clear shape cache if the route selection changed since the last fetch.
-    if (container._shapeRouteKey !== config.route) {
-      container._shapeData          = null;
-      container._shapeUnavailable   = false;
-      container._shapeRouteKey      = null;
-      container._shapeFetchFailedAt = null;
-    }
-
-    if (container._shapeUnavailable) return false;
-    if (container._shapeData) return true;
+    const status = shapeStatus(container, key);
+    if (status.unavailable) return false;
+    if (status.data) return true;
 
     // Backoff: don't hammer the server after a transient failure.
-    if (container._shapeFetchFailedAt &&
-        Date.now() - container._shapeFetchFailedAt < SHAPE_RETRY_DELAY_MS) {
+    const lastFailure = status.failedAt || status.notReadyAt;
+    if (lastFailure && Date.now() - lastFailure < SHAPE_RETRY_DELAY_MS) {
       return false;
     }
 
@@ -37,19 +48,25 @@
       const url = `/api/v1/transit/agencies/${encodeURIComponent(config.agency)}/routes/${encodeURIComponent(config.route)}/shape`;
       const r = await fetch(url);
       if (r.status === 404) {
-        container._shapeUnavailable = true;
+        status.unavailable = true;
+        status.failedAt = null;
+        status.notReadyAt = null;
+        return false;
+      }
+      if (r.status === 503) {
+        status.notReadyAt = Date.now();
         return false;
       }
       if (!r.ok) {
-        container._shapeFetchFailedAt = Date.now();
+        status.failedAt = Date.now();
         return false;
       }
-      container._shapeData          = await r.json();
-      container._shapeRouteKey      = config.route;
-      container._shapeFetchFailedAt = null;
+      status.data = await r.json();
+      status.failedAt = null;
+      status.notReadyAt = null;
       return true;
     } catch {
-      container._shapeFetchFailedAt = Date.now();
+      status.failedAt = Date.now();
       return false;
     }
   }
@@ -68,14 +85,10 @@
     const ok = await fetchShape(container, config);
     if (!ok) {
       ovl.unregister(widgetId);
-      if (container._shapeUnavailable && config.show_route) {
-        config.show_route = false;
-        container._saveConfig?.();
-      }
       return;
     }
 
-    const shape = container._shapeData;
+    const shape = shapeStatus(container, routeKey(config)).data;
     ovl.register(widgetId, {
       type:        'polyline',
       color:       shape.color || '',
@@ -100,10 +113,7 @@
       prevHasMap = hasMap;
 
       if (!hasMap && wasAvail && config.show_route) {
-        // Map widget was removed while show_route was active — reset and persist.
-        config.show_route = false;
         ovl.unregister(container.dataset.widgetId || '');
-        container._saveConfig?.();
       } else if (hasMap && config.show_route) {
         syncOverlay(container, config);
       }
@@ -216,12 +226,14 @@
     // Determine whether "show route on map" can be enabled.
     const content      = panel.closest('.widget-inner')?.querySelector('.widget-content');
     const hasMap       = window.CupolaOverlays?.hasMap() || false;
-    const noShapes     = content?._shapeUnavailable || false;
-    const canShowRoute = hasMap && !noShapes;
+    const selectedRouteKey = routeKey({ agency: selAg, route: selRt });
+    const shapeStatusForRoute = selectedRouteKey && content?._shapeStatusByRouteKey?.[selectedRouteKey];
+    const noShapes = !!shapeStatusForRoute?.unavailable;
+    const canShowRoute = hasMap;
     const showRouteHint = !hasMap
       ? 'Add a map widget to enable this option'
       : noShapes
-        ? 'This agency has no route shape data'
+        ? 'This route has no shape data and will not be drawn'
         : '';
 
     const agOpts = agencies.map(a =>
@@ -248,7 +260,7 @@
         </label>
         <label class="config-row" title="${esc(showRouteHint)}">
           <span>Show route on map</span>
-          <input type="checkbox" name="show_route"${cfg.show_route && canShowRoute ? ' checked' : ''}${!canShowRoute ? ' disabled' : ''}>
+          <input type="checkbox" name="show_route"${cfg.show_route ? ' checked' : ''}${!canShowRoute ? ' disabled' : ''}>
         </label>
         <div class="config-actions">
           <button type="submit" class="btn-small btn-primary">Save</button>
@@ -272,7 +284,16 @@
       let routes = [];
       try {
         const r = await fetch(`/api/v1/transit/agencies/${encodeURIComponent(agencyID)}/routes`);
-        if (r.ok) routes = await r.json();
+        if (r.status === 503) {
+          rtSel.innerHTML = '<option value="">Route data is still loading</option>';
+          return;
+        }
+        if (r.ok) {
+          routes = await r.json();
+        } else {
+          rtSel.innerHTML = '<option value="">Unable to load routes</option>';
+          return;
+        }
       } catch {}
       if (routes.length === 0) {
         rtSel.innerHTML = '<option value="">No routes found</option>';
@@ -291,7 +312,16 @@
       let stops = [];
       try {
         const r = await fetch(`/api/v1/transit/agencies/${encodeURIComponent(agencyID)}/routes/${encodeURIComponent(routeID)}/stops`);
-        if (r.ok) stops = await r.json();
+        if (r.status === 503) {
+          stopSel.innerHTML = '<option value="">Stop data is still loading</option>';
+          return;
+        }
+        if (r.ok) {
+          stops = await r.json();
+        } else {
+          stopSel.innerHTML = '<option value="">Unable to load stops</option>';
+          return;
+        }
       } catch {}
       if (stops.length === 0) {
         stopSel.innerHTML = '<option value="">No stops found</option>';
@@ -314,14 +344,7 @@
     form.addEventListener('submit', e => {
       e.preventDefault();
       const data      = new FormData(e.target);
-      const prevRoute = wc.config?.route || '';
       const newRoute  = data.get('route') || '';
-      // If the route changed, clear the cached shape so it is re-fetched.
-      if (newRoute !== prevRoute && content) {
-        content._shapeData        = null;
-        content._shapeUnavailable = false;
-        content._shapeRouteKey    = null;
-      }
       wc.config = {
         agency:     data.get('agency')    || '',
         route:      newRoute,

@@ -53,6 +53,12 @@ func (h *Handler) getTransitRoutes(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if !ag.Schedule.HasRoutes() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
+		return
+	}
 	routes := ag.Schedule.AllRoutes()
 	out := make([]routeInfo, 0, len(routes))
 	for _, rt := range routes {
@@ -66,6 +72,12 @@ func (h *Handler) getTransitStops(w http.ResponseWriter, r *http.Request) {
 	ag := h.findAgency(chi.URLParam(r, "agencyID"))
 	if ag == nil {
 		http.NotFound(w, r)
+		return
+	}
+	if !ag.Schedule.HasRoutes() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
 		return
 	}
 	stops := ag.Schedule.StopsForRoute(chi.URLParam(r, "routeID"))
@@ -100,6 +112,12 @@ func (h *Handler) getTransitRouteShape(w http.ResponseWriter, r *http.Request) {
 	ag := h.findAgency(chi.URLParam(r, "agencyID"))
 	if ag == nil {
 		http.NotFound(w, r)
+		return
+	}
+	if !ag.Schedule.HasRoutes() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
 		return
 	}
 	if !ag.Schedule.HasShapes() {
