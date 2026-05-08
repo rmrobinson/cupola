@@ -25,6 +25,16 @@ type AgencyManager struct {
 	refreshLocks   map[string]*sync.Mutex
 }
 
+type AgencyStats struct {
+	ID                   string             `json:"id"`
+	Enabled              bool               `json:"enabled"`
+	GTFSStaticURLs       int                `json:"gtfs_static_urls"`
+	GTFSRTTripUpdates    int                `json:"gtfs_rt_trip_updates_urls"`
+	GTFSRTVehicleUpdates int                `json:"gtfs_rt_vehicle_positions_urls"`
+	GTFSRTAlerts         int                `json:"gtfs_rt_alerts_urls"`
+	Schedule             gtfs.ScheduleStats `json:"schedule"`
+}
+
 func NewAgencyManager(db *store.SQLiteStore, cacheDir string) (*AgencyManager, error) {
 	m := &AgencyManager{
 		agencies:     make(map[string]*Agency),
@@ -91,6 +101,29 @@ func (m *AgencyManager) Get(id string) *Agency {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.agencies[id]
+}
+
+func (m *AgencyManager) Stats() []AgencyStats {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]AgencyStats, 0, len(m.agencies))
+	for _, ag := range m.agencies {
+		alerts := 0
+		if ag.AlertsURL != "" {
+			alerts = 1
+		}
+		out = append(out, AgencyStats{
+			ID:                   ag.ID,
+			Enabled:              true,
+			GTFSStaticURLs:       len(ag.StaticURLs),
+			GTFSRTTripUpdates:    len(ag.TripUpdatesURLs),
+			GTFSRTVehicleUpdates: len(ag.VehiclePositionsURLs),
+			GTFSRTAlerts:         alerts,
+			Schedule:             ag.Schedule.Stats(),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
 }
 
 func (m *AgencyManager) RefreshStatic(id string) error {

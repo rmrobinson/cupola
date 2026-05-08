@@ -2,6 +2,7 @@ package store
 
 import (
 	"sync"
+	"time"
 
 	"github.com/rmrobinson/cupola/internal/domain"
 )
@@ -11,6 +12,16 @@ type SystemEvent struct {
 	CollectorID string
 	Status      string // "ok" or "error"
 	Message     string // non-empty on error
+	At          time.Time
+}
+
+// SystemSnapshot is the retained health state for a collector.
+type SystemSnapshot struct {
+	CollectorID   string    `json:"collector_id"`
+	Status        string    `json:"status"`
+	Message       string    `json:"message,omitempty"`
+	LastEventAt   time.Time `json:"last_event_at"`
+	LastSuccessAt time.Time `json:"last_success_at,omitempty"`
 }
 
 // Update is delivered to SSE subscribers. Exactly one of State and System is non-nil.
@@ -25,6 +36,8 @@ type StateStore struct {
 	mu   sync.RWMutex
 	data map[domain.DomainType]domain.DomainState
 
+	system map[string]SystemSnapshot
+
 	subsMu sync.Mutex
 	subs   map[int]chan Update
 	nextID int
@@ -32,8 +45,9 @@ type StateStore struct {
 
 func NewStateStore() *StateStore {
 	return &StateStore{
-		data: make(map[domain.DomainType]domain.DomainState),
-		subs: make(map[int]chan Update),
+		data:   make(map[domain.DomainType]domain.DomainState),
+		system: make(map[string]SystemSnapshot),
+		subs:   make(map[int]chan Update),
 	}
 }
 
@@ -54,7 +68,29 @@ func (s *StateStore) Get(dt domain.DomainType) domain.DomainState {
 
 // PublishSystem fans out a collector health event to all SSE subscribers.
 func (s *StateStore) PublishSystem(e SystemEvent) {
+	if e.At.IsZero() {
+		e.At = time.Now().UTC()
+	}
+	s.mu.Lock()
+	snap := s.system[e.CollectorID]
+	snap.CollectorID = e.CollectorID
+	snap.Status = e.Status
+	snap.Message = e.Message
+	snap.LastEventAt = e.At
+	if e.Status == "ok" {
+		snap.LastSuccessAt = e.At
+	}
+	s.system[e.CollectorID] = snap
+	s.mu.Unlock()
 	s.fan(Update{System: &e})
+}
+
+// GetSystem returns the retained health state for collectorID.
+func (s *StateStore) GetSystem(collectorID string) (SystemSnapshot, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	snap, ok := s.system[collectorID]
+	return snap, ok
 }
 
 // Subscribe returns a channel that receives state updates and an unsubscribe

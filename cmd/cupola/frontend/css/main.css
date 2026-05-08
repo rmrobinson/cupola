@@ -383,7 +383,7 @@ button {
 .canvas-toolbar {
   display: flex;
   justify-content: flex-end;
-  padding: 6px 12px 0;
+  padding: 6px 12px 10px;
   gap: 8px;
 }
 

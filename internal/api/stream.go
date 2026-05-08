@@ -88,9 +88,13 @@ func (h *Handler) writeSSEUpdate(w http.ResponseWriter, u store.Update) error {
 			Data:   u.State,
 		})
 	case u.System != nil:
+		ts := u.System.At
+		if ts.IsZero() {
+			ts = time.Now().UTC()
+		}
 		payload, err = json.Marshal(systemEvent{
 			Domain:      "system",
-			Ts:          time.Now().Unix(),
+			Ts:          ts.Unix(),
 			CollectorID: u.System.CollectorID,
 			Status:      u.System.Status,
 			Message:     u.System.Message,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"time"
 
 	"github.com/rmrobinson/cupola/internal/domain"
@@ -67,6 +68,16 @@ func (r *Registry) Domains() []domain.DomainType {
 	for dt := range r.collectors {
 		out = append(out, dt)
 	}
+	return out
+}
+
+// Collectors returns every registered collector ordered by collector ID.
+func (r *Registry) Collectors() []Collector {
+	out := make([]Collector, 0, len(r.collectors))
+	for _, c := range r.collectors {
+		out = append(out, c)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID() < out[j].ID() })
 	return out
 }
 

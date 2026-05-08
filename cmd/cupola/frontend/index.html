@@ -21,20 +21,18 @@
   <div id="landing" class="landing hidden"></div>
   <div id="canvas" class="canvas hidden">
     <div id="canvas-toolbar" class="canvas-toolbar">
-      <button id="btn-transit-admin" class="btn-small" title="Manage transit GTFS feeds">GTFS Feeds</button>
+      <button id="btn-admin" class="btn-small" title="Open admin">Admin</button>
       <button id="btn-add-widget" class="btn-small" title="Add widget">+ Widget</button>
     </div>
     <div id="widget-grid" class="widget-grid"></div>
   </div>
   <div id="widget-picker" class="widget-picker hidden"></div>
-  <div id="transit-admin" class="admin-page hidden" aria-hidden="true"></div>
   <!-- Map libraries: loaded before widgets so radar-map.js can reference L and protomapsL -->
   <script src="/js/vendor/leaflet.js"></script>
   <script src="/js/vendor/protomaps-leaflet.js"></script>
   <!-- load order: stream → subscriptions → overlays → widgets → profile → picker → grid → main -->
   <script src="/js/app-ui.js"></script>
   <script src="/js/details.js"></script>
-  <script src="/js/transit-admin.js"></script>
   <script src="/js/stream.js"></script>
   <script src="/js/subscriptions.js"></script>
   <script src="/js/overlays.js"></script>

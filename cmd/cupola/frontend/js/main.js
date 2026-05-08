@@ -181,4 +181,12 @@ async function launchCanvas(profile) {
       });
     });
   }
+
+  const adminBtn = document.getElementById('btn-admin');
+  if (adminBtn && !adminBtn.dataset.bound) {
+    adminBtn.dataset.bound = '1';
+    adminBtn.addEventListener('click', () => {
+      window.location.href = '/admin';
+    });
+  }
 }

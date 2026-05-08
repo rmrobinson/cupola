@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#10141c">
+  <title>Cupola Admin</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body class="admin-view">
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <main class="admin-app">
+    <header class="admin-app-header">
+      <div>
+        <h1 class="admin-app-title">Admin</h1>
+        <p class="admin-app-subtitle">Manage feeds, dashboards, and collector health.</p>
+      </div>
+      <a href="/" class="btn-secondary admin-back-link">Dashboard</a>
+    </header>
+
+    <div class="admin-layout">
+      <nav class="admin-nav" aria-label="Admin sections">
+        <button type="button" class="admin-nav-item active" data-tab="gtfs">GTFS Feeds</button>
+        <button type="button" class="admin-nav-item" data-tab="dashboards">Dashboards</button>
+        <button type="button" class="admin-nav-item" data-tab="collectors">Collectors</button>
+      </nav>
+
+      <section id="admin-panel" class="admin-content" aria-live="polite"></section>
+    </div>
+  </main>
+
+  <script src="/js/app-ui.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

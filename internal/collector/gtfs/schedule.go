@@ -66,6 +66,15 @@ type Schedule struct {
 	routeShapes map[string][]string     // route_id → ordered unique shape_ids (precomputed index)
 }
 
+// ScheduleStats summarizes the static GTFS data currently cached in memory.
+type ScheduleStats struct {
+	Routes     int `json:"routes"`
+	Stops      int `json:"stops"`
+	Trips      int `json:"trips"`
+	Shapes     int `json:"shapes"`
+	RouteStops int `json:"route_stops"`
+}
+
 func New() *Schedule {
 	return &Schedule{
 		routes:      make(map[string]Route),
@@ -74,6 +83,23 @@ func New() *Schedule {
 		routeStops:  make(map[string][]string),
 		shapes:      make(map[string][]ShapePoint),
 		routeShapes: make(map[string][]string),
+	}
+}
+
+// Stats returns counts for the currently loaded in-memory GTFS schedule.
+func (s *Schedule) Stats() ScheduleStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	routeStops := 0
+	for _, stops := range s.routeStops {
+		routeStops += len(stops)
+	}
+	return ScheduleStats{
+		Routes:     len(s.routes),
+		Stops:      len(s.stops),
+		Trips:      len(s.trips),
+		Shapes:     len(s.shapes),
+		RouteStops: routeStops,
 	}
 }
 

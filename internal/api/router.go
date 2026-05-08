@@ -97,6 +97,14 @@ func (h *Handler) Router() http.Handler {
 	r.Patch("/api/v1/transit/agency-configs/{agencyID}", h.updateTransitAgencyConfig)
 	r.Delete("/api/v1/transit/agency-configs/{agencyID}", h.deleteTransitAgencyConfig)
 
+	r.Get("/admin", h.getAdminPage)
+	r.Get("/admin/", h.getAdminPage)
+	r.Route("/api/v1/admin", func(r chi.Router) {
+		// Keep admin API routes grouped so future authentication middleware can
+		// wrap this boundary without changing endpoint paths.
+		r.Get("/collectors", h.getAdminCollectors)
+	})
+
 	r.Get("/tiles/local.pmtiles", h.getTileFile)
 	r.Get("/tiles/{z}/{x}/{y}", h.getTile)
 
