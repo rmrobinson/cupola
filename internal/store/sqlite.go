@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -25,7 +26,18 @@ func NewSQLiteStore(dataDir string) (*SQLiteStore, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
-	db, err := sql.Open("sqlite", filepath.Join(dataDir, "cupola.db"))
+	dbPath, err := filepath.Abs(filepath.Join(dataDir, "cupola.db"))
+	if err != nil {
+		return nil, fmt.Errorf("resolve sqlite path: %w", err)
+	}
+	dbURL := url.URL{Scheme: "file", Path: dbPath}
+	q := dbURL.Query()
+	q.Add("_pragma", "busy_timeout(30000)")
+	q.Add("_pragma", "journal_mode(WAL)")
+	q.Add("_pragma", "foreign_keys(ON)")
+	dbURL.RawQuery = q.Encode()
+
+	db, err := sql.Open("sqlite", dbURL.String())
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
@@ -43,6 +55,7 @@ func NewSQLiteStore(dataDir string) (*SQLiteStore, error) {
 
 func (s *SQLiteStore) migrate() error {
 	stmts := []string{
+		`PRAGMA busy_timeout=30000`,
 		`PRAGMA journal_mode=WAL`,
 		`PRAGMA foreign_keys=ON`,
 		`CREATE TABLE IF NOT EXISTS profiles (
