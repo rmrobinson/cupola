@@ -5,6 +5,10 @@
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function escAttr(s) {
+    return esc(s).replace(/"/g, '&quot;');
+  }
+
   function fmtNum(v, decimals) {
     if (v == null) return null;
     return Number(v).toFixed(decimals);
@@ -56,7 +60,9 @@
       : '';
 
     return `
-      <div class="ww-gauge ${advClass ? 'ww-gauge-alert' : ''} ${esc(advClass)}">
+      <div class="ww-gauge ${advClass ? 'ww-gauge-alert' : ''} ${esc(advClass)} detail-clickable"
+           data-detail-domain="waterway.conditions" data-detail-id="${escAttr(g.id)}"
+           role="button" tabindex="0">
         <div class="ww-gauge-left">
           <div class="ww-gauge-title">
             <span class="ww-name">${esc(g.name)}</span>${badge}

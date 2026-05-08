@@ -10,6 +10,7 @@ const PRECACHE = [
   '/css/horizon.css',
   '/js/stream.js',
   '/js/app-ui.js',
+  '/js/details.js',
   '/js/transit-admin.js',
   '/js/subscriptions.js',
   '/js/overlays.js',

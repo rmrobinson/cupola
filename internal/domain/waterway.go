@@ -21,4 +21,5 @@ type WaterwayGauge struct {
 	AdvisoryStatus string    `json:"advisory_status"`
 	AdvisoryText   *string   `json:"advisory_text,omitempty"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	SourceURL      string    `json:"source_url,omitempty"`
 }

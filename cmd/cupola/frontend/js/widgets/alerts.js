@@ -25,6 +25,21 @@
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  function escAttr(s) {
+    return esc(s).replace(/"/g, '&quot;');
+  }
+
+  function safeHTTPURL(raw) {
+    if (!raw) return '';
+    try {
+      const u = new URL(raw, window.location.href);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+      return u.href;
+    } catch {
+      return '';
+    }
+  }
+
   function fmtTime(iso) {
     if (!iso) return '';
     return new Date(iso).toLocaleString(undefined, {
@@ -82,7 +97,16 @@
         const overlayId = `${widgetId}:${a.id}`;
         const changeKey = `${color}|${emoji || ''}|${a.title}|${a.description || ''}`;
         next.set(overlayId, {
-          overlay: { type: 'polygon', color, emoji, coordinates: a.polygon, label: a.title, description: a.description || '' },
+          overlay: {
+            type: 'polygon',
+            color,
+            emoji,
+            coordinates: a.polygon,
+            label: a.title,
+            description: a.description || '',
+            detail_domain: 'municipal.alerts',
+            detail_id: a.id,
+          },
           changeKey,
         });
       }
@@ -131,11 +155,14 @@
       const timeStr = fmtTime(a.published_at || a.onset);
       const endsStr = (a.expires || a.ends_at) ? ` — ends ${fmtTime(a.expires || a.ends_at)}` : '';
       const area = a.area ? `<span class="alert-area">${esc(a.area)}</span>` : '';
-      const link = (a.source_url || a.url)
-        ? `<a class="alert-link" href="${esc(a.source_url || a.url)}" target="_blank" rel="noopener">Details ↗</a>`
+      const linkURL = safeHTTPURL(a.source_url || a.url);
+      const link = linkURL
+        ? `<a class="alert-link" href="${escAttr(linkURL)}" target="_blank" rel="noopener">Details ↗</a>`
         : '';
       return `
-        <div class="alert-card" style="border-left-color:${sev.text}">
+        <div class="alert-card detail-clickable" style="border-left-color:${sev.text}"
+             data-detail-domain="${escAttr(a._domain)}" data-detail-id="${escAttr(a.id)}"
+             role="button" tabindex="0">
           <div class="alert-card-top">
             <span class="alert-sev-badge" style="background:${sev.bg};color:${sev.text}">${esc(sev.label)}</span>
             <span class="alert-source">${srcLabel}</span>

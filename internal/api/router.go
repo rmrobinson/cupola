@@ -71,6 +71,7 @@ func (h *Handler) Router() http.Handler {
 	r.Get("/api/v1/config", h.getConfig)
 	r.Get("/api/v1/domains", h.getDomains)
 	r.Get("/api/v1/state/{domain}", h.getState)
+	r.Get("/api/v1/details/{domain}", h.getDetail)
 	r.Get("/api/v1/stream", h.getStream)
 
 	r.Post("/api/v1/subscriptions", h.createSubscription)

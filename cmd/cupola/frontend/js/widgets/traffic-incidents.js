@@ -5,6 +5,10 @@
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function escAttr(s) {
+    return esc(s).replace(/"/g, '&quot;');
+  }
+
   function fmtTime(iso) {
     if (!iso) return null;
     return new Date(iso).toLocaleString(undefined, {
@@ -87,7 +91,9 @@
       : '';
 
     return `
-      <div class="incident-row sev-${esc(inc.severity)}">
+      <div class="incident-row sev-${esc(inc.severity)} detail-clickable"
+           data-detail-domain="traffic.incidents" data-detail-id="${escAttr(inc.id)}"
+           role="button" tabindex="0">
         <div class="incident-top">
           <span class="incident-type">${typeLabel}</span>
           <span class="incident-road">${esc(inc.road_name)}</span>

@@ -5,6 +5,10 @@
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  function escAttr(s) {
+    return esc(s).replace(/"/g, '&quot;');
+  }
+
   function fmtDate(iso) {
     if (!iso) return null;
     return new Date(iso).toLocaleDateString(undefined, {
@@ -32,7 +36,9 @@
     const emoji    = countryFlag(window.CupolaConfig?.country_code);
 
     container.innerHTML = `
-      <div class="widget-flag">
+      <div class="widget-flag detail-clickable"
+           data-detail-domain="flag.status" data-detail-id="current"
+           role="button" tabindex="0">
         <div class="flag-icon${halfMast ? ' flag-half' : ''}"
              aria-label="${halfMast ? 'Flag at half-mast' : 'Flag at full mast'}">
           <div class="flag-pole"></div>

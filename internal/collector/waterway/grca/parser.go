@@ -27,9 +27,77 @@ func init() {
 }
 
 const (
-	flowURL      = "https://apps.grandriver.ca/waterdata/kiwischarts/wiskiData/RF_CurrentValue/RF_CurrentValue.json"
-	reservoirURL = "https://apps.grandriver.ca/waterdata/kiwischarts/wiskiData/LS_ResSummary/LS_ResSummary.json"
+	flowURL              = "https://apps.grandriver.ca/waterdata/kiwischarts/wiskiData/RF_CurrentValue/RF_CurrentValue.json"
+	reservoirURL         = "https://apps.grandriver.ca/waterdata/kiwischarts/wiskiData/LS_ResSummary/LS_ResSummary.json"
+	flowSummaryURL       = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/flow-summary/"
+	upperGrandURL        = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/upper-grand-flows/"
+	centralGrandURL      = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/central-grand-flows/"
+	centralLowerGrandURL = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/central-lower-grand-flows/"
+	lowerGrandURL        = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/lower-grand-flows/"
+	conestogoRiverURL    = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/conestogo-river-flows/"
+	nithRiverURL         = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/nith-river-flows/"
+	speedEramosaURL      = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/speed-and-eramosa-flows/"
+	canagagigueCreekURL  = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/canagagigue-creek-flows/"
+	laurelCreekURL       = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/laurel-creek-flows/"
+	mckenzieCreekURL     = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/mckenzie-creek-flows/"
+	millCreekURL         = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/mill-creek-flows/"
+	whitemansCreekURL    = "https://www.grandriver.ca/our-watershed/river-data/river-and-stream-flows/whitemans-creek-flows/"
+	conestogoDamURL      = "https://www.grandriver.ca/our-watershed/river-data/reservoir-levels/conestogo-dam/"
+	guelphDamURL         = "https://www.grandriver.ca/our-watershed/river-data/reservoir-levels/guelph-dam/"
+	laurelDamURL         = "https://www.grandriver.ca/our-watershed/river-data/reservoir-levels/laurel-dam/"
+	lutherDamURL         = "https://www.grandriver.ca/our-watershed/river-data/reservoir-levels/luther-dam/"
+	shadesMillsDamURL    = "https://www.grandriver.ca/our-watershed/river-data/reservoir-levels/shades-mills-dam/"
+	shandDamURL          = "https://www.grandriver.ca/our-watershed/river-data/reservoir-levels/shand-dam/"
+	woolwichDamURL       = "https://www.grandriver.ca/our-watershed/river-data/reservoir-levels/woolwich-dam/"
 )
+
+var sourceURLsByGaugeID = map[string]string{
+	"grca_dundalk_wsc":             upperGrandURL,
+	"grca_riverview_keldon":        upperGrandURL,
+	"grca_legatt":                  upperGrandURL,
+	"grca_waldemar":                upperGrandURL,
+	"grca_marsville_wsc":           upperGrandURL,
+	"grca_below_shand_dam_wsc":     upperGrandURL,
+	"grca_west_montrose_wsc":       upperGrandURL,
+	"grca_salem_wsc":               upperGrandURL,
+	"grca_bridgeport":              centralGrandURL,
+	"grca_hidden_valley_wsc":       centralGrandURL,
+	"grca_doon":                    centralGrandURL,
+	"grca_galt_wsc":                centralGrandURL,
+	"grca_brantford_wsc":           centralLowerGrandURL,
+	"grca_york":                    centralLowerGrandURL,
+	"grca_dunnville":               lowerGrandURL,
+	"grca_floradale":               canagagigueCreekURL,
+	"grca_elmira_arthur_st":        canagagigueCreekURL,
+	"grca_below_elmira_wsc":        canagagigueCreekURL,
+	"grca_drayton":                 conestogoRiverURL,
+	"grca_moorefield":              conestogoRiverURL,
+	"grca_glen_allan_wsc":          conestogoRiverURL,
+	"grca_st_jacobs_wsc":           conestogoRiverURL,
+	"grca_erbsville":               laurelCreekURL,
+	"grca_laurel_creek_weber_wsc":  laurelCreekURL,
+	"grca_speed_edinburgh_wsc":     speedEramosaURL,
+	"grca_armstrong_mills_wsc":     speedEramosaURL,
+	"grca_victoria":                speedEramosaURL,
+	"grca_eramosa_watson_rd_wsc":   speedEramosaURL,
+	"grca_speed_road32":            speedEramosaURL,
+	"grca_speed_beaverdale_wsc":    speedEramosaURL,
+	"grca_mill_creek_sr10":         millCreekURL,
+	"grca_nithburg_wsc":            nithRiverURL,
+	"grca_philipsburg":             nithRiverURL,
+	"grca_new_hamburg_wsc":         nithRiverURL,
+	"grca_ayr":                     nithRiverURL,
+	"grca_canning_wsc":             nithRiverURL,
+	"grca_whitemans_mt_vernon_wsc": whitemansCreekURL,
+	"grca_mckenzie_caledonia_wsc":  mckenzieCreekURL,
+	"grca_res_shand":               shandDamURL,
+	"grca_res_conestogo":           conestogoDamURL,
+	"grca_res_guelph":              guelphDamURL,
+	"grca_res_luther":              lutherDamURL,
+	"grca_res_woolwich":            woolwichDamURL,
+	"grca_res_laurel":              laurelDamURL,
+	"grca_res_shades":              shadesMillsDamURL,
+}
 
 // stationMeta describes a flow-monitoring station or reservoir.
 // levelTSID and flowTSID reference ts_id values in the KiWIS JSON.
@@ -117,9 +185,9 @@ type Parser struct {
 
 // kiwisSeries is one entry in the KiWIS JSON array.
 type kiwisSeries struct {
-	TSID string      `json:"ts_id"`
-	Rows string      `json:"rows"`
-	Data [][2]any    `json:"data"`
+	TSID string   `json:"ts_id"`
+	Rows string   `json:"rows"`
+	Data [][2]any `json:"data"`
 }
 
 func (p *Parser) AllGauges(ctx context.Context) ([]domain.WaterwayGauge, error) {
@@ -194,6 +262,7 @@ func buildGauge(meta stationMeta, data map[string][2]any) domain.WaterwayGauge {
 		Lat:            meta.lat,
 		Lon:            meta.lon,
 		AdvisoryStatus: "none",
+		SourceURL:      sourceURLForGauge(meta.id),
 	}
 
 	// Timestamp from the time ts_id entry.
@@ -219,6 +288,13 @@ func buildGauge(meta stationMeta, data map[string][2]any) domain.WaterwayGauge {
 	}
 
 	return g
+}
+
+func sourceURLForGauge(id string) string {
+	if url := sourceURLsByGaugeID[id]; url != "" {
+		return url
+	}
+	return flowSummaryURL
 }
 
 func toFloat64(v any) (float64, error) {

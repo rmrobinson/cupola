@@ -18,6 +18,7 @@ const (
 	eventsURL   = "https://511on.ca/api/v2/get/event?format=json&lang=en"
 	camerasURL  = "https://511on.ca/api/v2/get/Cameras?format=json&lang=en"
 	roadCondURL = "https://511on.ca/api/v3/get/RoadConditions?format=json&lang=en"
+	publicURL   = "https://511on.ca"
 
 	defaultIncidentInterval = 15 * time.Minute
 	defaultCameraInterval   = 24 * time.Hour
@@ -123,6 +124,7 @@ func (c *IncidentsCollector) fetch(ctx context.Context) error {
 			Lon:         e.Longitude,
 			Description: e.Description,
 			RoadName:    e.RoadwayName,
+			SourceURL:   publicURL,
 		}
 		if e.StartDate > 0 {
 			t := time.Unix(e.StartDate, 0)
@@ -291,8 +293,10 @@ type RoadConditionsCollector struct {
 	state      domain.TrafficRoadConditions
 }
 
-func (c *RoadConditionsCollector) ID() string                { return "511on.road_conditions" }
-func (c *RoadConditionsCollector) Domain() domain.DomainType { return domain.DomainTrafficRoadConditions }
+func (c *RoadConditionsCollector) ID() string { return "511on.road_conditions" }
+func (c *RoadConditionsCollector) Domain() domain.DomainType {
+	return domain.DomainTrafficRoadConditions
+}
 
 func (c *RoadConditionsCollector) Start(ctx context.Context) error {
 	go func() {

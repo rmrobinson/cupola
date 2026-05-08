@@ -23,6 +23,15 @@
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  function escAttr(s) {
+    return esc(s).replace(/"/g, '&quot;');
+  }
+
+  function detailButton(domain, id) {
+    if (!domain || !id) return '';
+    return `<br><button class="map-popup-detail detail-open-action" type="button" data-detail-domain="${escAttr(domain)}" data-detail-id="${escAttr(id)}">More info</button>`;
+  }
+
   function initMap(container, config) {
     // Prefer explicitly-configured centre, then fall back to the home location
     // exposed by the server via window.CupolaConfig.  Use ?? (not ||) so that a
@@ -92,7 +101,7 @@
       if (ovl.type !== 'polygon' || !ovl.coordinates?.length) continue;
       const color = ovl.color || '#ffc060';
       const latLngs = ovl.coordinates.map(([lon, lat]) => [lat, lon]);
-      const popup = `<b>${esc(ovl.label || '')}</b>${ovl.description ? '<br>' + esc(ovl.description) : ''}`;
+      const popup = `<b>${esc(ovl.label || '')}</b>${ovl.description ? '<br>' + esc(ovl.description) : ''}${detailButton(ovl.detail_domain, ovl.detail_id)}`;
       L.polygon(latLngs, {
         color, weight: 2, opacity: 0.85, fillColor: color, fillOpacity: 0.15,
       }).bindPopup(popup).addTo(layerGroup);
@@ -109,12 +118,12 @@
     if (!incidents?.length || config?.layer_incidents === false) return;
     for (const inc of incidents) {
       if (!inc.lat || !inc.lon) continue;
-      const popup = `<b>${esc(inc.type)}</b><br>${esc(inc.road_name)}<br>${esc(inc.description)}<br><i>${esc(inc.severity)}</i>`;
+      const popup = `<b>${esc(inc.type)}</b><br>${esc(inc.road_name)}<br>${esc(inc.description)}<br><i>${esc(inc.severity)}</i>${detailButton('traffic.incidents', inc.id)}`;
       let marker;
       if (inc.type === 'construction') {
         marker = L.marker([inc.lat, inc.lon], { icon: emojiIcon('🚧') });
       } else if (inc.type === 'collision') {
-        marker = L.marker([inc.lat, inc.lon], { icon: emojiIcon('🚗') });
+        marker = L.marker([inc.lat, inc.lon], { icon: emojiIcon('💥') });
       } else {
         const color = INC_COLORS[inc.severity] || '#95a5a6';
         marker = L.circleMarker([inc.lat, inc.lon], {

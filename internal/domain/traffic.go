@@ -19,6 +19,7 @@ type TrafficIncident struct {
 	RoadName    string     `json:"road_name"`
 	StartsAt    *time.Time `json:"starts_at,omitempty"`
 	EndsAt      *time.Time `json:"ends_at,omitempty"`
+	SourceURL   string     `json:"source_url,omitempty"`
 }
 
 type TrafficCameras struct {
