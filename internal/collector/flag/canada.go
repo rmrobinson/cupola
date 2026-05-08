@@ -109,6 +109,7 @@ func (c *Canada) fetch() error {
 	}
 
 	notices := parseNotices(string(body))
+	notices = resolveNoticeUpdates(notices)
 	relevant := filterActive(notices, c.province)
 	state := buildStatus(relevant, c.url)
 
@@ -196,6 +197,7 @@ type halfMastNotice struct {
 	since     *time.Time
 	until     *time.Time
 	createdAt time.Time // from the hidden Unix-ms timestamp in each table row
+	updated   bool
 }
 
 func parseNotices(html string) []halfMastNotice {
@@ -216,6 +218,7 @@ func parseNotices(html string) []halfMastNotice {
 		periodRaw := cellText(cells[1][1])
 		locationRaw := cellText(cells[2][1])
 
+		updated := strings.HasPrefix(reasonRaw, "Updated ")
 		reason := extractNoticeReason(reasonRaw)
 		since, until := parsePeriod(periodRaw)
 		province := detectProvince(locationRaw)
@@ -235,6 +238,7 @@ func parseNotices(html string) []halfMastNotice {
 			since:     since,
 			until:     until,
 			createdAt: createdAt,
+			updated:   updated,
 		})
 	}
 	return notices
@@ -254,6 +258,7 @@ func cellText(html string) string {
 
 // extractNoticeReason returns the text after "Notice of half-masting:" in the cell.
 func extractNoticeReason(text string) string {
+	text = strings.TrimSpace(strings.TrimPrefix(text, "Updated"))
 	const marker = "Notice of half-masting:"
 	if i := strings.Index(text, marker); i >= 0 {
 		text = strings.TrimSpace(text[i+len(marker):])
@@ -355,14 +360,75 @@ func detectProvince(text string) string {
 
 // ── Filtering and status building ─────────────────────────────────────────────
 
+func resolveNoticeUpdates(notices []halfMastNotice) []halfMastNotice {
+	superseded := make([]bool, len(notices))
+	for i, updated := range notices {
+		if !updated.updated {
+			continue
+		}
+		for j, original := range notices {
+			if i == j || original.updated {
+				continue
+			}
+			if noticeSupersedes(updated, original) {
+				superseded[j] = true
+			}
+		}
+	}
+
+	out := make([]halfMastNotice, 0, len(notices))
+	for i, n := range notices {
+		if !superseded[i] {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func noticeSupersedes(updated, original halfMastNotice) bool {
+	if !sameNoticeKey(updated, original) {
+		return false
+	}
+	if updated.createdAt.IsZero() || original.createdAt.IsZero() {
+		return true
+	}
+	return updated.createdAt.After(original.createdAt)
+}
+
+func sameNoticeKey(a, b halfMastNotice) bool {
+	if normalizeNoticeText(a.reason) != normalizeNoticeText(b.reason) {
+		return false
+	}
+	if a.province != b.province {
+		return false
+	}
+	if a.since == nil || b.since == nil {
+		return true
+	}
+	return sameNoticeDay(*a.since, *b.since)
+}
+
+func normalizeNoticeText(s string) string {
+	return strings.Join(strings.Fields(strings.ToLower(s)), " ")
+}
+
+func sameNoticeDay(a, b time.Time) bool {
+	ay, am, ad := a.Date()
+	by, bm, bd := b.Date()
+	return ay == by && am == bm && ad == bd
+}
+
 // filterActive returns notices that are:
 //  1. Not expired    — until is nil, or until is still in the future
 //  2. Already active — since is nil, or since is in the past
 //  3. Not historical — notices with no end date are only kept when they were
-//                      published within maxNoticeAge (the table is a full archive)
+//     published within maxNoticeAge (the table is a full archive)
 //  4. Relevant       — national scope or matching the given province
 func filterActive(notices []halfMastNotice, province string) []halfMastNotice {
-	now := time.Now()
+	return filterActiveAt(notices, province, time.Now())
+}
+
+func filterActiveAt(notices []halfMastNotice, province string, now time.Time) []halfMastNotice {
 	var out []halfMastNotice
 	for _, n := range notices {
 		// Drop expired notices
@@ -376,11 +442,11 @@ func filterActive(notices []halfMastNotice, province string) []halfMastNotice {
 		// Drop open-ended historical notices: no end date + published long ago.
 		// This handles the archive rows going back to 2011.
 		if n.until == nil {
-			if !n.createdAt.IsZero() && time.Since(n.createdAt) > maxNoticeAge {
+			if !n.createdAt.IsZero() && now.Sub(n.createdAt) > maxNoticeAge {
 				continue
 			}
 			// If we have no publication timestamp, use the since date as a proxy.
-			if n.createdAt.IsZero() && n.since != nil && time.Since(*n.since) > maxNoticeAge {
+			if n.createdAt.IsZero() && n.since != nil && now.Sub(*n.since) > maxNoticeAge {
 				continue
 			}
 		}
