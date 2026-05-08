@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'runtime-v1';
+const CACHE_VERSION = 'runtime-v2';
 const STATIC_CACHE = `cupola-static-${CACHE_VERSION}`;
 
 const PRECACHE = [
@@ -10,6 +10,7 @@ const PRECACHE = [
   '/css/horizon.css',
   '/js/stream.js',
   '/js/app-ui.js',
+  '/js/transit-admin.js',
   '/js/subscriptions.js',
   '/js/overlays.js',
   '/js/profile.js',
