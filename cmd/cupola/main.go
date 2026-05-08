@@ -8,11 +8,8 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
-	"regexp"
-	"strings"
 	"syscall"
 	"time"
 
@@ -40,8 +37,6 @@ import (
 	"github.com/rmrobinson/cupola/internal/store"
 	"github.com/rmrobinson/cupola/internal/tiles"
 )
-
-var transitAgencyIDRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 
 func main() {
 	cfgPath := flag.String("config", "config.yaml", "path to config file")
@@ -154,9 +149,6 @@ func main() {
 
 	subManager := store.NewSubscriptionManager()
 
-	if err := seedTransitAgencies(sqliteStore, cfg.Collectors.Transit); err != nil {
-		log.Fatalf("seed transit agencies: %v", err)
-	}
 	transitAgencies, err := gtfsrt.NewAgencyManager(sqliteStore, cfg.Server.DataDir)
 	if err != nil {
 		log.Fatalf("load transit agencies: %v", err)
@@ -294,68 +286,4 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown: %v", err)
 	}
-}
-
-func seedTransitAgencies(db *store.SQLiteStore, cfg *config.TransitConfig) error {
-	if cfg == nil || len(cfg.Agencies) == 0 {
-		return nil
-	}
-	log.Printf("transit: collectors.transit.agencies is deprecated; seeding missing agencies into SQLite")
-	for _, ac := range cfg.Agencies {
-		if err := validateYAMLTransitAgency(ac); err != nil {
-			log.Printf("transit: skipping YAML agency %q: %v", ac.ID, err)
-			continue
-		}
-		inserted, err := db.InsertTransitAgencyIfMissing(store.TransitAgencyConfig{
-			ID:                         strings.TrimSpace(ac.ID),
-			Enabled:                    true,
-			GTFSStaticURLs:             normalizeYAMLURLs(ac.GTFSStaticURLs),
-			GTFSRTTripUpdatesURLs:      normalizeYAMLURLs(ac.GTFSRTTripUpdatesURLs),
-			GTFSRTVehiclePositionsURLs: normalizeYAMLURLs(ac.GTFSRTVehiclePositionsURLs),
-			GTFSRTAlertsURL:            strings.TrimSpace(ac.GTFSRTAlertsURL),
-		})
-		if err != nil {
-			return err
-		}
-		if inserted {
-			log.Printf("transit: migrated YAML agency %s into SQLite", ac.ID)
-		}
-	}
-	return nil
-}
-
-func validateYAMLTransitAgency(ac config.TransitAgencyConfig) error {
-	if !transitAgencyIDRe.MatchString(strings.TrimSpace(ac.ID)) {
-		return fmt.Errorf("invalid agency id")
-	}
-	if len(ac.GTFSStaticURLs) == 0 {
-		return fmt.Errorf("missing gtfs_static_urls")
-	}
-	for _, raw := range append(append(normalizeYAMLURLs(ac.GTFSStaticURLs), normalizeYAMLURLs(ac.GTFSRTTripUpdatesURLs)...), normalizeYAMLURLs(ac.GTFSRTVehiclePositionsURLs)...) {
-		if err := validateYAMLTransitURL(raw); err != nil {
-			return err
-		}
-	}
-	if strings.TrimSpace(ac.GTFSRTAlertsURL) != "" {
-		if err := validateYAMLTransitURL(ac.GTFSRTAlertsURL); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func normalizeYAMLURLs(in []string) []string {
-	out := make([]string, 0, len(in))
-	for _, raw := range in {
-		out = append(out, strings.TrimSpace(raw))
-	}
-	return out
-}
-
-func validateYAMLTransitURL(raw string) error {
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
-		return fmt.Errorf("feed URLs must be absolute http or https URLs")
-	}
-	return nil
 }

@@ -27,8 +27,8 @@ These collectors make outbound HTTPS (or HTTP) requests to external services. Th
 |-----------|---------|-------------------|
 | `envcanada` | `internal/collector/envcanada` | `weather.gc.ca` (forecast and alert Atom feeds); `services.swpc.noaa.gov` (NOAA planetary K-index for solar/aurora data). |
 | `flag` | `internal/collector/flag` | `canada.ca` — scrapes the Canadian Heritage half-masting notices page. |
-| `gtfs` | `internal/collector/gtfs` | Transit agency GTFS static ZIP feeds. URLs are configured per agency in `config.yaml`. |
-| `gtfsrt` | `internal/collector/gtfsrt` | Transit agency GTFS-RT protobuf feeds (trip updates, vehicle positions, alerts). URLs are configured per agency in `config.yaml`. |
+| `gtfs` | `internal/collector/gtfs` | Transit agency GTFS static ZIP feeds. URLs are configured per agency in SQLite through the GTFS Feeds admin/API. |
+| `gtfsrt` | `internal/collector/gtfsrt` | Transit agency GTFS-RT protobuf feeds (trip updates, vehicle positions, alerts). URLs are configured per agency in SQLite through the GTFS Feeds admin/API. |
 | `municipal` | `internal/collector/municipal` | Agency-specific URLs determined by the registered parser. Configured in `config.yaml`. |
 | `rss` | `internal/collector/rss` | Any number of RSS/Atom feed URLs. Fully configurable in `config.yaml`. |
 | `traffic511` | `internal/collector/traffic511` | `511on.ca` — incidents, cameras, and road conditions APIs. URLs are hardcoded to the Ontario 511 service. |

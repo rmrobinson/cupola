@@ -45,26 +45,6 @@ func TestTransitAgencyCRUD(t *testing.T) {
 		t.Fatalf("updated agency = %#v", got)
 	}
 
-	inserted, err := s.InsertTransitAgencyIfMissing(TransitAgencyConfig{
-		ID:                    "grt",
-		Enabled:               true,
-		GTFSStaticURLs:        []string{"https://example.com/other.zip"},
-		GTFSRTTripUpdatesURLs: []string{"https://example.com/other.pb"},
-	})
-	if err != nil {
-		t.Fatalf("InsertTransitAgencyIfMissing() error = %v", err)
-	}
-	if inserted {
-		t.Fatal("InsertTransitAgencyIfMissing() inserted an existing agency")
-	}
-	got, err = s.GetTransitAgency("grt")
-	if err != nil {
-		t.Fatalf("GetTransitAgency() after ignored insert error = %v", err)
-	}
-	if got.Enabled {
-		t.Fatalf("ignored insert overwrote existing agency: %#v", got)
-	}
-
 	if err := s.DeleteTransitAgency("grt"); err != nil {
 		t.Fatalf("DeleteTransitAgency() error = %v", err)
 	}

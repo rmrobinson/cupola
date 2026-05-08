@@ -85,18 +85,9 @@ type EnvCanadaSolarConfig struct {
 	Region       *int     `yaml:"region"` // nil = auto-select from lat/lon
 }
 
-type TransitAgencyConfig struct {
-	ID                         string   `yaml:"id"`
-	GTFSStaticURLs             []string `yaml:"gtfs_static_urls"`
-	GTFSRTTripUpdatesURLs      []string `yaml:"gtfs_rt_trip_updates_urls"`
-	GTFSRTVehiclePositionsURLs []string `yaml:"gtfs_rt_vehicle_positions_urls"`
-	GTFSRTAlertsURL            string   `yaml:"gtfs_rt_alerts_url"`
-}
-
 type TransitConfig struct {
-	Agencies              []TransitAgencyConfig `yaml:"agencies"`
-	RTPollInterval        Duration              `yaml:"rt_poll_interval"`
-	StaticRefreshInterval Duration              `yaml:"static_refresh_interval"`
+	RTPollInterval        Duration `yaml:"rt_poll_interval"`
+	StaticRefreshInterval Duration `yaml:"static_refresh_interval"`
 }
 
 type Traffic511Config struct {

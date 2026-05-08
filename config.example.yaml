@@ -41,18 +41,6 @@ collectors:
   transit:
     rt_poll_interval: 30s
     static_refresh_interval: 24h
-    agencies:
-      - id: grt
-        gtfs_static_urls:
-          - "https://webapps.regionofwaterloo.ca/api/grt-routes/api/staticfeeds/1"  # bus
-          - "https://webapps.regionofwaterloo.ca/api/grt-routes/api/staticfeeds/2"  # LRT
-        gtfs_rt_trip_updates_urls:  # optional; omit for schedule-only agencies
-          - "https://webapps.regionofwaterloo.ca/api/grt-routes/api/tripupdates/1"
-          - "https://webapps.regionofwaterloo.ca/api/grt-routes/api/tripupdates/2"
-        gtfs_rt_vehicle_positions_urls:
-          - "https://webapps.regionofwaterloo.ca/api/grt-routes/api/vehiclepositions/1"
-          - "https://webapps.regionofwaterloo.ca/api/grt-routes/api/vehiclepositions/2"
-        gtfs_rt_alerts_url: "https://webapps.regionofwaterloo.ca/api/grt-routes/api/alerts"
 
   traffic_511:
     enabled: true

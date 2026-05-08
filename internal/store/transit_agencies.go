@@ -59,25 +59,6 @@ func (s *SQLiteStore) GetTransitAgency(id string) (*TransitAgencyConfig, error) 
 	return cfg, err
 }
 
-func (s *SQLiteStore) InsertTransitAgencyIfMissing(cfg TransitAgencyConfig) (bool, error) {
-	now := time.Now().UTC()
-	staticURLs, tripURLs, vehicleURLs, err := marshalTransitAgencyURLs(cfg)
-	if err != nil {
-		return false, err
-	}
-	res, err := s.db.Exec(`
-		INSERT OR IGNORE INTO transit_agencies
-			(id, enabled, gtfs_static_urls, gtfs_rt_trip_updates_urls,
-			 gtfs_rt_vehicle_positions_urls, gtfs_rt_alerts_url, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, cfg.ID, boolInt(cfg.Enabled), staticURLs, tripURLs, vehicleURLs, cfg.GTFSRTAlertsURL, now.Format(time.RFC3339), now.Format(time.RFC3339))
-	if err != nil {
-		return false, err
-	}
-	n, err := res.RowsAffected()
-	return n > 0, err
-}
-
 func (s *SQLiteStore) CreateTransitAgency(cfg TransitAgencyConfig) error {
 	now := time.Now().UTC()
 	staticURLs, tripURLs, vehicleURLs, err := marshalTransitAgencyURLs(cfg)

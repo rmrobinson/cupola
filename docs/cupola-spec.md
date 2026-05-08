@@ -931,16 +931,8 @@ collectors:
     # region: 4
 
   transit:
-    agencies:
-      - id: grt
-        gtfs_url: "https://..."
-        gtfs_rt_url: "https://..."
-      - id: gotransit
-        gtfs_url: "https://..."
-        gtfs_rt_url: "https://..."
-      - id: via
-        gtfs_url: "https://..."
-        gtfs_rt_url: "https://..."
+    rt_poll_interval: 30s
+    static_refresh_interval: 24h
 
   traffic_511:
     enabled: true
