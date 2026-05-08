@@ -61,6 +61,16 @@ func (s *SQLiteStore) migrate() error {
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS transit_agencies (
+			id                             TEXT PRIMARY KEY NOT NULL,
+			enabled                        INTEGER NOT NULL DEFAULT 1,
+			gtfs_static_urls               TEXT NOT NULL,
+			gtfs_rt_trip_updates_urls      TEXT NOT NULL,
+			gtfs_rt_vehicle_positions_urls TEXT NOT NULL DEFAULT '[]',
+			gtfs_rt_alerts_url             TEXT NOT NULL DEFAULT '',
+			created_at                     TEXT NOT NULL,
+			updated_at                     TEXT NOT NULL
+		)`,
 		// GTFS timetable tables — populated by the transit collector, queried
 		// during internet outages to serve schedule-based arrival estimates.
 		`CREATE TABLE IF NOT EXISTS gtfs_stop_times (

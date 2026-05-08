@@ -24,7 +24,7 @@ type Handler struct {
 	notesRefresh func() error   // called after every notes mutation to push SSE
 	tileHandler  *tiles.Handler // nil until tiles are ready
 	frontend     fs.FS          // embedded static files; nil disables file serving
-	agencies     []*gtfsrt.Agency
+	agencies     *gtfsrt.AgencyManager
 	homeLat      float64
 	homeLon      float64
 	countryCode  string
@@ -39,7 +39,7 @@ func NewHandler(
 	notesRefresh func() error,
 	tileHandler *tiles.Handler,
 	frontend fs.FS,
-	agencies []*gtfsrt.Agency,
+	agencies *gtfsrt.AgencyManager,
 	homeLat, homeLon float64,
 	countryCode string,
 	cspImgSrc []string,
@@ -90,6 +90,11 @@ func (h *Handler) Router() http.Handler {
 	r.Get("/api/v1/transit/agencies/{agencyID}/routes", h.getTransitRoutes)
 	r.Get("/api/v1/transit/agencies/{agencyID}/routes/{routeID}/stops", h.getTransitStops)
 	r.Get("/api/v1/transit/agencies/{agencyID}/routes/{routeID}/shape", h.getTransitRouteShape)
+	r.Get("/api/v1/transit/agency-configs", h.listTransitAgencyConfigs)
+	r.Post("/api/v1/transit/agency-configs", h.createTransitAgencyConfig)
+	r.Get("/api/v1/transit/agency-configs/{agencyID}", h.getTransitAgencyConfig)
+	r.Patch("/api/v1/transit/agency-configs/{agencyID}", h.updateTransitAgencyConfig)
+	r.Delete("/api/v1/transit/agency-configs/{agencyID}", h.deleteTransitAgencyConfig)
 
 	r.Get("/tiles/local.pmtiles", h.getTileFile)
 	r.Get("/tiles/{z}/{x}/{y}", h.getTile)

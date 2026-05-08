@@ -12,6 +12,7 @@ func TestNewSQLiteStoreFreshDataDirMigrates(t *testing.T) {
 	tables := []string{
 		"profiles",
 		"notes",
+		"transit_agencies",
 		"gtfs_stop_times",
 		"gtfs_services",
 		"gtfs_service_exceptions",

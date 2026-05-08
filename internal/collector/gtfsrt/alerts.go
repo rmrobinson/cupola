@@ -18,14 +18,22 @@ var htmlTagRe = regexp.MustCompile(`<[^>]+>`)
 
 // AlertsCollector polls GTFS-RT service alert feeds and publishes transit.alerts.
 type AlertsCollector struct {
-	agencies []*Agency
+	agencies AgencySource
 	state    *store.StateStore
 	interval time.Duration
+	wake     chan struct{}
 }
 
 func (c *AlertsCollector) ID() string                { return "gtfsrt.alerts" }
 func (c *AlertsCollector) Domain() domain.DomainType { return domain.DomainTransitAlerts }
 func (c *AlertsCollector) State() domain.DomainState { return c.state.Get(c.Domain()) }
+
+func (c *AlertsCollector) OnSubscription() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+}
 
 func (c *AlertsCollector) Start(ctx context.Context) error {
 	go func() {
@@ -38,6 +46,8 @@ func (c *AlertsCollector) Start(ctx context.Context) error {
 				return
 			case <-t.C:
 				c.fetch()
+			case <-c.wake:
+				c.fetch()
 			}
 		}
 	}()
@@ -48,7 +58,7 @@ func (c *AlertsCollector) fetch() {
 	var alerts []domain.TransitAlert
 	seen := make(map[string]bool)
 
-	for _, ag := range c.agencies {
+	for _, ag := range c.agencies.List() {
 		if ag.AlertsURL == "" {
 			continue
 		}

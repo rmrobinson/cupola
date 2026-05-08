@@ -31,7 +31,7 @@ type Agency struct {
 // loc is used to convert wall-clock time to the agency's local time for calendar
 // queries; pass time.UTC when the timezone is unknown.
 func NewCollectors(
-	agencies []*Agency,
+	agencies AgencySource,
 	subs *store.SubscriptionManager,
 	state *store.StateStore,
 	rtInterval time.Duration,
@@ -62,8 +62,8 @@ func NewCollectors(
 		inFallback:     make(map[string]bool),
 		wake:           make(chan struct{}, 1),
 	}
-	veh := &VehiclesCollector{agencies: agencies, state: state, interval: rtInterval}
-	alt := &AlertsCollector{agencies: agencies, state: state, interval: rtInterval}
+	veh := &VehiclesCollector{agencies: agencies, state: state, interval: rtInterval, wake: make(chan struct{}, 1)}
+	alt := &AlertsCollector{agencies: agencies, state: state, interval: rtInterval, wake: make(chan struct{}, 1)}
 	return arr, veh, alt
 }
 

@@ -12,14 +12,22 @@ import (
 // VehiclesCollector polls GTFS-RT vehicle position feeds and publishes
 // transit.vehicles. All vehicles from all configured agencies are included.
 type VehiclesCollector struct {
-	agencies []*Agency
+	agencies AgencySource
 	state    *store.StateStore
 	interval time.Duration
+	wake     chan struct{}
 }
 
 func (c *VehiclesCollector) ID() string                { return "gtfsrt.vehicles" }
 func (c *VehiclesCollector) Domain() domain.DomainType { return domain.DomainTransitVehicles }
 func (c *VehiclesCollector) State() domain.DomainState { return c.state.Get(c.Domain()) }
+
+func (c *VehiclesCollector) OnSubscription() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+}
 
 func (c *VehiclesCollector) Start(ctx context.Context) error {
 	go func() {
@@ -32,6 +40,8 @@ func (c *VehiclesCollector) Start(ctx context.Context) error {
 				return
 			case <-t.C:
 				c.fetch()
+			case <-c.wake:
+				c.fetch()
 			}
 		}
 	}()
@@ -41,7 +51,7 @@ func (c *VehiclesCollector) Start(ctx context.Context) error {
 func (c *VehiclesCollector) fetch() {
 	var vehicles []domain.TransitVehicle
 
-	for _, ag := range c.agencies {
+	for _, ag := range c.agencies.List() {
 		for _, url := range ag.VehiclePositionsURLs {
 			feed, err := fetchFeed(url)
 			if err != nil {
@@ -106,15 +116,15 @@ func (c *VehiclesCollector) fetch() {
 func gtfsRouteTypeToVehicleType(t int) string {
 	switch t {
 	case 0:
-		return "lrt"   // tram / light rail / streetcar
+		return "lrt" // tram / light rail / streetcar
 	case 1:
 		return "metro" // subway / metro
 	case 2:
 		return "train" // intercity / commuter rail
 	case 3:
-		return "bus"   // bus
+		return "bus" // bus
 	case 11:
-		return "bus"   // trolleybus
+		return "bus" // trolleybus
 	default:
 		return "bus"
 	}

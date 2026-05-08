@@ -209,3 +209,18 @@ func (s *SQLiteStore) HasGTFSData(agencyID string) (bool, error) {
 	).Scan(&exists)
 	return exists == 1, err
 }
+
+func (s *SQLiteStore) DeleteGTFSAgency(agencyID string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	for _, tbl := range []string{"gtfs_stop_times", "gtfs_services", "gtfs_service_exceptions"} {
+		if _, err := tx.Exec("DELETE FROM "+tbl+" WHERE agency_id = ?", agencyID); err != nil {
+			return fmt.Errorf("clear %s: %w", tbl, err)
+		}
+	}
+	return tx.Commit()
+}

@@ -8,8 +8,11 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"regexp"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,7 +23,6 @@ import (
 	ecowittcollector "github.com/rmrobinson/cupola/internal/collector/ecowitt"
 	"github.com/rmrobinson/cupola/internal/collector/envcanada"
 	flagcollector "github.com/rmrobinson/cupola/internal/collector/flag"
-	"github.com/rmrobinson/cupola/internal/collector/gtfs"
 	"github.com/rmrobinson/cupola/internal/collector/gtfsrt"
 	municipalcollector "github.com/rmrobinson/cupola/internal/collector/municipal"
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/enovapower"
@@ -38,6 +40,8 @@ import (
 	"github.com/rmrobinson/cupola/internal/store"
 	"github.com/rmrobinson/cupola/internal/tiles"
 )
+
+var transitAgencyIDRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 
 func main() {
 	cfgPath := flag.String("config", "config.yaml", "path to config file")
@@ -150,45 +154,35 @@ func main() {
 
 	subManager := store.NewSubscriptionManager()
 
-	// Transit: GTFS-RT collectors need subManager, so registration is here.
-	// transitAgencies is also passed to the HTTP handler for the catalog API.
-	var transitAgencies []*gtfsrt.Agency
-	if t := cfg.Collectors.Transit; t != nil && len(t.Agencies) > 0 {
-		rtInterval := t.RTPollInterval.Duration
+	if err := seedTransitAgencies(sqliteStore, cfg.Collectors.Transit); err != nil {
+		log.Fatalf("seed transit agencies: %v", err)
+	}
+	transitAgencies, err := gtfsrt.NewAgencyManager(sqliteStore, cfg.Server.DataDir)
+	if err != nil {
+		log.Fatalf("load transit agencies: %v", err)
+	}
+
+	// Transit collectors are always registered so agencies can be added via the
+	// API later without restarting the service.
+	{
+		var rtInterval, staticInterval time.Duration
+		if t := cfg.Collectors.Transit; t != nil {
+			rtInterval = t.RTPollInterval.Duration
+			staticInterval = t.StaticRefreshInterval.Duration
+		}
 		if rtInterval == 0 {
 			rtInterval = 30 * time.Second
 		}
-		staticInterval := t.StaticRefreshInterval.Duration
 		if staticInterval == 0 {
 			staticInterval = 24 * time.Hour
 		}
 
-		for _, ac := range t.Agencies {
-			if len(ac.GTFSStaticURLs) == 0 {
-				log.Printf("transit: agency %s: skipping — no gtfs_static_urls", ac.ID)
-				continue
-			}
-			if len(ac.GTFSRTTripUpdatesURLs) == 0 {
-				log.Printf("transit: agency %s: skipping — no gtfs_rt_trip_updates_urls", ac.ID)
-				continue
-			}
-			transitAgencies = append(transitAgencies, &gtfsrt.Agency{
-				ID:                   ac.ID,
-				StaticURLs:           ac.GTFSStaticURLs,
-				TripUpdatesURLs:      ac.GTFSRTTripUpdatesURLs,
-				VehiclePositionsURLs: ac.GTFSRTVehiclePositionsURLs,
-				AlertsURL:            ac.GTFSRTAlertsURL,
-				Schedule:             gtfs.New(),
-			})
-		}
-		if len(transitAgencies) > 0 {
-			log.Printf("transit: registering %d agencies (rt=%s, static=%s)",
-				len(transitAgencies), rtInterval, staticInterval)
-			arr, veh, alt := gtfsrt.NewCollectors(transitAgencies, subManager, stateStore, rtInterval, staticInterval, cfg.Server.DataDir, sqliteStore, loc)
-			registry.Register(arr)
-			registry.Register(veh)
-			registry.Register(alt)
-		}
+		log.Printf("transit: registering collectors for %d enabled agencies (rt=%s, static=%s)",
+			len(transitAgencies.List()), rtInterval, staticInterval)
+		arr, veh, alt := gtfsrt.NewCollectors(transitAgencies, subManager, stateStore, rtInterval, staticInterval, cfg.Server.DataDir, sqliteStore, loc)
+		registry.Register(arr)
+		registry.Register(veh)
+		registry.Register(alt)
 	}
 
 	// Municipal collectors: one EventsCollector and/or one AlertsCollector,
@@ -300,4 +294,71 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown: %v", err)
 	}
+}
+
+func seedTransitAgencies(db *store.SQLiteStore, cfg *config.TransitConfig) error {
+	if cfg == nil || len(cfg.Agencies) == 0 {
+		return nil
+	}
+	log.Printf("transit: collectors.transit.agencies is deprecated; seeding missing agencies into SQLite")
+	for _, ac := range cfg.Agencies {
+		if err := validateYAMLTransitAgency(ac); err != nil {
+			log.Printf("transit: skipping YAML agency %q: %v", ac.ID, err)
+			continue
+		}
+		inserted, err := db.InsertTransitAgencyIfMissing(store.TransitAgencyConfig{
+			ID:                         strings.TrimSpace(ac.ID),
+			Enabled:                    true,
+			GTFSStaticURLs:             normalizeYAMLURLs(ac.GTFSStaticURLs),
+			GTFSRTTripUpdatesURLs:      normalizeYAMLURLs(ac.GTFSRTTripUpdatesURLs),
+			GTFSRTVehiclePositionsURLs: normalizeYAMLURLs(ac.GTFSRTVehiclePositionsURLs),
+			GTFSRTAlertsURL:            strings.TrimSpace(ac.GTFSRTAlertsURL),
+		})
+		if err != nil {
+			return err
+		}
+		if inserted {
+			log.Printf("transit: migrated YAML agency %s into SQLite", ac.ID)
+		}
+	}
+	return nil
+}
+
+func validateYAMLTransitAgency(ac config.TransitAgencyConfig) error {
+	if !transitAgencyIDRe.MatchString(strings.TrimSpace(ac.ID)) {
+		return fmt.Errorf("invalid agency id")
+	}
+	if len(ac.GTFSStaticURLs) == 0 {
+		return fmt.Errorf("missing gtfs_static_urls")
+	}
+	if len(ac.GTFSRTTripUpdatesURLs) == 0 {
+		return fmt.Errorf("missing gtfs_rt_trip_updates_urls")
+	}
+	for _, raw := range append(append(normalizeYAMLURLs(ac.GTFSStaticURLs), normalizeYAMLURLs(ac.GTFSRTTripUpdatesURLs)...), normalizeYAMLURLs(ac.GTFSRTVehiclePositionsURLs)...) {
+		if err := validateYAMLTransitURL(raw); err != nil {
+			return err
+		}
+	}
+	if strings.TrimSpace(ac.GTFSRTAlertsURL) != "" {
+		if err := validateYAMLTransitURL(ac.GTFSRTAlertsURL); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func normalizeYAMLURLs(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, raw := range in {
+		out = append(out, strings.TrimSpace(raw))
+	}
+	return out
+}
+
+func validateYAMLTransitURL(raw string) error {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return fmt.Errorf("feed URLs must be absolute http or https URLs")
+	}
+	return nil
 }

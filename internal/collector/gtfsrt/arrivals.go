@@ -9,7 +9,6 @@ import (
 
 	pb "github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs"
 
-	"github.com/rmrobinson/cupola/internal/collector/gtfs"
 	"github.com/rmrobinson/cupola/internal/domain"
 	"github.com/rmrobinson/cupola/internal/store"
 )
@@ -20,7 +19,7 @@ const maxArrivalsPerStop = 8
 // Only (agency:route:stop_id) combinations that have active widget subscriptions
 // are populated; all others are omitted to avoid unbounded state growth.
 type ArrivalsCollector struct {
-	agencies       []*Agency
+	agencies       AgencySource
 	subs           *store.SubscriptionManager
 	state          *store.StateStore
 	rtInterval     time.Duration
@@ -67,8 +66,8 @@ func (c *ArrivalsCollector) staticLoop(ctx context.Context) {
 }
 
 func (c *ArrivalsCollector) refreshStatic() {
-	for _, ag := range c.agencies {
-		if err := gtfs.LoadAndPersist(ag.Schedule, ag.ID, ag.StaticURLs, c.cacheDir, c.db); err != nil {
+	for _, ag := range c.agencies.List() {
+		if err := c.agencies.RefreshStatic(ag.ID); err != nil {
 			log.Printf("[gtfsrt] %s: static refresh: %v", ag.ID, err)
 		}
 	}
@@ -111,7 +110,7 @@ func (c *ArrivalsCollector) fetch() {
 	stops := make(map[string]domain.StopArrivals)
 	now := time.Now().In(c.loc)
 
-	for _, ag := range c.agencies {
+	for _, ag := range c.agencies.List() {
 		rtOK := c.fetchRTForAgency(ag, wanted, stops, now)
 		if c.db == nil {
 			continue

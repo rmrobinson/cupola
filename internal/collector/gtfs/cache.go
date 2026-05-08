@@ -54,3 +54,7 @@ func LoadZips(cacheDir, agencyID string) ([][]byte, error) {
 	}
 	return blobs, nil
 }
+
+func DeleteZipCache(cacheDir, agencyID string) error {
+	return os.RemoveAll(zipCacheDir(cacheDir, agencyID))
+}
