@@ -1,7 +1,9 @@
 package store
 
 import (
+	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -74,50 +76,14 @@ func (s *SQLiteStore) ReplaceGTFSAgency(
 		}
 	}
 
-	stStmt, err := tx.Prepare(`
-		INSERT OR IGNORE INTO gtfs_stop_times
-			(agency_id, route_id, trip_id, stop_id, headsign, service_id, stop_sequence, departure_secs)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`)
-	if err != nil {
-		return fmt.Errorf("prepare stop_times: %w", err)
+	if err := batchInsertStopTimes(tx, agencyID, stopTimes); err != nil {
+		return fmt.Errorf("insert stop_times: %w", err)
 	}
-	defer stStmt.Close()
-	for _, st := range stopTimes {
-		if _, err := stStmt.Exec(
-			agencyID, st.RouteID, st.TripID, st.StopID,
-			st.Headsign, st.ServiceID, st.StopSequence, st.DepartureSecs,
-		); err != nil {
-			return fmt.Errorf("insert stop_time: %w", err)
-		}
+	if err := batchInsertServices(tx, agencyID, services); err != nil {
+		return fmt.Errorf("insert services: %w", err)
 	}
-
-	svcStmt, err := tx.Prepare(`
-		INSERT OR IGNORE INTO gtfs_services (agency_id, service_id, weekday_mask, start_date, end_date)
-		VALUES (?, ?, ?, ?, ?)
-	`)
-	if err != nil {
-		return fmt.Errorf("prepare services: %w", err)
-	}
-	defer svcStmt.Close()
-	for _, svc := range services {
-		if _, err := svcStmt.Exec(agencyID, svc.ServiceID, svc.WeekdayMask, svc.StartDate, svc.EndDate); err != nil {
-			return fmt.Errorf("insert service: %w", err)
-		}
-	}
-
-	excStmt, err := tx.Prepare(`
-		INSERT OR IGNORE INTO gtfs_service_exceptions (agency_id, service_id, date, added)
-		VALUES (?, ?, ?, ?)
-	`)
-	if err != nil {
-		return fmt.Errorf("prepare exceptions: %w", err)
-	}
-	defer excStmt.Close()
-	for _, exc := range exceptions {
-		if _, err := excStmt.Exec(agencyID, exc.ServiceID, exc.Date, boolInt(exc.Added)); err != nil {
-			return fmt.Errorf("insert exception: %w", err)
-		}
+	if err := batchInsertExceptions(tx, agencyID, exceptions); err != nil {
+		return fmt.Errorf("insert exceptions: %w", err)
 	}
 
 	return tx.Commit()
@@ -223,4 +189,69 @@ func (s *SQLiteStore) DeleteGTFSAgency(agencyID string) error {
 		}
 	}
 	return tx.Commit()
+}
+
+// gtfsBatchSize is the number of rows per multi-row INSERT. Each table's column
+// count × gtfsBatchSize must stay under SQLite's default variable limit (999).
+// stop_times has 8 columns → 8×100 = 800 params, safely under the limit.
+const gtfsBatchSize = 100
+
+func batchInsertStopTimes(tx *sql.Tx, agencyID string, rows []GTFSStopTime) error {
+	for i := 0; i < len(rows); i += gtfsBatchSize {
+		batch := rows[i:min(i+gtfsBatchSize, len(rows))]
+		var sb strings.Builder
+		sb.WriteString("INSERT OR IGNORE INTO gtfs_stop_times (agency_id,route_id,trip_id,stop_id,headsign,service_id,stop_sequence,departure_secs) VALUES ")
+		args := make([]any, 0, len(batch)*8)
+		for j, st := range batch {
+			if j > 0 {
+				sb.WriteByte(',')
+			}
+			sb.WriteString("(?,?,?,?,?,?,?,?)")
+			args = append(args, agencyID, st.RouteID, st.TripID, st.StopID, st.Headsign, st.ServiceID, st.StopSequence, st.DepartureSecs)
+		}
+		if _, err := tx.Exec(sb.String(), args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func batchInsertServices(tx *sql.Tx, agencyID string, rows []GTFSService) error {
+	for i := 0; i < len(rows); i += gtfsBatchSize {
+		batch := rows[i:min(i+gtfsBatchSize, len(rows))]
+		var sb strings.Builder
+		sb.WriteString("INSERT OR IGNORE INTO gtfs_services (agency_id,service_id,weekday_mask,start_date,end_date) VALUES ")
+		args := make([]any, 0, len(batch)*5)
+		for j, svc := range batch {
+			if j > 0 {
+				sb.WriteByte(',')
+			}
+			sb.WriteString("(?,?,?,?,?)")
+			args = append(args, agencyID, svc.ServiceID, svc.WeekdayMask, svc.StartDate, svc.EndDate)
+		}
+		if _, err := tx.Exec(sb.String(), args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func batchInsertExceptions(tx *sql.Tx, agencyID string, rows []GTFSServiceException) error {
+	for i := 0; i < len(rows); i += gtfsBatchSize {
+		batch := rows[i:min(i+gtfsBatchSize, len(rows))]
+		var sb strings.Builder
+		sb.WriteString("INSERT OR IGNORE INTO gtfs_service_exceptions (agency_id,service_id,date,added) VALUES ")
+		args := make([]any, 0, len(batch)*4)
+		for j, exc := range batch {
+			if j > 0 {
+				sb.WriteByte(',')
+			}
+			sb.WriteString("(?,?,?,?)")
+			args = append(args, agencyID, exc.ServiceID, exc.Date, boolInt(exc.Added))
+		}
+		if _, err := tx.Exec(sb.String(), args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
