@@ -49,13 +49,36 @@ func (c *ArrivalsCollector) OnSubscription() {
 }
 
 func (c *ArrivalsCollector) Start(ctx context.Context) error {
-	go c.staticLoop(ctx)
-	go c.rtLoop(ctx)
+	// staticReady is closed after the first refreshStatic completes so that
+	// rtLoop does not call fetch before route/stop names are in memory.
+	staticReady := make(chan struct{})
+	go c.staticLoop(ctx, staticReady)
+	go c.rtLoop(ctx, staticReady)
 	return nil
 }
 
-func (c *ArrivalsCollector) staticLoop(ctx context.Context) {
-	c.refreshStatic()
+func (c *ArrivalsCollector) staticLoop(ctx context.Context, ready chan struct{}) {
+	// Initial load: unblock rtLoop after the first agency is ready, then wake
+	// it again after each subsequent agency so widgets update progressively.
+	readyClosed := false
+	for _, ag := range c.agencies.List() {
+		if err := c.agencies.RefreshStatic(ag.ID); err != nil {
+			log.Printf("[gtfsrt] %s: static refresh: %v", ag.ID, err)
+		}
+		if !readyClosed {
+			close(ready)
+			readyClosed = true
+		} else {
+			select {
+			case c.wake <- struct{}{}:
+			default:
+			}
+		}
+	}
+	if !readyClosed {
+		close(ready)
+	}
+
 	t := time.NewTicker(c.staticInterval)
 	defer t.Stop()
 	for {
@@ -76,7 +99,12 @@ func (c *ArrivalsCollector) refreshStatic() {
 	}
 }
 
-func (c *ArrivalsCollector) rtLoop(ctx context.Context) {
+func (c *ArrivalsCollector) rtLoop(ctx context.Context, ready chan struct{}) {
+	select {
+	case <-ready:
+	case <-ctx.Done():
+		return
+	}
 	if c.netCheck == nil || c.netCheck() {
 		c.fetch()
 	}
