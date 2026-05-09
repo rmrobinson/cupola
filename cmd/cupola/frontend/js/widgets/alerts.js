@@ -29,17 +29,6 @@
     return esc(s).replace(/"/g, '&quot;');
   }
 
-  function safeHTTPURL(raw) {
-    if (!raw) return '';
-    try {
-      const u = new URL(raw, window.location.href);
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
-      return u.href;
-    } catch {
-      return '';
-    }
-  }
-
   function fmtTime(iso) {
     if (!iso) return '';
     return new Date(iso).toLocaleString(undefined, {
@@ -158,10 +147,6 @@
       const timeStr = fmtTime(a.published_at || a.onset);
       const endsStr = (a.expires || a.ends_at) ? ` — ends ${fmtTime(a.expires || a.ends_at)}` : '';
       const area = a.area ? `<span class="alert-area">${esc(a.area)}</span>` : '';
-      const linkURL = safeHTTPURL(a.source_url || a.url);
-      const link = linkURL
-        ? `<a class="alert-link" href="${escAttr(linkURL)}" target="_blank" rel="noopener">Details ↗</a>`
-        : '';
       return `
         <div class="alert-card detail-clickable" style="border-left-color:${sev.text}"
              data-detail-domain="${escAttr(a._domain)}" data-detail-id="${escAttr(a.id)}"
@@ -174,7 +159,6 @@
           <div class="alert-title">${esc(a.title)}</div>
           ${area}
           ${desc ? `<div class="alert-desc">${esc(desc)}</div>` : ''}
-          ${link}
         </div>
       `;
     }).join('');
