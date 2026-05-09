@@ -1,0 +1,101 @@
+location:
+  name: "Home"
+  lat: 43.45
+  lon: -80.49
+  timezone: "America/Toronto"
+  country_code: "CA"
+
+server:
+  port: 8181
+  data_dir: "/var/lib/cupolad"
+  csp_img_src:
+    - "https://511on.ca"
+    - "https://511.alberta.ca"
+    - "https://www.drivebc.ca"
+
+tiles:
+  radius_km: 50
+  cache_path: "/var/lib/cupolad/tiles/local.pmtiles"
+
+connectivity:
+  check_url: "http://connectivitycheck.gstatic.com/generate_204"
+  interval: 30s
+
+collectors:
+  weather_ecowitt:
+    enabled: false
+    url: "http://192.168.1.x"
+    poll_interval: 60s
+
+  weather_envcanada:
+    enabled: true
+    poll_interval_forecast: 1h
+    poll_interval_alerts: 15m
+
+  solar_envcanada:
+    enabled: true
+    poll_interval: 1h
+
+  transit:
+    rt_poll_interval: 30s
+    static_refresh_interval: 24h
+
+  traffic_511:
+    enabled: true
+    provinces: [ON]
+    poll_interval_incidents: 15m
+    poll_interval_cameras: 24h
+
+  aircraft_dump1090:
+    enabled: false
+    url: "http://localhost:8080"
+    poll_interval: 5s
+    radius_km: 250
+
+  rss_feeds: []
+
+  flag_canada:
+    enabled: true
+    poll_interval: 4h
+
+  waterways:
+    - id: grand_river
+      parser: grca
+      url: "https://www.grandriver.ca/our-watershed/river-data/"
+      poll_interval: 15m
+      alert_on: [warning, emergency]
+
+  municipal:
+    - id: kitchener_snow
+      parser: kitchener.snow
+      url: "https://www.kitchener.ca/news/snow-events/"
+      poll_interval: 30m
+      domain: municipal.events
+    - id: grca_flood
+      parser: grca.flood
+      url: "https://www.grandriver.ca/news/categories/flood-messages/"
+      poll_interval: 15m
+      domain: municipal.alerts
+    - id: enova_power
+      parser: enova.power
+      url: "https://oms.enovapower.com/Outages/"
+      poll_interval: 10m
+      domain: municipal.alerts
+    - id: kitchener_utilities
+      parser: kitchener.utilities
+      url: "https://www.kitchenerutilities.ca/en/outages-and-news.aspx"
+      poll_interval: 10m
+      domain: municipal.alerts
+
+  waste_collection:
+    enabled: false
+    data_path: "/var/lib/cupolad/waste_schedule.json"
+    week_start: sunday
+
+  imap:
+    enabled: false
+    host: "imap.example.com"
+    port: 993
+    username: "alerts@example.com"
+    password: "${IMAP_PASSWORD}"
+    poll_interval: 2m
