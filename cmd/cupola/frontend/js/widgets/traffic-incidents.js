@@ -38,6 +38,10 @@
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
+  function hasLocation(i) {
+    return Number.isFinite(i.lat) && Number.isFinite(i.lon) && (i.lat !== 0 || i.lon !== 0);
+  }
+
   function render(container, state, config) {
     const maxN = config?.max_items > 0 ? Number(config.max_items) : 10;
     const sevFilter = Array.isArray(config?.severities) && config.severities.length > 0
@@ -47,13 +51,18 @@
     const homeLon = window.CupolaConfig?.lon;
     const incidents = (state?.incidents || [])
       .filter(i => !sevFilter || sevFilter.includes(i.severity))
-      .filter(i => !radiusKm || !homeLat || !homeLon ||
+      .filter(i => !radiusKm || !homeLat || !homeLon || !hasLocation(i) ||
                    haversineKm(homeLat, homeLon, i.lat, i.lon) <= radiusKm)
       .slice()
       .sort((a, b) => {
-        if (homeLat && homeLon) {
+        const al = hasLocation(a);
+        const bl = hasLocation(b);
+        if (homeLat && homeLon && al && bl) {
           return haversineKm(homeLat, homeLon, a.lat, a.lon) -
                  haversineKm(homeLat, homeLon, b.lat, b.lon);
+        }
+        if (al !== bl) {
+          return (SEV_ORDER[a.severity] ?? 3) - (SEV_ORDER[b.severity] ?? 3);
         }
         return (SEV_ORDER[a.severity] ?? 3) - (SEV_ORDER[b.severity] ?? 3);
       })
@@ -89,6 +98,9 @@
     const timeStr = starts
       ? (ends ? `${starts} – ${ends}` : `Since ${starts}`)
       : '';
+    const locationNote = inc.approximate_location
+      ? `${inc.location_label || 'Approximate location'} · not shown on map`
+      : '';
 
     return `
       <div class="incident-row sev-${esc(inc.severity)} detail-clickable"
@@ -100,6 +112,7 @@
           <span class="incident-sev incident-sev-${esc(inc.severity)}">${esc(inc.severity)}</span>
         </div>
         <div class="incident-desc">${esc(inc.description)}</div>
+        ${locationNote ? `<div class="incident-location-note">${esc(locationNote)}</div>` : ''}
         ${timeStr ? `<div class="incident-time">${timeStr}</div>` : ''}
       </div>`;
   }

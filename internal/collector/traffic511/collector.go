@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,10 +16,12 @@ import (
 )
 
 const (
-	eventsURL   = "https://511on.ca/api/v2/get/event?format=json&lang=en"
-	camerasURL  = "https://511on.ca/api/v2/get/Cameras?format=json&lang=en"
-	roadCondURL = "https://511on.ca/api/v3/get/RoadConditions?format=json&lang=en"
-	publicURL   = "https://511on.ca"
+	eventsURL                    = "https://511on.ca/api/v2/get/event?format=json&lang=en"
+	camerasURL                   = "https://511on.ca/api/v2/get/Cameras?format=json&lang=en"
+	roadCondURL                  = "https://511on.ca/api/v3/get/RoadConditions?format=json&lang=en"
+	publicURL                    = "https://511on.ca"
+	kitchenerRoadClosuresURL     = "https://www.kitchener.ca/roadclosures"
+	kitchenerRoadClosuresListURL = "https://app2.kitchener.ca/roadclosures/list.asp"
 
 	defaultIncidentInterval = 15 * time.Minute
 	defaultCameraInterval   = 24 * time.Hour
@@ -35,27 +38,40 @@ func NewCollectors(incidentInterval, cameraInterval time.Duration, stateStore *s
 	if cameraInterval == 0 {
 		cameraInterval = defaultCameraInterval
 	}
-	return &IncidentsCollector{interval: incidentInterval, stateStore: stateStore},
+	return NewIncidentsCollector(incidentInterval, stateStore, NewON511IncidentsSource(), NewKitchenerRoadClosuresSource()),
 		&CamerasCollector{interval: cameraInterval, stateStore: stateStore},
 		&RoadConditionsCollector{interval: incidentInterval, stateStore: stateStore}
 }
 
 // ── Incidents ─────────────────────────────────────────────────────────────────
 
+type IncidentSource interface {
+	ID() string
+	Fetch(ctx context.Context) ([]domain.TrafficIncident, error)
+}
+
 type IncidentsCollector struct {
 	interval   time.Duration
 	stateStore *store.StateStore
+	sources    []IncidentSource
 	mu         sync.RWMutex
 	state      domain.TrafficIncidents
 }
 
-func (c *IncidentsCollector) ID() string                { return "511on.incidents" }
+func NewIncidentsCollector(interval time.Duration, stateStore *store.StateStore, sources ...IncidentSource) *IncidentsCollector {
+	if interval == 0 {
+		interval = defaultIncidentInterval
+	}
+	return &IncidentsCollector{interval: interval, stateStore: stateStore, sources: sources}
+}
+
+func (c *IncidentsCollector) ID() string                { return "traffic.incidents" }
 func (c *IncidentsCollector) Domain() domain.DomainType { return domain.DomainTrafficIncidents }
 
 func (c *IncidentsCollector) Start(ctx context.Context) error {
 	go func() {
 		if err := c.fetch(ctx); err != nil {
-			log.Printf("[511on.incidents] initial fetch: %v", err)
+			log.Printf("[traffic.incidents] initial fetch: %v", err)
 			c.stateStore.PublishSystem(store.SystemEvent{
 				CollectorID: c.ID(), Status: "error", Message: err.Error(),
 			})
@@ -70,7 +86,7 @@ func (c *IncidentsCollector) Start(ctx context.Context) error {
 				return
 			case <-t.C:
 				if err := c.fetch(ctx); err != nil {
-					log.Printf("[511on.incidents] fetch: %v", err)
+					log.Printf("[traffic.incidents] fetch: %v", err)
 					c.stateStore.PublishSystem(store.SystemEvent{
 						CollectorID: c.ID(), Status: "error", Message: err.Error(),
 					})
@@ -89,6 +105,46 @@ func (c *IncidentsCollector) State() domain.DomainState {
 	return c.state
 }
 
+func (c *IncidentsCollector) fetch(ctx context.Context) error {
+	var incidents []domain.TrafficIncident
+	var failed []string
+	for _, source := range c.sources {
+		items, err := source.Fetch(ctx)
+		if err != nil {
+			log.Printf("[%s] fetch: %v", source.ID(), err)
+			failed = append(failed, fmt.Sprintf("%s: %v", source.ID(), err))
+			c.stateStore.PublishSystem(store.SystemEvent{
+				CollectorID: source.ID(), Status: "error", Message: err.Error(),
+			})
+			continue
+		}
+		incidents = append(incidents, items...)
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: source.ID(), Status: "ok"})
+		log.Printf("[%s] fetched %d incidents", source.ID(), len(items))
+	}
+
+	state := domain.TrafficIncidents{
+		StateBase: domain.StateBase{UpdatedAt: time.Now().UTC()},
+		Incidents: incidents,
+	}
+	c.mu.Lock()
+	c.state = state
+	c.mu.Unlock()
+	c.stateStore.Set(state)
+	log.Printf("[traffic.incidents] published %d incidents from %d source(s)", len(incidents), len(c.sources))
+
+	if len(failed) == len(c.sources) && len(c.sources) > 0 {
+		return fmt.Errorf("all traffic incident sources failed: %s", strings.Join(failed, "; "))
+	}
+	return nil
+}
+
+type ON511IncidentsSource struct{}
+
+func NewON511IncidentsSource() *ON511IncidentsSource { return &ON511IncidentsSource{} }
+
+func (s *ON511IncidentsSource) ID() string { return "511on.incidents" }
+
 // on511Event is the raw JSON shape returned by the Events endpoint.
 type on511Event struct {
 	ID                int     `json:"ID"`
@@ -104,14 +160,14 @@ type on511Event struct {
 	Severity          string  `json:"Severity"`
 }
 
-func (c *IncidentsCollector) fetch(ctx context.Context) error {
+func (s *ON511IncidentsSource) Fetch(ctx context.Context) ([]domain.TrafficIncident, error) {
 	body, err := getJSON(ctx, eventsURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var raw []on511Event
 	if err := json.Unmarshal(body, &raw); err != nil {
-		return fmt.Errorf("unmarshal events: %w", err)
+		return nil, fmt.Errorf("unmarshal events: %w", err)
 	}
 
 	incidents := make([]domain.TrafficIncident, 0, len(raw))
@@ -136,17 +192,7 @@ func (c *IncidentsCollector) fetch(ctx context.Context) error {
 		}
 		incidents = append(incidents, inc)
 	}
-
-	state := domain.TrafficIncidents{
-		StateBase: domain.StateBase{UpdatedAt: time.Now().UTC()},
-		Incidents: incidents,
-	}
-	c.mu.Lock()
-	c.state = state
-	c.mu.Unlock()
-	c.stateStore.Set(state)
-	log.Printf("[511on.incidents] fetched %d incidents", len(incidents))
-	return nil
+	return incidents, nil
 }
 
 func mapEventType(et string) string {

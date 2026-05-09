@@ -17,6 +17,7 @@
     expires: 'Expires',
     flow_cms: 'Flow',
     level_m: 'Level',
+    location: 'Location',
     onset: 'Onset',
     published_at: 'Published',
     road_name: 'Road',

@@ -148,6 +148,19 @@ func (h *Handler) detailFor(dt domain.DomainType, id string) (domain.Detail, boo
 			if inc.ID != id {
 				continue
 			}
+			var loc *domain.DetailLocation
+			if !inc.ApproximateLocation && (inc.Lat != 0 || inc.Lon != 0) {
+				loc = &domain.DetailLocation{Lat: inc.Lat, Lon: inc.Lon}
+			}
+			locationValue := "specific"
+			if inc.ApproximateLocation {
+				locationValue = inc.LocationLabel
+				if locationValue != "" {
+					locationValue += " (approximate; not shown on map)"
+				} else {
+					locationValue = "approximate; not shown on map"
+				}
+			}
 			return domain.Detail{
 				Domain:      string(dt),
 				ID:          inc.ID,
@@ -158,11 +171,12 @@ func (h *Handler) detailFor(dt domain.DomainType, id string) (domain.Detail, boo
 				Fields: compactFields([]domain.DetailField{
 					{Key: "road_name", Value: inc.RoadName},
 					{Key: "type", Value: inc.Type},
+					{Key: "location", Value: locationValue},
 					fieldTime("starts_at", inc.StartsAt),
 					fieldTime("ends_at", inc.EndsAt),
 				}),
 				SourceURL: safeSourceURL(inc.SourceURL),
-				Location:  &domain.DetailLocation{Lat: inc.Lat, Lon: inc.Lon},
+				Location:  loc,
 			}, true
 		}
 

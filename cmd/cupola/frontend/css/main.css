@@ -1685,6 +1685,12 @@ button {
   margin-top: 2px;
 }
 
+.incident-location-note {
+  font-size: 10px;
+  color: rgba(255,255,255,0.52);
+  margin-top: 2px;
+}
+
 /* Cameras */
 
 .widget-traffic-camera {

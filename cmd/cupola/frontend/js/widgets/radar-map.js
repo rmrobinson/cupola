@@ -117,6 +117,7 @@
     layerGroup.clearLayers();
     if (!incidents?.length || config?.layer_incidents === false) return;
     for (const inc of incidents) {
+      if (inc.approximate_location) continue;
       if (!inc.lat || !inc.lon) continue;
       const popup = `<b>${esc(inc.type)}</b><br>${esc(inc.road_name)}<br>${esc(inc.description)}<br><i>${esc(inc.severity)}</i>${detailButton('traffic.incidents', inc.id)}`;
       let marker;
