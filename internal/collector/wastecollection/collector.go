@@ -13,10 +13,17 @@ import (
 	"github.com/rmrobinson/cupola/internal/store"
 )
 
+type extraCollectionEntry struct {
+	Date      string `json:"date"`
+	DayOfWeek string `json:"day_of_week"`
+	Type      string `json:"type"`
+}
+
 type scheduleEntry struct {
-	Date        string   `json:"date"`
-	DayOfWeek   string   `json:"day_of_week"`
-	Collections []string `json:"collections"`
+	Date             string                 `json:"date"`
+	DayOfWeek        string                 `json:"day_of_week"`
+	Collections      []string               `json:"collections"`
+	ExtraCollections []extraCollectionEntry `json:"extra_collections"`
 }
 
 type scheduleFile struct {
@@ -82,6 +89,25 @@ func (c *Collector) load() error {
 	if err := json.Unmarshal(raw, &sf); err != nil {
 		return err
 	}
+	for _, e := range sf.Schedule {
+		entryDate, err := time.ParseInLocation("2006-01-02", e.Date, time.Local)
+		if err != nil {
+			continue
+		}
+		ws := currentWeekStart(entryDate, c.weekStart)
+		we := ws.AddDate(0, 0, 7)
+		for _, ex := range e.ExtraCollections {
+			exd, err := time.ParseInLocation("2006-01-02", ex.Date, time.Local)
+			if err != nil {
+				log.Printf("[waste.collection] entry %s: extra collection %q has invalid date %q", e.Date, ex.Type, ex.Date)
+				continue
+			}
+			if exd.Before(ws) || !exd.Before(we) {
+				log.Printf("[waste.collection] entry %s: extra collection %q date %s falls outside its week [%s, %s)",
+					e.Date, ex.Type, ex.Date, ws.Format("2006-01-02"), we.Format("2006-01-02"))
+			}
+		}
+	}
 	c.mu.Lock()
 	c.schedule = sf.Schedule
 	c.mu.Unlock()
@@ -113,12 +139,29 @@ func (c *Collector) compute() domain.WasteCollection {
 			continue
 		}
 		if !d.Before(ws) && d.Before(we) {
+			var extras []domain.ExtraCollection
+			for _, ex := range e.ExtraCollections {
+				exd, err := time.ParseInLocation("2006-01-02", ex.Date, time.Local)
+				if err != nil {
+					continue
+				}
+				if exd.Before(ws) || !exd.Before(we) {
+					continue
+				}
+				extras = append(extras, domain.ExtraCollection{
+					Date:      ex.Date,
+					DayOfWeek: ex.DayOfWeek,
+					Type:      ex.Type,
+					IsToday:   exd.Equal(today),
+				})
+			}
 			return domain.WasteCollection{
-				StateBase:   domain.StateBase{UpdatedAt: now.UTC()},
-				Date:        e.Date,
-				DayOfWeek:   e.DayOfWeek,
-				Collections: e.Collections,
-				IsToday:     d.Equal(today),
+				StateBase:        domain.StateBase{UpdatedAt: now.UTC()},
+				Date:             e.Date,
+				DayOfWeek:        e.DayOfWeek,
+				Collections:      e.Collections,
+				IsToday:          d.Equal(today),
+				ExtraCollections: extras,
 			}
 		}
 	}

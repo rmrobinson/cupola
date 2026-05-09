@@ -2103,6 +2103,43 @@ button {
   font-style: italic;
 }
 
+.waste-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.waste-extra-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.waste-extra-row.waste-extra-today {
+  opacity: 1;
+  color: #ffd54f;
+}
+
+.waste-extra-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b5651d;
+  flex-shrink: 0;
+}
+
+.waste-extra-type {
+  font-weight: 600;
+}
+
+.waste-extra-day {
+  opacity: 0.65;
+}
+
 /* ── Alerts widget ─────────────────────────────────────────────────────────── */
 
 .widget-alerts {
