@@ -8,7 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Cupola</title>
   <link rel="manifest" href="/manifest.json">
-  <link rel="apple-touch-icon" href="/icons/icon.svg">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/css/main.css">
   <link rel="stylesheet" href="/css/grid.css">
   <link rel="stylesheet" href="/css/horizon.css">
@@ -21,8 +23,13 @@
   <div id="landing" class="landing hidden"></div>
   <div id="canvas" class="canvas hidden">
     <div id="canvas-toolbar" class="canvas-toolbar">
-      <button id="btn-admin" class="btn-small" title="Open admin">Admin</button>
-      <button id="btn-add-widget" class="btn-small" title="Add widget">+ Widget</button>
+      <div class="canvas-brand" aria-label="Cupola">
+        <img src="/icons/icon-192.png" alt="" class="canvas-brand-icon">
+      </div>
+      <div class="canvas-toolbar-actions">
+        <button id="btn-admin" class="btn-small" title="Open admin">Admin</button>
+        <button id="btn-add-widget" class="btn-small" title="Add widget">+ Widget</button>
+      </div>
     </div>
     <div id="widget-grid" class="widget-grid"></div>
   </div>

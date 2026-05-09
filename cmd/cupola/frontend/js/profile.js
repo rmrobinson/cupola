@@ -45,7 +45,10 @@ const Profile = (() => {
 
     el.innerHTML = `
       <div class="landing-card">
-        <h1 class="landing-heading">Cupola</h1>
+        <h1 class="landing-heading">
+          <img src="/icons/icon-192.png" alt="" class="landing-heading-icon">
+          <span>Cupola</span>
+        </h1>
         <div class="landing-body">
           <section class="landing-section">
             <button id="btn-new-layout" class="btn-primary">New dashboard</button>
