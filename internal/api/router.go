@@ -98,6 +98,8 @@ func (h *Handler) Router() http.Handler {
 	r.Get("/api/v1/transit/agencies/{agencyID}/routes", h.getTransitRoutes)
 	r.Get("/api/v1/transit/agencies/{agencyID}/routes/{routeID}/stops", h.getTransitStops)
 	r.Get("/api/v1/transit/agencies/{agencyID}/routes/{routeID}/shape", h.getTransitRouteShape)
+	r.Get("/api/v1/transit/agencies/{agencyID}/stops", h.getTransitAllStops)
+	r.Get("/api/v1/transit/agencies/{agencyID}/stops/{stopID}/routes", h.getTransitRoutesForStop)
 	r.Get("/api/v1/transit/agency-configs", h.listTransitAgencyConfigs)
 	r.Post("/api/v1/transit/agency-configs", h.createTransitAgencyConfig)
 	r.Get("/api/v1/transit/agency-configs/{agencyID}", h.getTransitAgencyConfig)

@@ -108,6 +108,56 @@ type routeShapeResponse struct {
 	Geometry geoJSONMultiLineString `json:"geometry"`
 }
 
+func (h *Handler) getTransitAllStops(w http.ResponseWriter, r *http.Request) {
+	ag := h.findAgency(chi.URLParam(r, "agencyID"))
+	if ag == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !ag.Schedule.HasRoutes() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
+		return
+	}
+	stops := ag.Schedule.AllStops()
+	out := make([]stopInfo, 0, len(stops))
+	for _, st := range stops {
+		out = append(out, stopInfo{
+			ID:         st.ID,
+			Code:       st.Code,
+			Name:       st.Name,
+			Lat:        st.Lat,
+			Lon:        st.Lon,
+			DistanceKm: haversineKm(h.homeLat, h.homeLon, st.Lat, st.Lon),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].DistanceKm < out[j].DistanceKm })
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
+func (h *Handler) getTransitRoutesForStop(w http.ResponseWriter, r *http.Request) {
+	ag := h.findAgency(chi.URLParam(r, "agencyID"))
+	if ag == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !ag.Schedule.HasRoutes() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
+		return
+	}
+	routes := ag.Schedule.RoutesForStop(chi.URLParam(r, "stopID"))
+	out := make([]routeInfo, 0, len(routes))
+	for _, rt := range routes {
+		out = append(out, routeInfo{ID: rt.ID, ShortName: rt.ShortName, LongName: rt.LongName})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
 func (h *Handler) getTransitRouteShape(w http.ResponseWriter, r *http.Request) {
 	ag := h.findAgency(chi.URLParam(r, "agencyID"))
 	if ag == nil {

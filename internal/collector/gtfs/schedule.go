@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -203,6 +204,53 @@ func (s *Schedule) StopsForRoute(routeID string) []Stop {
 			out = append(out, st)
 		}
 	}
+	return out
+}
+
+// AllStops returns all stops in the schedule. Order is undefined; callers
+// should sort as needed (e.g. by distance from a reference point).
+func (s *Schedule) AllStops() []Stop {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]Stop, 0, len(s.stops))
+	for _, st := range s.stops {
+		out = append(out, st)
+	}
+	return out
+}
+
+// RoutesForStop returns all routes that serve stopID.
+func (s *Schedule) RoutesForStop(stopID string) []Route {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	seen := make(map[string]struct{})
+	var out []Route
+	for routeID, stops := range s.routeStops {
+		if slices.Contains(stops, stopID) {
+			if _, dup := seen[routeID]; !dup {
+				seen[routeID] = struct{}{}
+				if rt, ok := s.routes[routeID]; ok {
+					out = append(out, rt)
+				}
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		ni := out[i].ShortName
+		if ni == "" {
+			ni = out[i].LongName
+		}
+		nj := out[j].ShortName
+		if nj == "" {
+			nj = out[j].LongName
+		}
+		ii, erri := strconv.Atoi(ni)
+		ij, errj := strconv.Atoi(nj)
+		if erri == nil && errj == nil {
+			return ii < ij
+		}
+		return ni < nj
+	})
 	return out
 }
 

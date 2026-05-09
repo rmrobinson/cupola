@@ -1107,6 +1107,172 @@ button {
 .arrival-mins.rt-late         { color: #fc4a1a; }
 .arrival-time.rt              { opacity: 0.75; }
 
+/* ── Transit station widget ────────────────────────────────────────────── */
+
+.widget-transit-station {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 6px;
+}
+
+.station-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.station-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.station-empty,
+.station-no-config {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.45;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.station-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* agency | route | headsign | mins | time [| delay] */
+.station-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 2px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 12px;
+}
+
+.station-row.has-delay {
+  grid-template-columns: auto auto 1fr auto auto auto;
+}
+
+.departure-agency {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  color: #fff;
+  opacity: 0.9;
+}
+
+.departure-route {
+  font-weight: 700;
+  background: rgba(255,255,255,0.12);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.departure-headsign {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.departure-mins {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #74b9ff;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.departure-time {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.55;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.departure-delay {
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: rgba(255,255,255,0.5);
+}
+
+.departure-mins.rt-ontime       { color: #00b894; }
+.departure-mins.rt-slight-delay { color: #fdcb6e; }
+.departure-mins.rt-late         { color: #fc4a1a; }
+.departure-time.rt              { opacity: 0.75; }
+.departure-delay.delay-late     { color: #fc4a1a; }
+.departure-delay.delay-early    { color: #a8ff78; }
+
+/* Config panel — dynamic stop rows */
+.station-stop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.station-stop-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.station-stop-row select {
+  width: 100%;
+  min-width: 0;
+}
+
+.btn-remove-stop {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 3px;
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  padding: 2px 7px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.btn-remove-stop:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+.btn-add-stop {
+  font-size: 11px;
+  background: none;
+  border: 1px dashed rgba(255,255,255,0.25);
+  border-radius: 4px;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  padding: 4px 10px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.btn-add-stop:hover {
+  border-color: rgba(255,255,255,0.5);
+  color: rgba(255,255,255,0.85);
+}
+
 /* ── Clock widget ──────────────────────────────────────────────────────── */
 
 .widget-clock {
