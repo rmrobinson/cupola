@@ -595,6 +595,11 @@ button {
   touch-action: none;
   z-index: 1;
 }
+.widget-resize-handle::before {
+  content: '';
+  position: absolute;
+  inset: -16px;
+}
 
 /* Kiosk mode: hide all chrome and config panel */
 .canvas.kiosk .widget-chrome,
