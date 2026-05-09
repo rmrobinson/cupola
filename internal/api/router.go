@@ -29,6 +29,13 @@ type Handler struct {
 	homeLon      float64
 	countryCode  string
 	cspImgSrc    []string
+	connectivity connectivityChecker // nil if not wired
+}
+
+// SetConnectivity wires the connectivity checker into the admin API so operators
+// can toggle the force-down override from the admin page.
+func (h *Handler) SetConnectivity(c connectivityChecker) {
+	h.connectivity = c
 }
 
 func NewHandler(
@@ -103,6 +110,7 @@ func (h *Handler) Router() http.Handler {
 		// Keep admin API routes grouped so future authentication middleware can
 		// wrap this boundary without changing endpoint paths.
 		r.Get("/collectors", h.getAdminCollectors)
+		r.Patch("/connectivity", h.patchConnectivity)
 	})
 
 	r.Get("/tiles/local.pmtiles", h.getTileFile)

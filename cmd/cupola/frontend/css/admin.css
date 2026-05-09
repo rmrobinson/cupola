@@ -202,6 +202,18 @@ body.admin-view {
   line-height: 1.4;
 }
 
+.collector-force-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.collector-force-label {
+  font-size: 11px;
+  color: #fef08a;
+}
+
 .collector-time-label {
   display: inline-block;
   min-width: 156px;
@@ -229,6 +241,12 @@ body.admin-view {
   color: #fecaca;
   background: rgba(220,38,38,0.18);
   border-color: rgba(220,38,38,0.38);
+}
+
+.status-caution {
+  color: #fef08a;
+  background: rgba(202,138,4,0.18);
+  border-color: rgba(202,138,4,0.38);
 }
 
 .metadata-table {

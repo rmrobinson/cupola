@@ -23,10 +23,20 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type Config struct {
-	Location   LocationConfig   `yaml:"location"`
-	Server     ServerConfig     `yaml:"server"`
-	Tiles      TilesConfig      `yaml:"tiles"`
-	Collectors CollectorsConfig `yaml:"collectors"`
+	Location        LocationConfig        `yaml:"location"`
+	Server          ServerConfig          `yaml:"server"`
+	Tiles           TilesConfig           `yaml:"tiles"`
+	Collectors      CollectorsConfig      `yaml:"collectors"`
+	Connectivity    ConnectivityConfig    `yaml:"connectivity"`
+}
+
+// ConnectivityConfig controls the internet connectivity probe.
+type ConnectivityConfig struct {
+	// CheckURL is the URL polled to test internet reachability.
+	// Defaults to http://connectivitycheck.gstatic.com/generate_204.
+	CheckURL string `yaml:"check_url"`
+	// Interval between probes. Defaults to 30s.
+	Interval Duration `yaml:"interval"`
 }
 
 type LocationConfig struct {

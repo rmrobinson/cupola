@@ -57,9 +57,12 @@ type eventsSource struct {
 type EventsCollector struct {
 	sources    []eventsSource
 	stateStore *store.StateStore
+	netCheck   func() bool
 	mu         sync.RWMutex
 	items      map[string][]domain.MunicipalEvent // sourceID → events
 }
+
+func (c *EventsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
 func NewEventsCollector(cfgs []config.MunicipalConfig, stateStore *store.StateStore) *EventsCollector {
 	c := &EventsCollector{
@@ -96,11 +99,13 @@ func (c *EventsCollector) State() domain.DomainState {
 }
 
 func (c *EventsCollector) runSource(ctx context.Context, s eventsSource) {
-	if err := c.fetchSource(s); err != nil {
-		log.Printf("[municipal.events] %s initial fetch: %v", s.cfg.ID, err)
-		c.stateStore.PublishSystem(store.SystemEvent{
-			CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
-		})
+	if c.netCheck == nil || c.netCheck() {
+		if err := c.fetchSource(s); err != nil {
+			log.Printf("[municipal.events] %s initial fetch: %v", s.cfg.ID, err)
+			c.stateStore.PublishSystem(store.SystemEvent{
+				CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
+			})
+		}
 	}
 	interval := s.cfg.PollInterval.Duration
 	if interval == 0 {
@@ -113,6 +118,9 @@ func (c *EventsCollector) runSource(ctx context.Context, s eventsSource) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			if c.netCheck != nil && !c.netCheck() {
+				continue
+			}
 			if err := c.fetchSource(s); err != nil {
 				log.Printf("[municipal.events] %s fetch: %v", s.cfg.ID, err)
 				c.stateStore.PublishSystem(store.SystemEvent{
@@ -174,9 +182,12 @@ type alertsSource struct {
 type AlertsCollector struct {
 	sources    []alertsSource
 	stateStore *store.StateStore
+	netCheck   func() bool
 	mu         sync.RWMutex
 	items      map[string][]domain.MunicipalAlert // sourceID → alerts
 }
+
+func (c *AlertsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
 func NewAlertsCollector(cfgs []config.MunicipalConfig, stateStore *store.StateStore) *AlertsCollector {
 	c := &AlertsCollector{
@@ -213,11 +224,13 @@ func (c *AlertsCollector) State() domain.DomainState {
 }
 
 func (c *AlertsCollector) runSource(ctx context.Context, s alertsSource) {
-	if err := c.fetchSource(s); err != nil {
-		log.Printf("[municipal.alerts] %s initial fetch: %v", s.cfg.ID, err)
-		c.stateStore.PublishSystem(store.SystemEvent{
-			CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
-		})
+	if c.netCheck == nil || c.netCheck() {
+		if err := c.fetchSource(s); err != nil {
+			log.Printf("[municipal.alerts] %s initial fetch: %v", s.cfg.ID, err)
+			c.stateStore.PublishSystem(store.SystemEvent{
+				CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
+			})
+		}
 	}
 	interval := s.cfg.PollInterval.Duration
 	if interval == 0 {
@@ -230,6 +243,9 @@ func (c *AlertsCollector) runSource(ctx context.Context, s alertsSource) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			if c.netCheck != nil && !c.netCheck() {
+				continue
+			}
 			if err := c.fetchSource(s); err != nil {
 				log.Printf("[municipal.alerts] %s fetch: %v", s.cfg.ID, err)
 				c.stateStore.PublishSystem(store.SystemEvent{

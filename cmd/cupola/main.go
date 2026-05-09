@@ -33,6 +33,7 @@ import (
 	waterwaycollector "github.com/rmrobinson/cupola/internal/collector/waterway"
 	_ "github.com/rmrobinson/cupola/internal/collector/waterway/grca"
 	"github.com/rmrobinson/cupola/internal/config"
+	"github.com/rmrobinson/cupola/internal/connectivity"
 	"github.com/rmrobinson/cupola/internal/domain"
 	"github.com/rmrobinson/cupola/internal/store"
 	"github.com/rmrobinson/cupola/internal/tiles"
@@ -229,6 +230,18 @@ func main() {
 		registry.Register(wastecollector.New(w.DataPath, ws, stateStore))
 	}
 
+	// Connectivity checker: probes the internet and gates internet-dependent collectors.
+	// Created before ctx so Start can be called with the shared ctx below.
+	netChecker := connectivity.New(cfg.Connectivity.CheckURL, cfg.Connectivity.Interval.Duration, stateStore)
+
+	// Wire the connectivity gate into every internet-dependent collector.
+	type netCheckable interface{ SetNetCheck(func() bool) }
+	for _, c := range registry.Collectors() {
+		if nc, ok := c.(netCheckable); ok {
+			nc.SetNetCheck(netChecker.IsUp)
+		}
+	}
+
 	// ctx is shared by collectors, the HTTP server's BaseContext, and tile extraction.
 	// Cancelling it signals SSE connections and collector goroutines to stop cleanly.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -252,6 +265,7 @@ func main() {
 
 	handler := api.NewHandler(registry, stateStore, sqliteStore, subManager, notesCol.Refresh, tileHandler, webFS,
 		transitAgencies, cfg.Location.Lat, cfg.Location.Lon, cfg.Location.CountryCode, cfg.Server.CSPImgSrc)
+	handler.SetConnectivity(netChecker)
 
 	port := cfg.Server.Port
 	if port == 0 {
@@ -262,6 +276,8 @@ func main() {
 		Handler:     handler.Router(),
 		BaseContext: func(_ net.Listener) context.Context { return ctx },
 	}
+
+	netChecker.Start(ctx)
 
 	if err := registry.StartAll(ctx); err != nil {
 		log.Fatalf("start collectors: %v", err)

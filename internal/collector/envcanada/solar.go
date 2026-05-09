@@ -89,7 +89,10 @@ type SolarCurrentCollector struct {
 	lat        float64
 	interval   time.Duration
 	stateStore *store.StateStore
+	netCheck   func() bool
 }
+
+func (c *SolarCurrentCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
 // SolarForecastCollector is a lightweight companion that publishes solar.weather.forecast
 // whenever SolarCurrentCollector refreshes the shared state.
@@ -123,8 +126,10 @@ func (c *SolarCurrentCollector) Domain() domain.DomainType { return domain.Domai
 
 func (c *SolarCurrentCollector) Start(ctx context.Context) error {
 	go func() {
-		if err := c.fetch(); err != nil {
-			log.Printf("[envcanada.solar] initial fetch: %v", err)
+		if c.netCheck == nil || c.netCheck() {
+			if err := c.fetch(); err != nil {
+				log.Printf("[envcanada.solar] initial fetch: %v", err)
+			}
 		}
 		c.loop(ctx)
 	}()
@@ -145,6 +150,9 @@ func (c *SolarCurrentCollector) loop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			if c.netCheck != nil && !c.netCheck() {
+				continue
+			}
 			if err := c.fetch(); err != nil {
 				log.Printf("[envcanada.solar] fetch: %v", err)
 				c.stateStore.PublishSystem(store.SystemEvent{

@@ -32,9 +32,12 @@ type Canada struct {
 	province   string // 2-letter code derived from lat/lon
 	interval   time.Duration
 	stateStore *store.StateStore
+	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.FlagStatus
 }
+
+func (c *Canada) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
 func NewCanada(lat, lon float64, interval time.Duration, stateStore *store.StateStore) *Canada {
 	return NewCanadaWithURL("", lat, lon, interval, stateStore)
@@ -59,8 +62,10 @@ func (c *Canada) Domain() domain.DomainType { return domain.DomainFlagStatus }
 
 func (c *Canada) Start(ctx context.Context) error {
 	go func() {
-		if err := c.fetch(); err != nil {
-			log.Printf("[canada.flag] initial fetch: %v", err)
+		if c.netCheck == nil || c.netCheck() {
+			if err := c.fetch(); err != nil {
+				log.Printf("[canada.flag] initial fetch: %v", err)
+			}
 		}
 		c.loop(ctx)
 	}()
@@ -81,6 +86,9 @@ func (c *Canada) loop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			if c.netCheck != nil && !c.netCheck() {
+				continue
+			}
 			if err := c.fetch(); err != nil {
 				log.Printf("[canada.flag] fetch: %v", err)
 				c.stateStore.PublishSystem(store.SystemEvent{

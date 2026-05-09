@@ -341,10 +341,20 @@ const Admin = (() => {
       <div class="collector-list">${rows}</div>
     `;
     panel.querySelector('.btn-refresh')?.addEventListener('click', loadCollectors);
+    panel.querySelectorAll('.btn-connectivity-toggle').forEach(btn => {
+      btn.addEventListener('click', () => toggleConnectivityForce(btn.dataset.forced === 'true'));
+    });
     applyMutationState();
   }
 
   function collectorRow(c) {
+    const forceToggle = c.forced != null ? `
+      <div class="collector-force-row">
+        <button type="button" class="btn-small btn-connectivity-toggle" data-forced="${esc(String(c.forced))}">
+          ${c.forced ? 'Clear forced offline' : 'Force offline'}
+        </button>
+        ${c.forced ? '<span class="collector-force-label">Test mode active</span>' : ''}
+      </div>` : '';
     return `
       <article class="collector-row">
         <div class="collector-main">
@@ -352,13 +362,32 @@ const Admin = (() => {
             <span class="collector-id">${esc(c.id)}</span>
             <span class="status-pill status-${esc(c.status || 'unknown')}">${esc(c.status || 'unknown')}</span>
           </div>
-          <div class="collector-domain">${esc(c.domain)}</div>
+          <div class="collector-domain">${esc(c.domain || '')}</div>
           <div class="collector-times">${collectorTimes(c)}</div>
           ${c.message ? `<div class="collector-message">${esc(c.message)}</div>` : ''}
+          ${forceToggle}
         </div>
         <div class="collector-metadata">${metadataHTML(c.metadata)}</div>
       </article>
     `;
+  }
+
+  async function toggleConnectivityForce(currentlyForced) {
+    if (!beginMutation()) return;
+    try {
+      const res = await fetch('/api/v1/admin/connectivity', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ forced_down: !currentlyForced }),
+      });
+      if (!res.ok) throw new Error(await responseError(res));
+      AppUI.notify(currentlyForced ? 'Connectivity override cleared' : 'Connectivity forced offline');
+      await loadCollectors();
+    } catch (err) {
+      AppUI.reportError('Connectivity toggle failed', err);
+    } finally {
+      endMutation();
+    }
   }
 
   function collectorTimes(c) {

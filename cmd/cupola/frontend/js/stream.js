@@ -16,6 +16,7 @@ const Stream = (() => {
 
   const listeners = {};           // domain → [fn, ...]
   const failing = new Set();      // collector IDs currently in error state
+  const cautioning = new Set();   // collector IDs in caution state (e.g. connectivity)
   const connectHandlers = [];     // called each time a connection opens
   let es = null;
   let _lastDataAt = null;         // timestamp of last received SSE message
@@ -62,8 +63,13 @@ const Stream = (() => {
   function handleSystem(evt) {
     if (evt.status === 'error') {
       failing.add(evt.collector_id);
+      cautioning.delete(evt.collector_id);
+    } else if (evt.status === 'caution') {
+      cautioning.add(evt.collector_id);
+      failing.delete(evt.collector_id);
     } else {
       failing.delete(evt.collector_id);
+      cautioning.delete(evt.collector_id);
     }
     _syncBanner();
   }
@@ -79,13 +85,16 @@ const Stream = (() => {
           })()
         : 'unknown';
       banner.textContent = `Offline — last data: ${ago}`;
-      banner.classList.remove('hidden');
+      banner.className = 'alert-banner alert-banner--error';
     } else if (failing.size > 0) {
       banner.textContent = 'Source unavailable: ' + [...failing].join(', ');
-      banner.classList.remove('hidden');
+      banner.className = 'alert-banner alert-banner--error';
+    } else if (cautioning.size > 0) {
+      banner.textContent = 'No internet connectivity — local data only';
+      banner.className = 'alert-banner alert-banner--caution';
     } else {
       banner.textContent = '';
-      banner.classList.add('hidden');
+      banner.className = 'alert-banner hidden';
     }
   }
 

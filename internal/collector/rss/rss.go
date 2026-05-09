@@ -21,6 +21,7 @@ import (
 type Collector struct {
 	feeds      []config.RSSFeedConfig
 	stateStore *store.StateStore
+	netCheck   func() bool
 	mu         sync.RWMutex
 	items      map[string][]domain.FeedItem // feedID → items
 }
@@ -32,6 +33,8 @@ func New(feeds []config.RSSFeedConfig, stateStore *store.StateStore) *Collector 
 		items:      make(map[string][]domain.FeedItem),
 	}
 }
+
+func (c *Collector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
 func (c *Collector) ID() string                { return "rss" }
 func (c *Collector) Domain() domain.DomainType { return domain.DomainFeeds }
@@ -50,11 +53,13 @@ func (c *Collector) State() domain.DomainState {
 }
 
 func (c *Collector) runFeed(ctx context.Context, f config.RSSFeedConfig) {
-	if err := c.fetchFeed(f); err != nil {
-		log.Printf("[rss] %s initial fetch: %v", f.ID, err)
-		c.stateStore.PublishSystem(store.SystemEvent{
-			CollectorID: c.sourceID(f.ID), Status: "error", Message: err.Error(),
-		})
+	if c.netCheck == nil || c.netCheck() {
+		if err := c.fetchFeed(f); err != nil {
+			log.Printf("[rss] %s initial fetch: %v", f.ID, err)
+			c.stateStore.PublishSystem(store.SystemEvent{
+				CollectorID: c.sourceID(f.ID), Status: "error", Message: err.Error(),
+			})
+		}
 	}
 	interval := f.PollInterval.Duration
 	if interval == 0 {
@@ -67,6 +72,9 @@ func (c *Collector) runFeed(ctx context.Context, f config.RSSFeedConfig) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			if c.netCheck != nil && !c.netCheck() {
+				continue
+			}
 			if err := c.fetchFeed(f); err != nil {
 				log.Printf("[rss] %s fetch: %v", f.ID, err)
 				c.stateStore.PublishSystem(store.SystemEvent{

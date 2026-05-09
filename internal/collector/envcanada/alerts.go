@@ -20,6 +20,7 @@ type AlertsCollector struct {
 	userLon    float64
 	interval   time.Duration
 	stateStore *store.StateStore
+	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.WeatherAlerts
 }
@@ -32,6 +33,8 @@ func NewAlertsCollector(lat, lon float64, interval time.Duration, stateStore *st
 		stateStore: stateStore,
 	}
 }
+
+func (c *AlertsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
 func (c *AlertsCollector) ID() string                { return "envcanada.alerts" }
 func (c *AlertsCollector) Domain() domain.DomainType { return domain.DomainWeatherAlerts }
@@ -47,8 +50,10 @@ func (c *AlertsCollector) Start(ctx context.Context) error {
 			return
 		}
 		url := stationRSSURL("alerts", stLat, stLon)
-		if err := c.fetch(url); err != nil {
-			log.Printf("[envcanada.alerts] initial fetch: %v", err)
+		if c.netCheck == nil || c.netCheck() {
+			if err := c.fetch(url); err != nil {
+				log.Printf("[envcanada.alerts] initial fetch: %v", err)
+			}
 		}
 		c.loop(ctx, url)
 	}()
@@ -69,6 +74,9 @@ func (c *AlertsCollector) loop(ctx context.Context, url string) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			if c.netCheck != nil && !c.netCheck() {
+				continue
+			}
 			if err := c.fetch(url); err != nil {
 				log.Printf("[envcanada.alerts] fetch: %v", err)
 				c.stateStore.PublishSystem(store.SystemEvent{

@@ -28,8 +28,11 @@ type ArrivalsCollector struct {
 	db             *store.SQLiteStore
 	loc            *time.Location  // local timezone for calendar queries
 	inFallback     map[string]bool // agency_id → currently serving static schedule
-	wake           chan struct{}   // buffered(1): nudges rtLoop to fetch immediately
+	wake           chan struct{}    // buffered(1): nudges rtLoop to fetch immediately
+	netCheck       func() bool
 }
+
+func (c *ArrivalsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
 func (c *ArrivalsCollector) ID() string                { return "gtfsrt.arrivals" }
 func (c *ArrivalsCollector) Domain() domain.DomainType { return domain.DomainTransitArrivals }
@@ -74,7 +77,9 @@ func (c *ArrivalsCollector) refreshStatic() {
 }
 
 func (c *ArrivalsCollector) rtLoop(ctx context.Context) {
-	c.fetch()
+	if c.netCheck == nil || c.netCheck() {
+		c.fetch()
+	}
 	t := time.NewTicker(c.rtInterval)
 	defer t.Stop()
 	for {
@@ -82,8 +87,14 @@ func (c *ArrivalsCollector) rtLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			if c.netCheck != nil && !c.netCheck() {
+				continue
+			}
 			c.fetch()
 		case <-c.wake:
+			if c.netCheck != nil && !c.netCheck() {
+				continue
+			}
 			c.fetch()
 		}
 	}

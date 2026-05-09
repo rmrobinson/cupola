@@ -1,6 +1,7 @@
 package store
 
 import (
+	"sort"
 	"sync"
 	"time"
 
@@ -91,6 +92,18 @@ func (s *StateStore) GetSystem(collectorID string) (SystemSnapshot, bool) {
 	defer s.mu.RUnlock()
 	snap, ok := s.system[collectorID]
 	return snap, ok
+}
+
+// ListSystem returns snapshots for all known collector IDs, sorted by ID.
+func (s *StateStore) ListSystem() []SystemSnapshot {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]SystemSnapshot, 0, len(s.system))
+	for _, snap := range s.system {
+		out = append(out, snap)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CollectorID < out[j].CollectorID })
+	return out
 }
 
 // Subscribe returns a channel that receives state updates and an unsubscribe

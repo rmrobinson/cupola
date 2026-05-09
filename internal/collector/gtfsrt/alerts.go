@@ -22,7 +22,10 @@ type AlertsCollector struct {
 	state    *store.StateStore
 	interval time.Duration
 	wake     chan struct{}
+	netCheck func() bool
 }
+
+func (c *AlertsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
 func (c *AlertsCollector) ID() string                { return "gtfsrt.alerts" }
 func (c *AlertsCollector) Domain() domain.DomainType { return domain.DomainTransitAlerts }
@@ -37,7 +40,9 @@ func (c *AlertsCollector) OnSubscription() {
 
 func (c *AlertsCollector) Start(ctx context.Context) error {
 	go func() {
-		c.fetch()
+		if c.netCheck == nil || c.netCheck() {
+			c.fetch()
+		}
 		t := time.NewTicker(c.interval)
 		defer t.Stop()
 		for {
@@ -45,8 +50,14 @@ func (c *AlertsCollector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
+				if c.netCheck != nil && !c.netCheck() {
+					continue
+				}
 				c.fetch()
 			case <-c.wake:
+				if c.netCheck != nil && !c.netCheck() {
+					continue
+				}
 				c.fetch()
 			}
 		}

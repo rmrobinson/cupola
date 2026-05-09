@@ -16,7 +16,10 @@ type VehiclesCollector struct {
 	state    *store.StateStore
 	interval time.Duration
 	wake     chan struct{}
+	netCheck func() bool
 }
+
+func (c *VehiclesCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
 func (c *VehiclesCollector) ID() string                { return "gtfsrt.vehicles" }
 func (c *VehiclesCollector) Domain() domain.DomainType { return domain.DomainTransitVehicles }
@@ -31,7 +34,12 @@ func (c *VehiclesCollector) OnSubscription() {
 
 func (c *VehiclesCollector) Start(ctx context.Context) error {
 	go func() {
-		c.fetch()
+		prevUp := true
+		if c.netCheck != nil && !c.netCheck() {
+			prevUp = false
+		} else {
+			c.fetch()
+		}
 		t := time.NewTicker(c.interval)
 		defer t.Stop()
 		for {
@@ -39,13 +47,32 @@ func (c *VehiclesCollector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
+				isUp := c.netCheck == nil || c.netCheck()
+				if !isUp {
+					if prevUp {
+						c.publishEmpty()
+					}
+					prevUp = false
+					continue
+				}
+				prevUp = true
 				c.fetch()
 			case <-c.wake:
+				if c.netCheck != nil && !c.netCheck() {
+					continue
+				}
 				c.fetch()
 			}
 		}
 	}()
 	return nil
+}
+
+func (c *VehiclesCollector) publishEmpty() {
+	c.state.Set(domain.TransitVehicles{
+		StateBase: domain.StateBase{UpdatedAt: time.Now()},
+		Vehicles:  []domain.TransitVehicle{},
+	})
 }
 
 func (c *VehiclesCollector) fetch() {

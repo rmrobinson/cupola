@@ -43,9 +43,12 @@ type Collector struct {
 	sources    []sourceEntry
 	stateStore *store.StateStore
 	alertsColl *municipal.AlertsCollector
+	netCheck   func() bool
 	mu         sync.RWMutex
 	gauges     map[string][]domain.WaterwayGauge // sourceID → gauges
 }
+
+func (c *Collector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
 func NewCollector(
 	cfgs []config.WaterwayConfig,
@@ -87,11 +90,13 @@ func (c *Collector) State() domain.DomainState {
 }
 
 func (c *Collector) runSource(ctx context.Context, s sourceEntry) {
-	if err := c.fetchSource(ctx, s); err != nil {
-		log.Printf("[waterway] %s initial fetch: %v", s.cfg.ID, err)
-		c.stateStore.PublishSystem(store.SystemEvent{
-			CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
-		})
+	if c.netCheck == nil || c.netCheck() {
+		if err := c.fetchSource(ctx, s); err != nil {
+			log.Printf("[waterway] %s initial fetch: %v", s.cfg.ID, err)
+			c.stateStore.PublishSystem(store.SystemEvent{
+				CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
+			})
+		}
 	}
 	interval := s.cfg.PollInterval.Duration
 	if interval == 0 {
@@ -104,6 +109,9 @@ func (c *Collector) runSource(ctx context.Context, s sourceEntry) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			if c.netCheck != nil && !c.netCheck() {
+				continue
+			}
 			if err := c.fetchSource(ctx, s); err != nil {
 				log.Printf("[waterway] %s fetch: %v", s.cfg.ID, err)
 				c.stateStore.PublishSystem(store.SystemEvent{

@@ -54,6 +54,7 @@ type IncidentsCollector struct {
 	interval   time.Duration
 	stateStore *store.StateStore
 	sources    []IncidentSource
+	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.TrafficIncidents
 }
@@ -65,18 +66,22 @@ func NewIncidentsCollector(interval time.Duration, stateStore *store.StateStore,
 	return &IncidentsCollector{interval: interval, stateStore: stateStore, sources: sources}
 }
 
+func (c *IncidentsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
+
 func (c *IncidentsCollector) ID() string                { return "traffic.incidents" }
 func (c *IncidentsCollector) Domain() domain.DomainType { return domain.DomainTrafficIncidents }
 
 func (c *IncidentsCollector) Start(ctx context.Context) error {
 	go func() {
-		if err := c.fetch(ctx); err != nil {
-			log.Printf("[traffic.incidents] initial fetch: %v", err)
-			c.stateStore.PublishSystem(store.SystemEvent{
-				CollectorID: c.ID(), Status: "error", Message: err.Error(),
-			})
-		} else {
-			c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
+		if c.netCheck == nil || c.netCheck() {
+			if err := c.fetch(ctx); err != nil {
+				log.Printf("[traffic.incidents] initial fetch: %v", err)
+				c.stateStore.PublishSystem(store.SystemEvent{
+					CollectorID: c.ID(), Status: "error", Message: err.Error(),
+				})
+			} else {
+				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
+			}
 		}
 		t := time.NewTicker(c.interval)
 		defer t.Stop()
@@ -85,6 +90,9 @@ func (c *IncidentsCollector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
+				if c.netCheck != nil && !c.netCheck() {
+					continue
+				}
 				if err := c.fetch(ctx); err != nil {
 					log.Printf("[traffic.incidents] fetch: %v", err)
 					c.stateStore.PublishSystem(store.SystemEvent{
@@ -223,22 +231,27 @@ func mapSeverity(et string, fullClosure bool) string {
 type CamerasCollector struct {
 	interval   time.Duration
 	stateStore *store.StateStore
+	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.TrafficCameras
 }
+
+func (c *CamerasCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
 func (c *CamerasCollector) ID() string                { return "511on.cameras" }
 func (c *CamerasCollector) Domain() domain.DomainType { return domain.DomainTrafficCameras }
 
 func (c *CamerasCollector) Start(ctx context.Context) error {
 	go func() {
-		if err := c.fetch(ctx); err != nil {
-			log.Printf("[511on.cameras] initial fetch: %v", err)
-			c.stateStore.PublishSystem(store.SystemEvent{
-				CollectorID: c.ID(), Status: "error", Message: err.Error(),
-			})
-		} else {
-			c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
+		if c.netCheck == nil || c.netCheck() {
+			if err := c.fetch(ctx); err != nil {
+				log.Printf("[511on.cameras] initial fetch: %v", err)
+				c.stateStore.PublishSystem(store.SystemEvent{
+					CollectorID: c.ID(), Status: "error", Message: err.Error(),
+				})
+			} else {
+				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
+			}
 		}
 		t := time.NewTicker(c.interval)
 		defer t.Stop()
@@ -247,6 +260,9 @@ func (c *CamerasCollector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
+				if c.netCheck != nil && !c.netCheck() {
+					continue
+				}
 				if err := c.fetch(ctx); err != nil {
 					log.Printf("[511on.cameras] fetch: %v", err)
 					c.stateStore.PublishSystem(store.SystemEvent{
@@ -335,9 +351,12 @@ func firstEnabledViewURL(views []on511CameraView) string {
 type RoadConditionsCollector struct {
 	interval   time.Duration
 	stateStore *store.StateStore
+	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.TrafficRoadConditions
 }
+
+func (c *RoadConditionsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
 func (c *RoadConditionsCollector) ID() string { return "511on.road_conditions" }
 func (c *RoadConditionsCollector) Domain() domain.DomainType {
@@ -346,13 +365,15 @@ func (c *RoadConditionsCollector) Domain() domain.DomainType {
 
 func (c *RoadConditionsCollector) Start(ctx context.Context) error {
 	go func() {
-		if err := c.fetch(ctx); err != nil {
-			log.Printf("[511on.road_conditions] initial fetch: %v", err)
-			c.stateStore.PublishSystem(store.SystemEvent{
-				CollectorID: c.ID(), Status: "error", Message: err.Error(),
-			})
-		} else {
-			c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
+		if c.netCheck == nil || c.netCheck() {
+			if err := c.fetch(ctx); err != nil {
+				log.Printf("[511on.road_conditions] initial fetch: %v", err)
+				c.stateStore.PublishSystem(store.SystemEvent{
+					CollectorID: c.ID(), Status: "error", Message: err.Error(),
+				})
+			} else {
+				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
+			}
 		}
 		t := time.NewTicker(c.interval)
 		defer t.Stop()
@@ -361,6 +382,9 @@ func (c *RoadConditionsCollector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
+				if c.netCheck != nil && !c.netCheck() {
+					continue
+				}
 				if err := c.fetch(ctx); err != nil {
 					log.Printf("[511on.road_conditions] fetch: %v", err)
 					c.stateStore.PublishSystem(store.SystemEvent{
