@@ -33,16 +33,15 @@
   box-sizing: border-box;
 }
 
-/* Phone: single-column, auto row height so widgets are not clipped */
+/* Phone: single-column, fixed row units so the resize handle still changes height */
 @media (max-width: 479px) {
   .widget-grid {
     grid-template-columns: 1fr;
-    grid-auto-rows: auto;
+    grid-auto-rows: 56px;
     gap: 8px;
   }
   .widget-cell {
     grid-column: 1 / -1 !important;
-    grid-row: auto !important;
     min-height: 140px;
   }
 }

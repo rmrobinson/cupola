@@ -19,9 +19,10 @@ const Grid = (() => {
     const grid = document.getElementById('widget-grid');
     grid.innerHTML = '';
     grid.dataset.layout = profile.layout || 'landscape';
+    const displayPositions = layoutDisplayPositions(profile.widgets || [], gridCols(grid));
 
     for (const wc of (profile.widgets || [])) {
-      const cell = await createCell(wc);
+      const cell = await createCell(wc, displayPositions.get(wc.id));
       grid.appendChild(cell);
     }
   }
@@ -43,8 +44,10 @@ const Grid = (() => {
 
   function addWidget(wc) {
     const grid = document.getElementById('widget-grid');
-    const cols = (_profile.layout === 'portrait') ? 4 : 12;
-    const free = nextFreePos(wc.pos.w, wc.pos.h, _profile.widgets, cols);
+    const cols = gridCols(grid);
+    wc.pos.w = Math.max(1, Math.min(wc.pos.w || 1, cols));
+    const occupied = [...layoutDisplayPositions(_profile.widgets || [], cols).values()];
+    const free = nextFreePos(wc.pos.w, wc.pos.h, occupied, cols);
     wc.pos.col = free.col;
     wc.pos.row = free.row;
     _profile.widgets.push(wc);
@@ -69,14 +72,14 @@ const Grid = (() => {
 
   // ── Cell creation ─────────────────────────────────────────────────────
 
-  async function createCell(wc) {
+  async function createCell(wc, displayPos = null) {
     const def = getDefByType(wc.type);
 
     const cell = document.createElement('div');
     cell.className = 'widget-cell';
     cell.dataset.widgetId = wc.id;
     cell.dataset.widgetType = wc.type;
-    setCellPos(cell, wc.pos);
+    setCellPos(cell, displayPos || wc.pos);
 
     const inner = document.createElement('div');
     inner.className = 'widget-inner';
@@ -109,9 +112,9 @@ const Grid = (() => {
 
     initResize(resizeHandle, cell, wc);
 
-    const dragHandle = chrome.querySelector('.drag-handle');
-    dragHandle.addEventListener('pointerdown', e => {
-      e.currentTarget.setPointerCapture(e.pointerId);
+    chrome.addEventListener('pointerdown', e => {
+      if (e.target.closest('button,input,select,textarea,a')) return;
+      chrome.setPointerCapture(e.pointerId);
       startPointerDrag(e, cell, wc);
     });
 
@@ -282,6 +285,11 @@ const Grid = (() => {
     if (e.button != null && e.button !== 0) return;
     e.preventDefault();
     const grid = document.getElementById('widget-grid');
+    const current = effectiveGridPos(cell._gridPos || wc.pos, gridCols(grid));
+    wc.pos.col = current.col;
+    wc.pos.w = current.w;
+    wc.pos.h = current.h;
+    setCellPos(cell, current);
     const startX = e.clientX;
     const startY = e.clientY;
     let moved = false;
@@ -327,7 +335,8 @@ const Grid = (() => {
   function showDragOverlay(grid, wc) {
     removeDragOverlay();
     const rect = grid.getBoundingClientRect();
-    const cols = (grid.dataset.layout === 'portrait') ? 4 : 12;
+    const cols = gridCols(grid);
+    const pos = effectiveGridPos(wc.pos, cols);
     const cs = getComputedStyle(grid);
     const rowH    = parseFloat(cs.gridAutoRows) || 60;
     const rowGap  = parseFloat(cs.rowGap)       || 0;
@@ -353,8 +362,8 @@ const Grid = (() => {
     const ghost = document.createElement('div');
     ghost.id = 'drag-drop-ghost';
     ghost.className = 'drag-drop-ghost';
-    ghost.style.width  = `${wc.pos.w * colPitch - colGap}px`;
-    ghost.style.height = `${wc.pos.h * rowPitch - rowGap}px`;
+    ghost.style.width  = `${pos.w * colPitch - colGap}px`;
+    ghost.style.height = `${pos.h * rowPitch - rowGap}px`;
     ghost.style.display = 'none';
     overlay.appendChild(ghost);
     document.body.appendChild(overlay);
@@ -364,7 +373,7 @@ const Grid = (() => {
     const ghost = document.getElementById('drag-drop-ghost');
     if (!ghost) return;
     const rect = grid.getBoundingClientRect();
-    const cols = (grid.dataset.layout === 'portrait') ? 4 : 12;
+    const cols = gridCols(grid);
     const cs = getComputedStyle(grid);
     const rowH    = parseFloat(cs.gridAutoRows) || 60;
     const rowGap  = parseFloat(cs.rowGap)       || 0;
@@ -385,7 +394,7 @@ const Grid = (() => {
 
   function posFromEvent(e, grid) {
     const rect = grid.getBoundingClientRect();
-    const cols = (grid.dataset.layout === 'portrait') ? 4 : 12;
+    const cols = gridCols(grid);
     const cs = getComputedStyle(grid);
     const rowH    = parseFloat(cs.gridAutoRows) || 60;
     const rowGap  = parseFloat(cs.rowGap)       || 0;
@@ -404,16 +413,27 @@ const Grid = (() => {
       e.preventDefault();
       e.stopPropagation();
       handle.setPointerCapture(e.pointerId);
+      cell.classList.add('widget-resizing');
       const grid = document.getElementById('widget-grid');
-      const cols = (grid.dataset.layout === 'portrait') ? 4 : 12;
+      const cols = gridCols(grid);
+      const current = effectiveGridPos(cell._gridPos || wc.pos, cols);
+      wc.pos.col = current.col;
+      wc.pos.w = current.w;
+      wc.pos.h = current.h;
+      setCellPos(cell, current);
       const rect = grid.getBoundingClientRect();
-      const colW = rect.width / cols;
-      const rowH = parseFloat(getComputedStyle(grid).gridAutoRows) || 60;
+      const cs = getComputedStyle(grid);
+      const colGap = parseFloat(cs.columnGap) || 0;
+      const rowGap = parseFloat(cs.rowGap) || 0;
+      const colW = (rect.width + colGap) / cols;
+      const rowH = (parseFloat(cs.gridAutoRows) || 60) + rowGap;
       const startX = e.clientX, startY = e.clientY;
-      const startW = wc.pos.w, startH = wc.pos.h;
+      const startW = current.w, startH = current.h;
 
       const onMove = e => {
-        wc.pos.w = Math.max(1, Math.min(cols - wc.pos.col, startW + Math.round((e.clientX - startX) / colW)));
+        e.preventDefault();
+        const maxW = Math.max(1, cols - Math.min(wc.pos.col, cols - 1));
+        wc.pos.w = Math.max(1, Math.min(maxW, startW + Math.round((e.clientX - startX) / colW)));
         wc.pos.h = Math.max(1, startH + Math.round((e.clientY - startY) / rowH));
         setCellPos(cell, wc.pos);
       };
@@ -421,6 +441,7 @@ const Grid = (() => {
         document.removeEventListener('pointermove', onMove);
         document.removeEventListener('pointerup', onUp);
         document.removeEventListener('pointercancel', onUp);
+        cell.classList.remove('widget-resizing');
         scheduleSave();
       };
       document.addEventListener('pointermove', onMove);
@@ -431,11 +452,12 @@ const Grid = (() => {
 
   // ── Helpers ───────────────────────────────────────────────────────────
 
-  function nextFreePos(newW, newH, widgets, cols) {
+  function nextFreePos(newW, newH, occupiedPositions, cols) {
     const occ = new Set();
-    for (const wc of widgets) {
-      for (let r = wc.pos.row; r < wc.pos.row + wc.pos.h; r++) {
-        for (let c = wc.pos.col; c < wc.pos.col + wc.pos.w; c++) {
+    for (const rawPos of occupiedPositions) {
+      const pos = effectiveGridPos(rawPos, cols);
+      for (let r = pos.row; r < pos.row + pos.h; r++) {
+        for (let c = pos.col; c < pos.col + pos.w; c++) {
           occ.add(r + ',' + c);
         }
       }
@@ -453,13 +475,86 @@ const Grid = (() => {
       }
     }
     let bottom = 0;
-    for (const wc of widgets) bottom = Math.max(bottom, wc.pos.row + wc.pos.h);
+    for (const rawPos of occupiedPositions) {
+      const pos = effectiveGridPos(rawPos, cols);
+      bottom = Math.max(bottom, pos.row + pos.h);
+    }
     return { col: 0, row: bottom };
   }
 
+  function layoutDisplayPositions(widgets, cols) {
+    const placed = new Map();
+    const occupied = [];
+    const ordered = [...widgets].sort((a, b) => {
+      const ar = a.pos?.row ?? 0, br = b.pos?.row ?? 0;
+      if (ar !== br) return ar - br;
+      return (a.pos?.col ?? 0) - (b.pos?.col ?? 0);
+    });
+
+    for (const wc of ordered) {
+      const desired = effectiveGridPos(wc.pos || {}, cols);
+      const pos = firstAvailableAtOrAfter(desired, occupied, cols);
+      placed.set(wc.id, pos);
+      occupied.push(pos);
+    }
+    return placed;
+  }
+
+  function firstAvailableAtOrAfter(desired, occupied, cols) {
+    let row = desired.row;
+    const maxCol = Math.max(0, cols - desired.w);
+    while (row < 2000) {
+      const startCol = row === desired.row ? Math.min(desired.col, maxCol) : 0;
+      for (let col = startCol; col <= maxCol; col++) {
+        const candidate = { ...desired, row, col };
+        if (!overlapsAny(candidate, occupied)) return candidate;
+      }
+      row++;
+    }
+    return nextFreePos(desired.w, desired.h, occupied, cols);
+  }
+
+  function overlapsAny(pos, occupied) {
+    return occupied.some(other =>
+      pos.col < other.col + other.w &&
+      pos.col + pos.w > other.col &&
+      pos.row < other.row + other.h &&
+      pos.row + pos.h > other.row
+    );
+  }
+
+  function effectiveGridPos(pos, cols) {
+    const col = Math.max(0, Math.min(pos.col ?? 0, cols - 1));
+    const w = Math.max(1, Math.min(pos.w || 1, cols - col));
+    return {
+      col,
+      row: Math.max(0, pos.row ?? 0),
+      w,
+      h: Math.max(1, pos.h || 1),
+    };
+  }
+
   function setCellPos(cell, pos) {
-    cell.style.gridColumn = `${(pos.col ?? 0) + 1} / span ${pos.w || 1}`;
-    cell.style.gridRow    = `${(pos.row ?? 0) + 1} / span ${pos.h || 1}`;
+    const next = {
+      col: pos.col ?? 0,
+      row: pos.row ?? 0,
+      w: pos.w || 1,
+      h: pos.h || 1,
+    };
+    cell._gridPos = next;
+    cell.style.gridColumn = `${next.col + 1} / span ${next.w}`;
+    cell.style.gridRow    = `${next.row + 1} / span ${next.h}`;
+  }
+
+  function gridCols(grid) {
+    const tracks = getComputedStyle(grid).gridTemplateColumns
+      .split(' ')
+      .filter(Boolean).length;
+    return tracks || layoutCols(grid.dataset.layout);
+  }
+
+  function layoutCols(layout) {
+    return layout === 'portrait' ? 4 : 12;
   }
 
   function getDefByType(type) {
