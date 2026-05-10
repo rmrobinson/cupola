@@ -587,18 +587,21 @@ button {
   position: absolute;
   bottom: 2px;
   right: 2px;
-  width: 10px;
-  height: 10px;
-  background: rgba(255,255,255,0.2);
-  border-radius: 2px;
+  width: 32px;
+  height: 32px;
   cursor: se-resize;
   touch-action: none;
   z-index: 1;
 }
-.widget-resize-handle::before {
+.widget-resize-handle::after {
   content: '';
   position: absolute;
-  inset: -16px;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
 }
 
 /* Kiosk mode: hide all chrome and config panel */
