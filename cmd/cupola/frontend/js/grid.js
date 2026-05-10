@@ -109,7 +109,11 @@ const Grid = (() => {
 
     initResize(resizeHandle, cell, wc);
 
-    chrome.querySelector('.drag-handle').addEventListener('pointerdown', e => startPointerDrag(e, cell, wc));
+    const dragHandle = chrome.querySelector('.drag-handle');
+    dragHandle.addEventListener('pointerdown', e => {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      startPointerDrag(e, cell, wc);
+    });
 
     if (!def) {
       content.innerHTML = `<div class="widget-unavailable"><span class="widget-unavailable-label">Unknown widget type: ${esc(wc.type)}</span></div>`;
@@ -399,7 +403,7 @@ const Grid = (() => {
     handle.addEventListener('pointerdown', e => {
       e.preventDefault();
       e.stopPropagation();
-      handle.setPointerCapture?.(e.pointerId);
+      handle.setPointerCapture(e.pointerId);
       const grid = document.getElementById('widget-grid');
       const cols = (grid.dataset.layout === 'portrait') ? 4 : 12;
       const rect = grid.getBoundingClientRect();
