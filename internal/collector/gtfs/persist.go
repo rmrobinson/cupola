@@ -25,7 +25,7 @@ type timetableData struct {
 //  3. On any download failure: falls back to the disk cache. If SQLite is
 //     already populated for this agency the cached ZIPs are only used to
 //     restore in-memory metadata; if SQLite is empty they also repopulate it.
-func LoadAndPersist(s *Schedule, agencyID string, urls []string, cacheDir string, db *store.SQLiteStore) error {
+func LoadAndPersist(s *Schedule, agencyID string, urls []string, cacheDir string, db *store.GTFSSQLiteStore) error {
 	blobs, downloadErr := tryDownload(urls)
 
 	if downloadErr != nil {

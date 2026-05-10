@@ -20,6 +20,7 @@ type AgencyManager struct {
 	mu             sync.RWMutex
 	agencies       map[string]*Agency
 	db             *store.SQLiteStore
+	gtfsDB         *store.GTFSSQLiteStore
 	cacheDir       string
 	refreshLocksMu sync.Mutex
 	refreshLocks   map[string]*sync.Mutex
@@ -35,10 +36,11 @@ type AgencyStats struct {
 	Schedule             gtfs.ScheduleStats `json:"schedule"`
 }
 
-func NewAgencyManager(db *store.SQLiteStore, cacheDir string) (*AgencyManager, error) {
+func NewAgencyManager(db *store.SQLiteStore, gtfsDB *store.GTFSSQLiteStore, cacheDir string) (*AgencyManager, error) {
 	m := &AgencyManager{
 		agencies:     make(map[string]*Agency),
 		db:           db,
+		gtfsDB:       gtfsDB,
 		cacheDir:     cacheDir,
 		refreshLocks: make(map[string]*sync.Mutex),
 	}
@@ -132,7 +134,7 @@ func (m *AgencyManager) RefreshStatic(id string) error {
 		if ag == nil {
 			return nil
 		}
-		return gtfs.LoadAndPersist(ag.Schedule, ag.ID, ag.StaticURLs, m.cacheDir, m.db)
+		return gtfs.LoadAndPersist(ag.Schedule, ag.ID, ag.StaticURLs, m.cacheDir, m.gtfsDB)
 	})
 }
 
@@ -154,7 +156,7 @@ func (m *AgencyManager) Delete(id string) error {
 		if err := m.db.DeleteTransitAgency(id); err != nil {
 			return fmt.Errorf("delete transit agency row: %w", err)
 		}
-		if err := m.db.DeleteGTFSAgency(id); err != nil {
+		if err := m.gtfsDB.DeleteGTFSAgency(id); err != nil {
 			return fmt.Errorf("delete gtfs timetable cache: %w", err)
 		}
 		if err := gtfs.DeleteZipCache(m.cacheDir, id); err != nil {

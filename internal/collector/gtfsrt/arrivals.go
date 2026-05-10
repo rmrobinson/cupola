@@ -25,7 +25,7 @@ type ArrivalsCollector struct {
 	rtInterval     time.Duration
 	staticInterval time.Duration
 	cacheDir       string
-	db             *store.SQLiteStore
+	db             *store.GTFSSQLiteStore
 	loc            *time.Location  // local timezone for calendar queries
 	inFallback     map[string]bool // agency_id → currently serving static schedule
 	wake           chan struct{}    // buffered(1): nudges rtLoop to fetch immediately

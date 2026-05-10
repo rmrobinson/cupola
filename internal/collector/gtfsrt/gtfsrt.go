@@ -37,7 +37,7 @@ func NewCollectors(
 	rtInterval time.Duration,
 	staticInterval time.Duration,
 	cacheDir string,
-	db *store.SQLiteStore,
+	db *store.GTFSSQLiteStore,
 	loc *time.Location,
 ) (*ArrivalsCollector, *VehiclesCollector, *AlertsCollector) {
 	if rtInterval == 0 {

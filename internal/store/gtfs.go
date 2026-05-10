@@ -56,7 +56,7 @@ type ScheduledDeparture struct {
 
 // ReplaceGTFSAgency atomically replaces all GTFS timetable data for agencyID.
 // Existing rows for the agency are deleted before new rows are inserted.
-func (s *SQLiteStore) ReplaceGTFSAgency(
+func (s *GTFSSQLiteStore) ReplaceGTFSAgency(
 	agencyID string,
 	stopTimes []GTFSStopTime,
 	services []GTFSService,
@@ -96,7 +96,7 @@ func (s *SQLiteStore) ReplaceGTFSAgency(
 // Overnight trips with departure_secs > 86400 are not returned when querying
 // during normal daytime hours — they will appear correctly when after is past
 // midnight on the following day.
-func (s *SQLiteStore) QueryUpcomingDepartures(
+func (s *GTFSSQLiteStore) QueryUpcomingDepartures(
 	agencyID, routeID, stopID string,
 	after time.Time,
 	limit int,
@@ -168,7 +168,7 @@ func (s *SQLiteStore) QueryUpcomingDepartures(
 // HasGTFSData reports whether any stop_times rows exist for agencyID.
 // Used at startup to decide whether SQLite can serve the static fallback
 // without repopulating from the ZIP cache.
-func (s *SQLiteStore) HasGTFSData(agencyID string) (bool, error) {
+func (s *GTFSSQLiteStore) HasGTFSData(agencyID string) (bool, error) {
 	var exists int
 	err := s.db.QueryRow(
 		`SELECT EXISTS(SELECT 1 FROM gtfs_stop_times WHERE agency_id = ? LIMIT 1)`, agencyID,
@@ -176,7 +176,7 @@ func (s *SQLiteStore) HasGTFSData(agencyID string) (bool, error) {
 	return exists == 1, err
 }
 
-func (s *SQLiteStore) DeleteGTFSAgency(agencyID string) error {
+func (s *GTFSSQLiteStore) DeleteGTFSAgency(agencyID string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err

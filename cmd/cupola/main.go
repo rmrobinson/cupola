@@ -59,6 +59,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("open sqlite: %v", err)
 	}
+	gtfsStore, err := store.NewGTFSSQLiteStore(cfg.Server.DataDir)
+	if err != nil {
+		log.Fatalf("open gtfs sqlite: %v", err)
+	}
 
 	registry := collector.NewRegistry()
 	stateStore := store.NewStateStore()
@@ -150,7 +154,7 @@ func main() {
 
 	subManager := store.NewSubscriptionManager()
 
-	transitAgencies, err := gtfsrt.NewAgencyManager(sqliteStore, cfg.Server.DataDir)
+	transitAgencies, err := gtfsrt.NewAgencyManager(sqliteStore, gtfsStore, cfg.Server.DataDir)
 	if err != nil {
 		log.Fatalf("load transit agencies: %v", err)
 	}
@@ -172,7 +176,7 @@ func main() {
 
 		log.Printf("transit: registering collectors for %d enabled agencies (rt=%s, static=%s)",
 			len(transitAgencies.List()), rtInterval, staticInterval)
-		arr, veh, alt := gtfsrt.NewCollectors(transitAgencies, subManager, stateStore, rtInterval, staticInterval, cfg.Server.DataDir, sqliteStore, loc)
+		arr, veh, alt := gtfsrt.NewCollectors(transitAgencies, subManager, stateStore, rtInterval, staticInterval, cfg.Server.DataDir, gtfsStore, loc)
 		registry.Register(arr)
 		registry.Register(veh)
 		registry.Register(alt)

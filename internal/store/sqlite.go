@@ -84,41 +84,7 @@ func (s *SQLiteStore) migrate() error {
 			created_at                     TEXT NOT NULL,
 			updated_at                     TEXT NOT NULL
 		)`,
-		// GTFS timetable tables — populated by the transit collector, queried
-		// during internet outages to serve schedule-based arrival estimates.
-		`CREATE TABLE IF NOT EXISTS gtfs_stop_times (
-			agency_id      TEXT    NOT NULL,
-			route_id       TEXT    NOT NULL,
-			trip_id        TEXT    NOT NULL,
-			stop_id        TEXT    NOT NULL,
-			headsign       TEXT    NOT NULL DEFAULT '',
-			service_id     TEXT    NOT NULL,
-			stop_sequence  INTEGER NOT NULL,
-			departure_secs INTEGER NOT NULL
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_gst_route_stop
-			ON gtfs_stop_times (agency_id, route_id, stop_id)`,
-		// Prevents duplicate rows when an agency uses multiple overlapping ZIPs.
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_gst_unique
-			ON gtfs_stop_times (agency_id, trip_id, stop_sequence)`,
-		`CREATE TABLE IF NOT EXISTS gtfs_services (
-			agency_id    TEXT    NOT NULL,
-			service_id   TEXT    NOT NULL,
-			weekday_mask INTEGER NOT NULL,
-			start_date   TEXT    NOT NULL,
-			end_date     TEXT    NOT NULL,
-			PRIMARY KEY (agency_id, service_id)
-		)`,
-		`CREATE TABLE IF NOT EXISTS gtfs_service_exceptions (
-			agency_id  TEXT    NOT NULL,
-			service_id TEXT    NOT NULL,
-			date       TEXT    NOT NULL,
-			added      INTEGER NOT NULL
-		)`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_gse_unique
-			ON gtfs_service_exceptions (agency_id, service_id, date)`,
-		`CREATE INDEX IF NOT EXISTS idx_gse
-			ON gtfs_service_exceptions (agency_id, service_id, date)`,
+
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.Exec(stmt); err != nil {

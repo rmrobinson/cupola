@@ -46,7 +46,11 @@ func TestTransitRouteShapeReturnsServiceUnavailableBeforeStaticMetadataLoads(t *
 		t.Fatalf("CreateTransitAgency() error = %v", err)
 	}
 
-	agencies, err := gtfsrt.NewAgencyManager(db, t.TempDir())
+	gtfsDB, err := store.NewGTFSSQLiteStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewGTFSSQLiteStore() error = %v", err)
+	}
+	agencies, err := gtfsrt.NewAgencyManager(db, gtfsDB, t.TempDir())
 	if err != nil {
 		t.Fatalf("NewAgencyManager() error = %v", err)
 	}
