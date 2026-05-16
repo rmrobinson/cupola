@@ -86,6 +86,10 @@ const Stream = (() => {
         : 'unknown';
       banner.textContent = `Offline — last data: ${ago}`;
       banner.className = 'alert-banner alert-banner--error';
+    } else if (cautioning.has('connectivity')) {
+      // Internet down is the root cause of collector failures — show it first.
+      banner.textContent = 'No internet connectivity — local data only';
+      banner.className = 'alert-banner alert-banner--caution';
     } else if (failing.size > 0) {
       banner.textContent = 'Source unavailable: ' + [...failing].join(', ');
       banner.className = 'alert-banner alert-banner--error';
