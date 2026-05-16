@@ -17,6 +17,7 @@ const PRECACHE = [
   '/css/horizon.css',
   '/js/stream.js',
   '/js/app-ui.js',
+  '/js/dashboard-api.js',
   '/js/details.js',
   '/js/admin.js',
   '/js/subscriptions.js',

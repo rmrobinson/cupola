@@ -35,8 +35,7 @@ const Profile = (() => {
 
     let profiles = [];
     try {
-      const res = await fetch('/api/v1/profiles');
-      if (res.ok) profiles = await res.json();
+      profiles = await DashboardAPI.listProfiles();
     } catch {}
 
     render(landing, profiles, onProfileLoaded);
@@ -54,6 +53,8 @@ const Profile = (() => {
         <div class="landing-body">
           <section class="landing-section">
             <button id="btn-new-layout" class="btn-primary">New dashboard</button>
+            <button id="btn-import-dashboard" class="btn-secondary">Import dashboard</button>
+            <input id="dashboard-import-file" type="file" accept="application/json,.json" hidden>
           </section>
           ${profiles.length ? `
           <section class="landing-section">
@@ -79,11 +80,20 @@ const Profile = (() => {
           </div>
         </div>
       </div>
+      <div id="dashboard-import-modal" class="import-modal hidden"></div>
     `;
 
     el.querySelector('#btn-new-layout').addEventListener('click', () => {
       el.querySelector('#landing-name-form').classList.remove('hidden');
       el.querySelector('#landing-name-input').select();
+    });
+
+    const fileInput = el.querySelector('#dashboard-import-file');
+    el.querySelector('#btn-import-dashboard').addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      fileInput.value = '';
+      if (file) startImport(el, file, onProfileLoaded);
     });
 
     el.querySelector('#btn-confirm-name').addEventListener('click', () =>
@@ -100,9 +110,11 @@ const Profile = (() => {
 
     el.querySelectorAll('.btn-load-profile').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const res = await fetch(`/api/v1/profiles/${btn.dataset.id}`);
-        if (!res.ok) return;
-        launch(await res.json(), onProfileLoaded);
+        try {
+          launch(await DashboardAPI.getProfile(btn.dataset.id), onProfileLoaded);
+        } catch (err) {
+          AppUI.reportError('Profile load failed', err);
+        }
       });
     });
   }
@@ -111,13 +123,7 @@ const Profile = (() => {
     const name = (el.querySelector('#landing-name-input').value || '').trim() || 'My Dashboard';
     const id   = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
     const profile = { ...DEFAULTS[defaultLayout], id, name };
-    fetch('/api/v1/profiles', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(profile),
-    }).then(r => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    }).catch(err => {
+    DashboardAPI.saveProfile(profile).catch(err => {
       AppUI.reportError('Profile save failed', err);
     });
     launch(profile, onProfileLoaded);
@@ -125,6 +131,91 @@ const Profile = (() => {
 
   function launch(profile, onProfileLoaded) {
     onProfileLoaded(profile);
+  }
+
+  async function startImport(root, file, onProfileLoaded) {
+    let exportData;
+    try {
+      exportData = JSON.parse(await file.text());
+    } catch (err) {
+      AppUI.reportError('Dashboard import file is not valid JSON', err);
+      return;
+    }
+    try {
+      renderImportPreview(root, exportData, await DashboardAPI.validateImport(exportData), onProfileLoaded);
+    } catch (err) {
+      AppUI.reportError('Dashboard import validation failed', err);
+    }
+  }
+
+  function renderImportPreview(root, exportData, validation, onProfileLoaded) {
+    const modal = root.querySelector('#dashboard-import-modal');
+    const defaultName = `${validation.profile_name || 'Imported dashboard'} (Imported)`;
+    const rows = (validation.widgets || []).map(w => {
+      const hardFail = w.status === 'missing_widget_type' || w.status === 'missing_domain';
+      const checked = hardFail ? '' : ' checked';
+      const disabled = hardFail ? ' disabled' : '';
+      const statusLabel = w.status === 'ok' ? 'Ready' : w.status === 'config_warning' ? 'Warning' : 'Unavailable';
+      const warnings = (w.warnings || []).concat((w.missing_domains || []).map(d => `Missing ${d}`));
+      return `
+        <label class="import-widget-row import-widget-${esc(w.status)}">
+          <input type="checkbox" name="widget" value="${esc(w.id)}"${checked}${disabled}>
+          <span class="import-widget-main">
+            <span class="import-widget-title">${esc(w.label || w.type)}</span>
+            <span class="import-widget-meta">${esc(statusLabel)}${warnings.length ? ` - ${esc(warnings.join('; '))}` : ''}</span>
+          </span>
+        </label>
+      `;
+    }).join('');
+
+    modal.innerHTML = `
+      <div class="import-card" role="dialog" aria-modal="true" aria-labelledby="import-title">
+        <button class="import-close" aria-label="Close">&times;</button>
+        <h2 id="import-title" class="import-title">Import dashboard</h2>
+        <label class="import-name-row">
+          <span>Name</span>
+          <input id="import-dashboard-name" type="text" value="${esc(defaultName)}">
+        </label>
+        <div class="import-summary">
+          ${esc(validation.layout || '')} dashboard - ${(validation.widgets || []).length} widgets
+        </div>
+        <div class="import-widget-list">${rows || '<p class="import-empty">No widgets found in this export.</p>'}</div>
+        <div class="import-actions">
+          <button class="btn-secondary import-cancel">Cancel</button>
+          <button class="btn-primary import-confirm"${validation.can_import ? '' : ' disabled'}>Import</button>
+        </div>
+      </div>
+    `;
+    modal.classList.remove('hidden');
+    modal.querySelector('.import-close').addEventListener('click', () => closeImport(modal));
+    modal.querySelector('.import-cancel').addEventListener('click', () => closeImport(modal));
+    modal.addEventListener('click', e => {
+      if (e.target === modal) closeImport(modal);
+    });
+    modal.querySelector('.import-confirm').addEventListener('click', () =>
+      confirmImport(modal, exportData, onProfileLoaded)
+    );
+    modal.querySelector('#import-dashboard-name')?.focus();
+  }
+
+  async function confirmImport(modal, exportData, onProfileLoaded) {
+    const btn = modal.querySelector('.import-confirm');
+    const selected = [...modal.querySelectorAll('input[name="widget"]:checked')].map(el => el.value);
+    const name = modal.querySelector('#import-dashboard-name')?.value || '';
+    btn.disabled = true;
+    try {
+      const data = await DashboardAPI.importProfile({ exportData, name, widgetIDs: selected });
+      closeImport(modal);
+      launch(data.profile, onProfileLoaded);
+    } catch (err) {
+      btn.disabled = false;
+      AppUI.reportError('Dashboard import failed', err);
+    }
+  }
+
+  function closeImport(modal) {
+    modal.classList.add('hidden');
+    modal.innerHTML = '';
   }
 
   function esc(s) {

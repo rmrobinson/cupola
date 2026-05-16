@@ -27,8 +27,9 @@
         <img src="/icons/icon-192.png" alt="" class="canvas-brand-icon">
       </div>
       <div class="canvas-toolbar-actions">
-        <button id="btn-admin" class="btn-small" title="Open admin">Admin</button>
         <button id="btn-add-widget" class="btn-small" title="Add widget">+ Widget</button>
+        <button id="btn-export-dashboard" class="btn-small" title="Export dashboard">Export</button>
+        <button id="btn-admin" class="btn-small" title="Open admin">Admin</button>
       </div>
     </div>
     <div id="widget-grid" class="widget-grid"></div>
@@ -39,6 +40,7 @@
   <script src="/js/vendor/protomaps-leaflet.js"></script>
   <!-- load order: stream → subscriptions → overlays → widgets → profile → picker → grid → main -->
   <script src="/js/app-ui.js"></script>
+  <script src="/js/dashboard-api.js"></script>
   <script src="/js/details.js"></script>
   <script src="/js/stream.js"></script>
   <script src="/js/subscriptions.js"></script>

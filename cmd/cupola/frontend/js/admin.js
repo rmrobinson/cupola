@@ -1,7 +1,6 @@
 const Admin = (() => {
   const API = {
     gtfs: '/api/v1/transit/agency-configs',
-    dashboards: '/api/v1/profiles',
     collectors: '/api/v1/admin/collectors',
   };
 
@@ -261,9 +260,7 @@ const Admin = (() => {
   async function loadDashboards() {
     panel.innerHTML = loadingHTML('Loading dashboards...');
     try {
-      const res = await fetch(API.dashboards);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const dashboards = await res.json();
+      const dashboards = await DashboardAPI.listProfiles();
       renderDashboards(dashboards || []);
     } catch (err) {
       AppUI.reportError('Dashboards failed to load', err);
@@ -305,8 +302,7 @@ const Admin = (() => {
     if (!window.confirm(`Delete dashboard ${name}?`)) return;
     if (!beginMutation()) return;
     try {
-      const res = await fetch(`${API.dashboards}/${encodeURIComponent(id)}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(await responseError(res));
+      await DashboardAPI.deleteProfile(id);
       AppUI.notify('Dashboard deleted');
       await loadDashboards();
     } catch (err) {

@@ -233,6 +233,125 @@ button {
   background: rgba(255, 255, 255, 0.18);
 }
 
+.import-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0,0,0,0.45);
+}
+
+.import-card {
+  width: min(560px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  background: rgba(10,10,30,0.96);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 10px;
+  padding: 18px;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.45);
+}
+
+.import-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.55);
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.import-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.import-name-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.import-name-row input {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 5px;
+  color: #fff;
+  padding: 7px 9px;
+  font: inherit;
+}
+
+.import-summary {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.import-widget-list {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.import-widget-row {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.045);
+}
+
+.import-widget-row input {
+  margin-top: 2px;
+}
+
+.import-widget-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.import-widget-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.import-widget-meta {
+  font-size: 11px;
+  opacity: 0.62;
+  line-height: 1.3;
+}
+
+.import-widget-config_warning {
+  border-color: rgba(202,138,4,0.38);
+}
+
+.import-widget-missing_domain,
+.import-widget-missing_widget_type {
+  opacity: 0.65;
+  border-color: rgba(220,38,38,0.35);
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* ── Widget chrome ─────────────────────────────────────────────────────── */
 
 .widget-inner {

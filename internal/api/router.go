@@ -86,6 +86,9 @@ func (h *Handler) Router() http.Handler {
 
 	r.Get("/api/v1/profiles", h.listProfiles)
 	r.Post("/api/v1/profiles", h.createProfile)
+	r.Post("/api/v1/profiles/import/validate", h.validateProfileImport)
+	r.Post("/api/v1/profiles/import", h.importProfile)
+	r.Get("/api/v1/profiles/{id}/export", h.exportProfile)
 	r.Get("/api/v1/profiles/{id}", h.getProfile)
 	r.Delete("/api/v1/profiles/{id}", h.deleteProfile)
 

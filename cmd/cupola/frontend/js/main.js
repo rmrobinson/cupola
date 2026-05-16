@@ -117,13 +117,7 @@ const Horizon = (() => {
 // ── Profile save helper ───────────────────────────────────────────────────────
 
 function saveProfile(profile) {
-  return fetch('/api/v1/profiles', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(profile),
-  }).then(r => {
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  }).catch(err => {
+  return DashboardAPI.saveProfile(profile).catch(err => {
     AppUI.reportError('Dashboard save failed', err);
   });
 }
@@ -145,11 +139,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (isKiosk && kioskProfileId) {
     // Kiosk mode: auto-load the named profile, suppress chrome
     document.getElementById('canvas').classList.add('kiosk');
-    fetch(`/api/v1/profiles/${kioskProfileId}`)
-      .then(r => r.ok ? r.json() : null)
+    DashboardAPI.getProfile(kioskProfileId)
       .then(profile => {
-        if (!profile) { console.error('[cupola] kiosk profile not found:', kioskProfileId); return; }
         launchCanvas(profile);
+      })
+      .catch(err => {
+        console.error('[cupola] kiosk profile not found:', kioskProfileId, err);
       });
   } else {
     Profile.showLanding(profile => launchCanvas(profile));
@@ -164,6 +159,7 @@ async function launchCanvas(profile) {
   canvas.classList.remove('hidden');
 
   Grid.init(profile, saveProfile);
+  window.CupolaActiveProfile = profile;
 
   // "+ Widget" button
   const addBtn = document.getElementById('btn-add-widget');
@@ -182,11 +178,42 @@ async function launchCanvas(profile) {
     });
   }
 
+  const exportBtn = document.getElementById('btn-export-dashboard');
+  if (exportBtn && !exportBtn.dataset.bound) {
+    exportBtn.dataset.bound = '1';
+    exportBtn.addEventListener('click', () => exportDashboard(exportBtn));
+  }
+
   const adminBtn = document.getElementById('btn-admin');
   if (adminBtn && !adminBtn.dataset.bound) {
     adminBtn.dataset.bound = '1';
     adminBtn.addEventListener('click', () => {
       window.location.href = '/admin';
     });
+  }
+}
+
+async function exportDashboard(btn) {
+  const profile = window.CupolaActiveProfile;
+  if (!profile?.id) return;
+  const prevText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Exporting...';
+  try {
+    await DashboardAPI.saveProfile(profile);
+    const { blob, filename } = await DashboardAPI.exportProfile(profile.id);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    AppUI.reportError('Dashboard export failed', err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevText;
   }
 }
