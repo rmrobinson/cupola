@@ -35,7 +35,7 @@
   window.CupolaWidgets.push({
     type: 'weather-forecast',
     domain: 'weather.forecast',
-    defaultSize: { w: 4, h: 8 },
+    defaultSize: { w: 7, h: 8 },
     subscriptionParams: () => null,
     render(container, state, config) { render(container, state, config); },
     onUpdate(container, data, config)  { render(container, data, config); },

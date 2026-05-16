@@ -74,7 +74,7 @@
   window.CupolaWidgets.push({
     type:    'aircraft',
     domain:  'aircraft',
-    defaultSize: { w: 2, h: 4 },
+    defaultSize: { w: 4, h: 4 },
     configSchema: [
       { key: 'center_lat', label: 'Center latitude',  type: 'number', placeholder: () => window.CupolaConfig?.lat ?? '' },
       { key: 'center_lon', label: 'Center longitude', type: 'number', placeholder: () => window.CupolaConfig?.lon ?? '' },

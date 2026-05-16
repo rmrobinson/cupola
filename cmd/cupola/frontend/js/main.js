@@ -174,7 +174,7 @@ async function launchCanvas(profile) {
         const wc = {
           id: 'w-' + Math.random().toString(36).slice(2, 9),
           type: def.type,
-          pos: { col: 0, row: 0, w: def.defaultSize?.w || 2, h: def.defaultSize?.h || 2 },
+          pos: { col: 0, row: 0, w: def.defaultSize?.w || 4, h: def.defaultSize?.h || 2 },
           config: {},
         };
         Grid.addWidget(wc);

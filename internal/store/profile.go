@@ -8,6 +8,7 @@ type Profile struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description,omitempty"`
 	Layout      string         `json:"layout"` // "landscape" or "portrait"
+	GridVersion int            `json:"grid_version,omitempty"`
 	Widgets     []WidgetConfig `json:"widgets"`
 }
 

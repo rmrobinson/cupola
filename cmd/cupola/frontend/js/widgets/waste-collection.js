@@ -63,7 +63,7 @@
   window.CupolaWidgets.push({
     type: 'waste-collection',
     domain: 'waste.collection',
-    defaultSize: { w: 3, h: 2 },
+    defaultSize: { w: 5, h: 2 },
     subscriptionParams: () => null,
     render(container, state, _config) { render(container, state); },
     onUpdate(container, data, _config)  { render(container, data); },

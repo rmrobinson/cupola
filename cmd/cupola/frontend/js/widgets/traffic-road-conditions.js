@@ -162,7 +162,7 @@
   window.CupolaWidgets.push({
     type:        'traffic-road-conditions',
     domain:      'traffic.road_conditions',
-    defaultSize: { w: 3, h: 5 },
+    defaultSize: { w: 6, h: 5 },
     buildConfig,
     subscriptionParams: () => null,
     render(container, state, config)  { render(container, state, config); },

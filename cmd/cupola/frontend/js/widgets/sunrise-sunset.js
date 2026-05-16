@@ -36,7 +36,7 @@
   window.CupolaWidgets.push({
     type: 'sunrise-sunset',
     domain: 'astro',
-    defaultSize: { w: 2, h: 4 },
+    defaultSize: { w: 3, h: 4 },
     subscriptionParams: () => null,
     render(container, state, config) { render(container, state, config); },
     onUpdate(container, data, config)  { render(container, data, config); },

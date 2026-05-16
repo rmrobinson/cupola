@@ -67,7 +67,7 @@
   window.CupolaWidgets.push({
     type: 'moon-phase',
     domain: 'astro',
-    defaultSize: { w: 2, h: 4 },
+    defaultSize: { w: 3, h: 4 },
     subscriptionParams: () => null,
     render(container, state, _config) { render(container, state); },
     onUpdate(container, data, _config)  { render(container, data); },

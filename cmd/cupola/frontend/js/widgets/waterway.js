@@ -90,7 +90,7 @@
     type: 'waterway',
     label: 'Waterway Conditions',
     domain: 'waterway.conditions',
-    defaultSize: { w: 3, h: 2 },
+    defaultSize: { w: 5, h: 2 },
     configSchema: [
       {
         key: 'gauge_ids',

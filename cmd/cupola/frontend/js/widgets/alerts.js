@@ -169,7 +169,7 @@
   window.CupolaWidgets.push({
     type: 'alerts',
     domains: ['weather.alerts', 'transit.alerts', 'municipal.alerts'],
-    defaultSize: { w: 4, h: 5 },
+    defaultSize: { w: 7, h: 5 },
     configSchema: [
       { key: 'showWeather',   label: 'Weather alerts',   type: 'boolean', default: true },
       { key: 'showTransit',   label: 'Transit alerts',   type: 'boolean', default: true },

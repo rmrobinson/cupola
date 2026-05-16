@@ -62,7 +62,7 @@
     type: 'weather-rainfall',
     label: 'Rainfall',
     domain: 'weather.current',
-    defaultSize: { w: 3, h: 4 },
+    defaultSize: { w: 5, h: 4 },
     subscriptionParams: () => null,
     render(container, state, _config) { render(container, state); },
     onUpdate(container, data, _config) { render(container, data); },

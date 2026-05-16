@@ -309,7 +309,7 @@
   window.CupolaWidgets.push({
     type:    'radar-map',
     domains: ['traffic.incidents', 'transit.vehicles', 'aircraft'],
-    defaultSize: { w: 6, h: 8 },
+    defaultSize: { w: 12, h: 8 },
     configSchema: [
       { key: 'center_lat',      label: 'Center latitude',  type: 'number', placeholder: () => window.CupolaConfig?.lat ?? '' },
       { key: 'center_lon',      label: 'Center longitude', type: 'number', placeholder: () => window.CupolaConfig?.lon ?? '' },

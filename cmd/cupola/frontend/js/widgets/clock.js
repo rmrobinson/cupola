@@ -3,7 +3,7 @@
   window.CupolaWidgets.push({
     type: 'clock',
     domain: 'astro',
-    defaultSize: { w: 3, h: 2 },
+    defaultSize: { w: 5, h: 2 },
     subscriptionParams: () => null,
 
     render(container, _state, config) {

@@ -1,10 +1,10 @@
-/* Widget grid: 12 columns landscape, 4 columns portrait.
+/* Widget grid: 24 columns landscape, 8 columns portrait.
    Column span / row span are set inline by main.js from profile widget pos data.
    Drag-and-drop resize/reorder is wired in Phase 8. */
 
 .widget-grid {
   display: grid;
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns: repeat(24, 1fr);
   grid-auto-rows: 60px;
   gap: 10px;
   width: 100%;
@@ -15,10 +15,10 @@
   min-width: 0;
 }
 
-/* Tablet portrait: 4-column grid */
+/* Tablet portrait: 8-column grid */
 @media (max-width: 767px) {
   .widget-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(8, 1fr);
     grid-auto-rows: 56px;
     gap: 8px;
   }
@@ -33,15 +33,20 @@
   box-sizing: border-box;
 }
 
-/* Phone: single-column, fixed row units so the resize handle still changes height */
+.drag-drop-ghost-resize {
+  background: rgba(100, 180, 255, 0.24);
+  border-color: rgba(125, 200, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(125, 200, 255, 0.28);
+}
+
+/* Phone: two-column grid, fixed row units so the resize handle still changes height */
 @media (max-width: 479px) {
   .widget-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
     grid-auto-rows: 56px;
     gap: 8px;
   }
   .widget-cell {
-    grid-column: 1 / -1 !important;
     min-height: 140px;
   }
 }

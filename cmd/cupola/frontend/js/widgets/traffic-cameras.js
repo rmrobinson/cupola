@@ -111,7 +111,7 @@
   window.CupolaWidgets.push({
     type:        'traffic-cameras',
     domain:      'traffic.cameras',
-    defaultSize: { w: 4, h: 4 },
+    defaultSize: { w: 7, h: 4 },
     configSchema: [
       { key: 'camera_id',   label: 'Camera ID (leave blank for list)', type: 'text',   default: '' },
       { key: 'max_cameras', label: 'Max cameras (list mode)',          type: 'number', default: 4 },

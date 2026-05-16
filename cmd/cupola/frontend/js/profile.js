@@ -9,19 +9,21 @@ const Profile = (() => {
   const DEFAULTS = {
     landscape: {
       layout: 'landscape',
+      grid_version: 2,
       widgets: [{
         id: 'w-notes',
         type: 'shared-notes',
-        pos: { col: 0, row: 0, w: 4, h: 8 },
+        pos: { col: 0, row: 0, w: 8, h: 8 },
         config: {},
       }],
     },
     portrait: {
       layout: 'portrait',
+      grid_version: 2,
       widgets: [{
         id: 'w-notes',
         type: 'shared-notes',
-        pos: { col: 0, row: 0, w: 4, h: 8 },
+        pos: { col: 0, row: 0, w: 8, h: 8 },
         config: {},
       }],
     },

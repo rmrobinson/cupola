@@ -361,7 +361,7 @@
   window.CupolaWidgets.push({
     type:        'transit',
     domain:      'transit.arrivals',
-    defaultSize: { w: 3, h: 4 },
+    defaultSize: { w: 6, h: 4 },
     buildConfig,
     subscriptionParams(config) {
       const agency  = (config?.agency  || '').trim();

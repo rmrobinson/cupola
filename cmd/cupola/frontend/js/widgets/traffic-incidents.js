@@ -165,7 +165,7 @@
   window.CupolaWidgets.push({
     type:        'traffic-incidents',
     domain:      'traffic.incidents',
-    defaultSize: { w: 3, h: 5 },
+    defaultSize: { w: 6, h: 5 },
     buildConfig,
     subscriptionParams: () => ({ province: 'ON' }),
     render(container, state, config)      { render(container, state, config); },

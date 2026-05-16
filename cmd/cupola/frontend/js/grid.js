@@ -5,6 +5,9 @@
  * Depends on: Stream, Subscriptions, Widgets (from main.js), window.CupolaWidgets
  */
 const Grid = (() => {
+  const RESIZE_HIT_SIZE = 44;
+  const GRID_VERSION = 2;
+  const GRID_VERSION_SCALE = 2;
   let _profile = null;
   let _onSave = null;
   let _saveTimer = null;
@@ -15,6 +18,7 @@ const Grid = (() => {
     destroy();
     _profile = profile;
     _onSave = onSave;
+    const migrated = migrateProfileGrid(_profile);
 
     const grid = document.getElementById('widget-grid');
     grid.innerHTML = '';
@@ -25,6 +29,8 @@ const Grid = (() => {
       const cell = await createCell(wc, displayPositions.get(wc.id));
       grid.appendChild(cell);
     }
+
+    if (migrated) scheduleSave();
   }
 
   function destroy() {
@@ -110,7 +116,7 @@ const Grid = (() => {
     inner.appendChild(resizeHandle);
     cell.appendChild(inner);
 
-    initResize(resizeHandle, cell, wc);
+    initResize(inner, cell, wc);
 
     chrome.addEventListener('pointerdown', e => {
       if (e.target.closest('button,input,select,textarea,a')) return;
@@ -334,57 +340,35 @@ const Grid = (() => {
 
   function showDragOverlay(grid, wc) {
     removeDragOverlay();
-    const rect = grid.getBoundingClientRect();
-    const cols = gridCols(grid);
-    const pos = effectiveGridPos(wc.pos, cols);
-    const cs = getComputedStyle(grid);
-    const rowH    = parseFloat(cs.gridAutoRows) || 60;
-    const rowGap  = parseFloat(cs.rowGap)       || 0;
-    const colGap  = parseFloat(cs.columnGap)    || 0;
-    const rowPitch = rowH + rowGap;
-    const colPitch = (rect.width + colGap) / cols;
+    const metrics = gridMetrics(grid);
 
     const overlay = document.createElement('div');
     overlay.id = 'drag-grid-overlay';
     overlay.style.cssText = [
       `position:fixed`,
-      `left:${rect.left}px`,
-      `top:${rect.top}px`,
-      `width:${rect.width}px`,
-      `height:${rect.height}px`,
+      `left:${metrics.rect.left}px`,
+      `top:${metrics.rect.top}px`,
+      `width:${metrics.rect.width}px`,
+      `height:${metrics.rect.height}px`,
       `pointer-events:none`,
       `z-index:50`,
       `background-image:` +
-        `repeating-linear-gradient(to right,rgba(255,255,255,0.07) 0,rgba(255,255,255,0.07) 1px,transparent 1px,transparent ${colPitch}px),` +
-        `repeating-linear-gradient(to bottom,rgba(255,255,255,0.07) 0,rgba(255,255,255,0.07) 1px,transparent 1px,transparent ${rowPitch}px)`,
+        `repeating-linear-gradient(to right,rgba(255,255,255,0.07) 0,rgba(255,255,255,0.07) 1px,transparent 1px,transparent ${metrics.colPitch}px),` +
+        `repeating-linear-gradient(to bottom,rgba(255,255,255,0.07) 0,rgba(255,255,255,0.07) 1px,transparent 1px,transparent ${metrics.rowPitch}px)`,
     ].join(';');
 
     const ghost = document.createElement('div');
     ghost.id = 'drag-drop-ghost';
     ghost.className = 'drag-drop-ghost';
-    ghost.style.width  = `${pos.w * colPitch - colGap}px`;
-    ghost.style.height = `${pos.h * rowPitch - rowGap}px`;
     ghost.style.display = 'none';
     overlay.appendChild(ghost);
     document.body.appendChild(overlay);
+    setOverlayGhost(effectiveGridPos(wc.pos, metrics.cols), metrics);
   }
 
   function updateDragOverlay(e, grid) {
-    const ghost = document.getElementById('drag-drop-ghost');
-    if (!ghost) return;
-    const rect = grid.getBoundingClientRect();
-    const cols = gridCols(grid);
-    const cs = getComputedStyle(grid);
-    const rowH    = parseFloat(cs.gridAutoRows) || 60;
-    const rowGap  = parseFloat(cs.rowGap)       || 0;
-    const colGap  = parseFloat(cs.columnGap)    || 0;
-    const rowPitch = rowH + rowGap;
-    const colPitch = (rect.width + colGap) / cols;
-    const col = Math.max(0, Math.min(cols - 1, Math.floor((e.clientX - rect.left) / colPitch)));
-    const row = Math.max(0, Math.floor((e.clientY - rect.top) / rowPitch));
-    ghost.style.left    = `${col * colPitch}px`;
-    ghost.style.top     = `${row * rowPitch}px`;
-    ghost.style.display = '';
+    const metrics = gridMetrics(grid);
+    setOverlayGhost({ ...posFromEvent(e, grid), w: 1, h: 1 }, metrics, { keepSize: true });
   }
 
   function removeDragOverlay() {
@@ -393,6 +377,13 @@ const Grid = (() => {
   }
 
   function posFromEvent(e, grid) {
+    const metrics = gridMetrics(grid);
+    const col = Math.max(0, Math.min(metrics.cols - 1, Math.floor((e.clientX - metrics.rect.left) / metrics.colPitch)));
+    const row = Math.max(0, Math.floor((e.clientY - metrics.rect.top) / metrics.rowPitch));
+    return { col, row };
+  }
+
+  function gridMetrics(grid) {
     const rect = grid.getBoundingClientRect();
     const cols = gridCols(grid);
     const cs = getComputedStyle(grid);
@@ -401,18 +392,29 @@ const Grid = (() => {
     const colGap  = parseFloat(cs.columnGap)    || 0;
     const rowPitch = rowH + rowGap;
     const colPitch = (rect.width + colGap) / cols;
-    const col = Math.max(0, Math.min(cols - 1, Math.floor((e.clientX - rect.left) / colPitch)));
-    const row = Math.max(0, Math.floor((e.clientY - rect.top) / rowPitch));
-    return { col, row };
+    return { rect, cols, rowGap, colGap, rowPitch, colPitch };
+  }
+
+  function setOverlayGhost(pos, metrics, opts = {}) {
+    const ghost = document.getElementById('drag-drop-ghost');
+    if (!ghost) return;
+    ghost.style.left = `${pos.col * metrics.colPitch}px`;
+    ghost.style.top = `${pos.row * metrics.rowPitch}px`;
+    if (!opts.keepSize) {
+      ghost.style.width = `${pos.w * metrics.colPitch - metrics.colGap}px`;
+      ghost.style.height = `${pos.h * metrics.rowPitch - metrics.rowGap}px`;
+    }
+    ghost.style.display = '';
   }
 
   // ── Resize ────────────────────────────────────────────────────────────
 
-  function initResize(handle, cell, wc) {
-    handle.addEventListener('pointerdown', e => {
+  function initResize(hitTarget, cell, wc) {
+    hitTarget.addEventListener('pointerdown', e => {
+      if (!isResizeHit(e, hitTarget)) return;
       e.preventDefault();
       e.stopPropagation();
-      handle.setPointerCapture(e.pointerId);
+      hitTarget.setPointerCapture(e.pointerId);
       cell.classList.add('widget-resizing');
       const grid = document.getElementById('widget-grid');
       const cols = gridCols(grid);
@@ -421,33 +423,42 @@ const Grid = (() => {
       wc.pos.w = current.w;
       wc.pos.h = current.h;
       setCellPos(cell, current);
-      const rect = grid.getBoundingClientRect();
-      const cs = getComputedStyle(grid);
-      const colGap = parseFloat(cs.columnGap) || 0;
-      const rowGap = parseFloat(cs.rowGap) || 0;
-      const colW = (rect.width + colGap) / cols;
-      const rowH = (parseFloat(cs.gridAutoRows) || 60) + rowGap;
+      showDragOverlay(grid, wc);
+      const ghost = document.getElementById('drag-drop-ghost');
+      if (ghost) ghost.classList.add('drag-drop-ghost-resize');
+      const metrics = gridMetrics(grid);
       const startX = e.clientX, startY = e.clientY;
       const startW = current.w, startH = current.h;
 
       const onMove = e => {
         e.preventDefault();
         const maxW = Math.max(1, cols - Math.min(wc.pos.col, cols - 1));
-        wc.pos.w = Math.max(1, Math.min(maxW, startW + Math.round((e.clientX - startX) / colW)));
-        wc.pos.h = Math.max(1, startH + Math.round((e.clientY - startY) / rowH));
+        wc.pos.w = Math.max(1, Math.min(maxW, startW + Math.round((e.clientX - startX) / metrics.colPitch)));
+        wc.pos.h = Math.max(1, startH + Math.round((e.clientY - startY) / metrics.rowPitch));
         setCellPos(cell, wc.pos);
+        setOverlayGhost(wc.pos, metrics);
       };
       const onUp = () => {
         document.removeEventListener('pointermove', onMove);
         document.removeEventListener('pointerup', onUp);
         document.removeEventListener('pointercancel', onUp);
         cell.classList.remove('widget-resizing');
+        removeDragOverlay();
         scheduleSave();
       };
       document.addEventListener('pointermove', onMove);
       document.addEventListener('pointerup', onUp);
       document.addEventListener('pointercancel', onUp);
     });
+  }
+
+  function isResizeHit(e, el) {
+    if (e.target.closest('.widget-chrome,.widget-config-panel,button,input,select,textarea,a')) return false;
+    const rect = el.getBoundingClientRect();
+    return e.clientX >= rect.right - RESIZE_HIT_SIZE &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.bottom - RESIZE_HIT_SIZE &&
+      e.clientY <= rect.bottom;
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────
@@ -534,6 +545,17 @@ const Grid = (() => {
     };
   }
 
+  function migrateProfileGrid(profile) {
+    if (!profile || Number(profile.grid_version || 1) >= GRID_VERSION) return false;
+    (profile.widgets || []).forEach(wc => {
+      if (!wc.pos) return;
+      wc.pos.col = Math.max(0, (wc.pos.col || 0) * GRID_VERSION_SCALE);
+      wc.pos.w = Math.max(1, (wc.pos.w || 1) * GRID_VERSION_SCALE);
+    });
+    profile.grid_version = GRID_VERSION;
+    return true;
+  }
+
   function setCellPos(cell, pos) {
     const next = {
       col: pos.col ?? 0,
@@ -554,7 +576,7 @@ const Grid = (() => {
   }
 
   function layoutCols(layout) {
-    return layout === 'portrait' ? 4 : 12;
+    return layout === 'portrait' ? 8 : 24;
   }
 
   function getDefByType(type) {

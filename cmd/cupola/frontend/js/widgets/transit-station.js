@@ -358,7 +358,7 @@
   window.CupolaWidgets.push({
     type:        'transit-station',
     domain:      'transit.arrivals',
-    defaultSize: { w: 3, h: 5 },
+    defaultSize: { w: 6, h: 5 },
     buildConfig,
 
     subscriptionParams() { return null; },

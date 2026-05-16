@@ -108,7 +108,7 @@
   window.CupolaWidgets.push({
     type:   'shared-notes',
     domain: 'notes',
-    defaultSize: { w: 4, h: 8 },
+    defaultSize: { w: 8, h: 8 },
     subscriptionParams: () => null,
 
     render(container, state, _config) {
