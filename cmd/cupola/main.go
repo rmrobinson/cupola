@@ -73,20 +73,25 @@ func main() {
 	// Ephem: always active — pure local computation, no network.
 	registry.Register(astro.New(cfg.Location.Lat, cfg.Location.Lon, cfg.Location.Timezone, stateStore))
 
-	// Environment Canada forecast + alerts via coordinate-based RSS feeds.
-	// No station discovery needed — the EC server resolves lat/lon to the nearest station.
+	// Environment Canada weather via nearest-station discovery from configured lat/lon.
+	// Forecast and alerts use RSS feeds; hourly forecast parses the EC hourly page SSR state.
 	if c := cfg.Collectors.WeatherEnvCanada; c != nil && c.Enabled {
 		fcInterval := c.PollIntervalForecast.Duration
 		if fcInterval == 0 {
 			fcInterval = time.Hour
 		}
+		hourlyInterval := c.PollIntervalHourlyForecast.Duration
+		if hourlyInterval == 0 {
+			hourlyInterval = 20 * time.Minute
+		}
 		alertInterval := c.PollIntervalAlerts.Duration
 		if alertInterval == 0 {
 			alertInterval = 15 * time.Minute
 		}
-		log.Printf("envcanada: registering RSS collectors for %.3f,%.3f",
+		log.Printf("envcanada: registering weather collectors for %.3f,%.3f",
 			cfg.Location.Lat, cfg.Location.Lon)
 		registry.Register(envcanada.NewForecastCollector(cfg.Location.Lat, cfg.Location.Lon, fcInterval, stateStore))
+		registry.Register(envcanada.NewHourlyForecastCollector(cfg.Location.Lat, cfg.Location.Lon, hourlyInterval, stateStore))
 		registry.Register(envcanada.NewAlertsCollector(cfg.Location.Lat, cfg.Location.Lon, alertInterval, stateStore))
 	}
 

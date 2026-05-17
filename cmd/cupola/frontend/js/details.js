@@ -12,29 +12,41 @@
     agency_id: 'Agency',
     alert_type: 'Type',
     area: 'Area',
+    condition: 'Condition',
     at_half_mast: 'At half-mast',
     ends_at: 'Ends',
     expires: 'Expires',
+    feels_like: 'Feels like',
     flow_cms: 'Flow',
+    humidex: 'Humidex',
     level_m: 'Level',
     location: 'Location',
     onset: 'Onset',
     published_at: 'Published',
+    precip_chance: 'Chance of precipitation',
     road_name: 'Road',
     since: 'Since',
     source_id: 'Source',
     starts_at: 'Starts',
+    temperature: 'Temperature',
     temp_c: 'Temperature',
     type: 'Type',
     until: 'Until',
     updated_at: 'Updated',
+    uv_index: 'UV index',
     waterway_name: 'Waterway',
+    wind_chill: 'Wind chill',
+    wind_direction: 'Wind direction',
+    wind_gust: 'Wind gust',
+    wind_speed: 'Wind speed',
   };
 
   const UNIT_SYMBOLS = {
     celsius: '°C',
+    km_per_h: 'km/h',
     m: 'm',
     m3_per_s: 'm³/s',
+    percent: '%',
   };
 
   const DOMAIN_LABELS = {
@@ -44,6 +56,7 @@
     'transit.alerts': 'Transit alert',
     'waterway.conditions': 'Waterway',
     'weather.alerts': 'Weather alert',
+    'weather.forecast.hourly': 'Hourly forecast',
   };
 
   function esc(s) {
@@ -56,7 +69,7 @@
 
   function fmtValue(value) {
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-    if (!value) return '';
+    if (value == null || value === '') return '';
     const ts = Date.parse(value);
     if (!Number.isNaN(ts) && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
       return new Date(ts).toLocaleString(undefined, {
@@ -207,7 +220,7 @@
       ? `<span class="detail-severity">${esc(d.severity)}</span>` : '';
     const fields = (d.fields || []).map(f => {
       const unit = unitFor(f.unit);
-      const value = `${fmtValue(f.value)}${unit ? ` ${unit}` : ''}`;
+      const value = `${fmtValue(f.value)}${unit ? `${unit === '%' ? '' : ' '}${unit}` : ''}`;
       return `
       <div class="detail-field">
         <dt>${esc(labelFor(f.key))}</dt>
@@ -263,6 +276,15 @@
     }
   }
 
+  function show(detail) {
+    if (!detail) return;
+    requestSeq++;
+    if (activeController) activeController.abort();
+    activeController = null;
+    lastFocus = document.activeElement;
+    renderDetail(detail);
+  }
+
   function close() {
     if (!root) return;
     requestSeq++;
@@ -283,5 +305,5 @@
     triggerFromEvent(e);
   });
 
-  window.CupolaDetails = { open, close };
+  window.CupolaDetails = { open, show, close };
 })();

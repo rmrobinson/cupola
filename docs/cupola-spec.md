@@ -100,6 +100,7 @@ Subsequent startups use the cached file and do not fetch from the network. To re
 |---|---|---|---|---|
 | `ecowitt.current` | `weather.current` | Ecowitt Wittboy (local GW2000 API) | Poll | 1 min |
 | `envcanada.forecast` | `weather.forecast` | Environment Canada forecast API | Poll | 1 hr |
+| `envcanada.hourly_forecast` | `weather.forecast.hourly` | Environment Canada hourly forecast page SSR JSON | Poll | 20 min |
 | `envcanada.alerts` | `weather.alerts` | Environment Canada weather alerts | Poll | 15 min |
 | `envcanada.solar` | `solar.weather.current`, `solar.weather.forecast` | Space Weather Canada RSS (region auto-selected by lat/lon) | Poll | 1 hr |
 | `gtfsrt.<agency>` | `transit.arrivals`, `transit.vehicles`, `transit.alerts` | GTFS-RT | Poll | 30 s |
@@ -170,6 +171,7 @@ type DomainType string
 const (
     DomainWeatherCurrent      DomainType = "weather.current"
     DomainWeatherForecast     DomainType = "weather.forecast"
+    DomainWeatherForecastHourly DomainType = "weather.forecast.hourly"
     DomainWeatherAlerts       DomainType = "weather.alerts"
     DomainSolarWeatherCurrent DomainType = "solar.weather.current"
     DomainSolarWeatherForecast DomainType = "solar.weather.forecast"
@@ -248,6 +250,35 @@ type ForecastPeriod struct {
 ```
 
 *Implementations:* `envcanada.forecast`, `noaa.forecast` (future)
+
+### `weather.forecast.hourly`
+
+```go
+type WeatherHourlyForecast struct {
+    Hours     []HourlyForecastPeriod
+    UpdatedAt time.Time
+}
+
+type HourlyForecastPeriod struct {
+    StartsAt      time.Time
+    EndsAt        time.Time
+    Condition     string
+    Temperature   *float64  // °C
+    FeelsLike     *float64  // °C
+    PrecipChance  *int      // %
+    WindDirection string
+    WindSpeed     *float64  // km/h
+    WindGust      *float64  // km/h
+    Humidex       *float64
+    WindChill     *float64
+    UVIndex       *float64
+    IconURL       string
+}
+```
+
+*Implementations:* `envcanada.hourly_forecast`
+
+Environment Canada does not currently publish a public RSS/Atom endpoint for hourly data. The collector discovers the nearest station from configured lat/lon, fetches `weather.gc.ca/en/forecast/hourly/index.html?coords={stationLat},{stationLon}`, and parses `location.hourly` from the embedded Vue SSR state. Current pages may nest the hourly array under `location.location["{lat}--{lon}"].hourly`; the parser supports both shapes. `epochTime` is exposed as UTC `starts_at`; `ends_at` is `starts_at + 1h`. The public model intentionally omits provider-specific fields such as `iconCode`, station coordinates, source URL, location name, timezone, and source update timestamps.
 
 ### `weather.alerts`
 
@@ -654,6 +685,7 @@ Returns the list of domain types with active collectors on this instance. Used b
   "domains": [
     "weather.current",
     "weather.forecast",
+    "weather.forecast.hourly",
     "weather.alerts",
     "solar.weather.current",
     "solar.weather.forecast",
@@ -832,6 +864,7 @@ On startup the frontend fetches `GET /api/v1/domains`. Widgets whose domain is a
 | `moon-phase` | `astro` | — |
 | `weather-current` | `weather.current` | Units |
 | `weather-forecast` | `weather.forecast` | Days to show |
+| `weather-hourly-forecast` | `weather.forecast.hourly` | — |
 | `alerts` | `weather.alerts`, `transit.alerts`, `municipal.alerts` | Source type filter (default: all) |
 | `transit` | `transit.arrivals` | Agency, route, stop ID, max trips |
 | `camera` | `home` or `traffic.cameras` | Camera ID, stream type, refresh interval |
@@ -922,6 +955,7 @@ collectors:
   weather_envcanada:
     enabled: true
     poll_interval_forecast: 1h
+    poll_interval_hourly_forecast: 20m
     poll_interval_alerts: 15m
 
   solar_envcanada:
@@ -1079,6 +1113,7 @@ cupola/
 │   │       ├── transit.js
 │   │       ├── weather-current.js
 │   │       ├── weather-forecast.js
+│   │       ├── weather-hourly-forecast.js
 │   │       ├── alerts.js
 │   │       ├── camera.js
 │   │       ├── radar-map.js

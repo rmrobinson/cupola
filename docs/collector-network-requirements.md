@@ -25,7 +25,10 @@ These collectors make outbound HTTPS (or HTTP) requests to external services. Th
 
 | Collector | Package | External services |
 |-----------|---------|-------------------|
-| `envcanada` | `internal/collector/envcanada` | `weather.gc.ca` (forecast and alert Atom feeds); `services.swpc.noaa.gov` (NOAA planetary K-index for solar/aurora data). |
+| `envcanada.forecast` | `internal/collector/envcanada` | `weather.gc.ca` forecast Atom feeds. |
+| `envcanada.hourly_forecast` | `internal/collector/envcanada` | `weather.gc.ca` hourly forecast HTML pages. No RSS endpoint has been found for hourly data, so the collector parses embedded SSR JSON from the public hourly page. |
+| `envcanada.alerts` | `internal/collector/envcanada` | `weather.gc.ca` alert Atom feeds. |
+| `envcanada.solar` | `internal/collector/envcanada` | `services.swpc.noaa.gov` NOAA planetary K-index for solar/aurora data. |
 | `flag` | `internal/collector/flag` | `canada.ca` — scrapes the Canadian Heritage half-masting notices page. |
 | `gtfs` | `internal/collector/gtfs` | Transit agency GTFS static ZIP feeds. URLs are configured per agency in SQLite through the GTFS Feeds admin/API. |
 | `gtfsrt` | `internal/collector/gtfsrt` | Transit agency GTFS-RT protobuf feeds (trip updates, vehicle positions, alerts). URLs are configured per agency in SQLite through the GTFS Feeds admin/API. |
@@ -46,3 +49,4 @@ The probe URL and interval are configurable via `connectivity.check_url` and `co
 - Collectors not listed in `config.yaml` are not loaded at startup and impose no network requirements.
 - For collectors with configurable URLs (`gtfs`, `gtfsrt`, `municipal`, `rss`, `waterway`), network requirements depend entirely on where those URLs resolve.
 - The `traffic511` collector includes `kitchener.roadclosures` as a sub-source alongside `511on.ca`; both are gated at the `IncidentsCollector` level.
+- Weather widgets that render provider icons require the icon origin to be allowed by `server.csp_img_src`. Environment Canada hourly icons use `https://weather.gc.ca`; future providers should either emit CSP-allowed `icon_url` values or omit `icon_url`.

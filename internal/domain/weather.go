@@ -12,11 +12,11 @@ type WeatherCurrent struct {
 	WindGust      float64 `json:"wind_gust"`
 	Pressure      float64 `json:"pressure"`
 	Precipitation float64 `json:"precipitation"`
-	RainEvent   float64 `json:"rain_event"`   // mm since last dry period
-	RainDaily   float64 `json:"rain_daily"`   // mm past 24h
-	RainWeekly  float64 `json:"rain_weekly"`  // mm this week
-	RainMonthly float64 `json:"rain_monthly"` // mm this month
-	RainYearly  float64 `json:"rain_yearly"`  // mm this year
+	RainEvent     float64 `json:"rain_event"`   // mm since last dry period
+	RainDaily     float64 `json:"rain_daily"`   // mm past 24h
+	RainWeekly    float64 `json:"rain_weekly"`  // mm this week
+	RainMonthly   float64 `json:"rain_monthly"` // mm this month
+	RainYearly    float64 `json:"rain_yearly"`  // mm this year
 	UV            float64 `json:"uv"`
 	Visibility    float64 `json:"visibility"`
 	Condition     string  `json:"condition"`
@@ -31,18 +31,45 @@ type WeatherForecast struct {
 
 func (WeatherForecast) DomainType() DomainType { return DomainWeatherForecast }
 
+type WeatherHourlyForecast struct {
+	StateBase
+	Hours []HourlyForecastPeriod `json:"hours"`
+}
+
+func (WeatherHourlyForecast) DomainType() DomainType { return DomainWeatherForecastHourly }
+
+type HourlyForecastPeriod struct {
+	StartsAt time.Time `json:"starts_at"`
+	EndsAt   time.Time `json:"ends_at"`
+
+	Condition    string   `json:"condition"`
+	Temperature  *float64 `json:"temperature,omitempty"`
+	FeelsLike    *float64 `json:"feels_like,omitempty"`
+	PrecipChance *int     `json:"precip_chance,omitempty"`
+
+	WindDirection string   `json:"wind_direction,omitempty"`
+	WindSpeed     *float64 `json:"wind_speed,omitempty"`
+	WindGust      *float64 `json:"wind_gust,omitempty"`
+
+	Humidex   *float64 `json:"humidex,omitempty"`
+	WindChill *float64 `json:"wind_chill,omitempty"`
+	UVIndex   *float64 `json:"uv_index,omitempty"`
+
+	IconURL string `json:"icon_url,omitempty"`
+}
+
 type ForecastPeriod struct {
-	StartsAt     time.Time `json:"starts_at"`
-	EndsAt       time.Time `json:"ends_at"`
-	Label        string    `json:"label"`
-	High         *float64  `json:"high,omitempty"`
-	Low          *float64  `json:"low,omitempty"`
-	Condition    string    `json:"condition"`
-	PrecipChance int       `json:"precip_chance"`
-	PrecipAmount float64   `json:"precip_amount"`
-	WindSpeed    float64   `json:"wind_speed"`
-	WindDirection int      `json:"wind_direction"`
-	Summary      string    `json:"summary"`
+	StartsAt      time.Time `json:"starts_at"`
+	EndsAt        time.Time `json:"ends_at"`
+	Label         string    `json:"label"`
+	High          *float64  `json:"high,omitempty"`
+	Low           *float64  `json:"low,omitempty"`
+	Condition     string    `json:"condition"`
+	PrecipChance  int       `json:"precip_chance"`
+	PrecipAmount  float64   `json:"precip_amount"`
+	WindSpeed     float64   `json:"wind_speed"`
+	WindDirection int       `json:"wind_direction"`
+	Summary       string    `json:"summary"`
 }
 
 type WeatherAlerts struct {

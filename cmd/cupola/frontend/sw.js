@@ -45,6 +45,7 @@ const PRECACHE = [
   '/js/widgets/waterway.js',
   '/js/widgets/weather-current.js',
   '/js/widgets/weather-forecast.js',
+  '/js/widgets/weather-hourly-forecast.js',
   '/js/widgets/weather-rainfall.js',
   '/js/vendor/leaflet.js',
   '/js/vendor/leaflet.css',

@@ -1598,6 +1598,129 @@ button {
 .fp-low  { color: #74b9ff; margin-left: 4px; }
 .fp-pop  { opacity: 0.6; white-space: nowrap; }
 
+/* ── Weather hourly forecast widget ────────────────────────────────────── */
+
+.widget-weather-hourly {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1px, 1.4cqh, 4px);
+}
+
+.hourly-period {
+  flex: 0 0 auto;
+  display: grid;
+  width: 100%;
+  align-items: center;
+  column-gap: clamp(5px, 1.8cqw, 12px);
+  row-gap: clamp(1px, 1cqh, 3px);
+  padding: clamp(2px, 1.4cqh, 5px) 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: clamp(0.56rem, min(2.8cqw, 5.8cqh), 0.75rem);
+  line-height: 1.15;
+  cursor: pointer;
+}
+
+.hourly-period.has-icon {
+  grid-template-columns:
+    minmax(3.8rem, 0.9fr)
+    minmax(26px, 0.45fr)
+    minmax(3rem, 0.7fr)
+    minmax(2.6rem, 0.6fr)
+    minmax(4.2rem, 0.9fr)
+    minmax(5.5rem, 1.45fr);
+}
+
+.hourly-period.no-icon {
+  grid-template-columns:
+    minmax(3.8rem, 0.85fr)
+    minmax(7rem, 1.6fr)
+    minmax(3rem, 0.7fr)
+    minmax(2.6rem, 0.6fr)
+    minmax(4.2rem, 0.9fr)
+    minmax(5.5rem, 1.2fr);
+}
+
+.hourly-period:hover,
+.hourly-period:focus-visible {
+  background: rgba(255,255,255,0.05);
+  outline: none;
+}
+
+.hp-time {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hp-icon-wrap {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hp-icon {
+  max-width: 26px;
+  max-height: 26px;
+}
+
+.hourly-period.has-icon .hp-condition,
+.hourly-period.no-icon .hp-icon-wrap {
+  display: none;
+}
+
+.hp-condition,
+.hp-wind {
+  opacity: 0.72;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hp-temp {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.hp-temp-main {
+  color: #f7b733;
+}
+
+.hp-temp-actual {
+  color: rgba(255,255,255,0.55);
+  font-size: 0.86em;
+}
+
+.hp-uv {
+  opacity: 0.68;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.hp-pop {
+  opacity: 0.68;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.hp-extra {
+  grid-column: 2 / -1;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  opacity: 0.55;
+  font-size: 0.9em;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 /* ── Rainfall widget ────────────────────────────────────────────────────── */
 
 .widget-rainfall {

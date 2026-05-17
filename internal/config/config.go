@@ -23,11 +23,11 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type Config struct {
-	Location        LocationConfig        `yaml:"location"`
-	Server          ServerConfig          `yaml:"server"`
-	Tiles           TilesConfig           `yaml:"tiles"`
-	Collectors      CollectorsConfig      `yaml:"collectors"`
-	Connectivity    ConnectivityConfig    `yaml:"connectivity"`
+	Location     LocationConfig     `yaml:"location"`
+	Server       ServerConfig       `yaml:"server"`
+	Tiles        TilesConfig        `yaml:"tiles"`
+	Collectors   CollectorsConfig   `yaml:"collectors"`
+	Connectivity ConnectivityConfig `yaml:"connectivity"`
 }
 
 // ConnectivityConfig controls the internet connectivity probe.
@@ -82,11 +82,12 @@ type EcowittConfig struct {
 }
 
 type EnvCanadaWeatherConfig struct {
-	Enabled              bool     `yaml:"enabled"`
-	StationCode          string   `yaml:"station_code"` // optional: bypass auto-discovery
-	Province             string   `yaml:"province"`     // required when station_code is set
-	PollIntervalForecast Duration `yaml:"poll_interval_forecast"`
-	PollIntervalAlerts   Duration `yaml:"poll_interval_alerts"`
+	Enabled                    bool     `yaml:"enabled"`
+	StationCode                string   `yaml:"station_code"` // optional: bypass auto-discovery
+	Province                   string   `yaml:"province"`     // required when station_code is set
+	PollIntervalForecast       Duration `yaml:"poll_interval_forecast"`
+	PollIntervalHourlyForecast Duration `yaml:"poll_interval_hourly_forecast"`
+	PollIntervalAlerts         Duration `yaml:"poll_interval_alerts"`
 }
 
 type EnvCanadaSolarConfig struct {

@@ -134,6 +134,12 @@ func stationRSSURL(feedType string, lat, lon float64) string {
 	return fmt.Sprintf("https://weather.gc.ca/rss/%s/%s_%s_e.xml", feedType, sLat, sLon)
 }
 
+func stationHourlyForecastURL(lat, lon float64) string {
+	sLat := strconv.FormatFloat(lat, 'f', -1, 64)
+	sLon := strconv.FormatFloat(lon, 'f', -1, 64)
+	return fmt.Sprintf("https://weather.gc.ca/en/forecast/hourly/index.html?coords=%s,%s", sLat, sLon)
+}
+
 func haversineKm(lat1, lon1, lat2, lon2 float64) float64 {
 	const R = 6371.0
 	φ1, φ2 := lat1*math.Pi/180, lat2*math.Pi/180
