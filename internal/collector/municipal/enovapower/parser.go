@@ -59,13 +59,7 @@ func (p *Parser) Parse(rawURL string) ([]domain.MunicipalAlert, error) {
 		return nil, fmt.Errorf("enova.power: decode XML: %w", err)
 	}
 
-	var alerts []domain.MunicipalAlert
-	for _, c := range dataset.Cases {
-		if a := caseToAlert(client, c); a != nil {
-			alerts = append(alerts, *a)
-		}
-	}
-	return alerts, nil
+	return casesToAlerts(client, dataset.Cases), nil
 }
 
 // omsDataset is the root XML element returned by the Enova OMS API.
@@ -139,6 +133,24 @@ func caseToAlert(client *http.Client, c omsCase) *domain.MunicipalAlert {
 		EndsAt:      endsPtr,
 		PublishedAt: pub,
 	}
+}
+
+func casesToAlerts(client *http.Client, cases []omsCase) []domain.MunicipalAlert {
+	var alerts []domain.MunicipalAlert
+	bySerial := make(map[string]int, len(cases))
+	for _, c := range cases {
+		a := caseToAlert(client, c)
+		if a == nil {
+			continue
+		}
+		if idx, ok := bySerial[c.Serial]; ok {
+			alerts[idx] = *a
+			continue
+		}
+		bySerial[c.Serial] = len(alerts)
+		alerts = append(alerts, *a)
+	}
+	return alerts
 }
 
 func buildTitle(c omsCase, planned bool) string {
@@ -218,11 +230,11 @@ func parseCustomerCount(s string) int {
 // nominatimResponse is the subset of fields we use from the Nominatim reverse geocode API.
 type nominatimResponse struct {
 	Address struct {
-		Suburb       string `json:"suburb"`
+		Suburb        string `json:"suburb"`
 		Neighbourhood string `json:"neighbourhood"`
-		City         string `json:"city"`
-		Town         string `json:"town"`
-		Village      string `json:"village"`
+		City          string `json:"city"`
+		Town          string `json:"town"`
+		Village       string `json:"village"`
 	} `json:"address"`
 }
 

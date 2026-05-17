@@ -1,6 +1,7 @@
 package enovapower
 
 import (
+	"net/http"
 	"testing"
 )
 
@@ -86,6 +87,44 @@ func TestParseCoordList(t *testing.T) {
 				t.Errorf("parseCoordList(%q)[%d] = %v, want %v", tt.input, i, got[i], tt.want[i])
 			}
 		}
+	}
+}
+
+func TestCasesToAlertsUsesLatestDuplicateSerial(t *testing.T) {
+	alerts := casesToAlerts(&http.Client{}, []omsCase{
+		{
+			Serial:    "12256",
+			Planned:   "0",
+			DescCause: "Vehicle",
+			CurCust:   "3",
+			CoordList: "43.423176,-80.431173,43.424198,-80.424435,43.425000,-80.425000",
+		},
+		{
+			Serial:    "12256",
+			Planned:   "0",
+			DescCause: "Vehicle",
+			CurCust:   "1",
+			CoordList: "43.423354,-80.431432,43.423354,-80.430722",
+		},
+		{
+			Serial:    "12258",
+			Planned:   "0",
+			DescCause: "Vehicle",
+			CurCust:   "6",
+		},
+	})
+
+	if len(alerts) != 2 {
+		t.Fatalf("got %d alerts, want 2", len(alerts))
+	}
+	if alerts[0].ID != "enova.power:12256" {
+		t.Fatalf("first alert ID = %q, want enova.power:12256", alerts[0].ID)
+	}
+	if alerts[0].Description != "Vehicle. 1 customers affected" {
+		t.Fatalf("deduped alert description = %q, want latest record", alerts[0].Description)
+	}
+	if len(alerts[0].Polygon) != 2 {
+		t.Fatalf("deduped alert polygon has %d points, want latest 2-point polygon", len(alerts[0].Polygon))
 	}
 }
 
