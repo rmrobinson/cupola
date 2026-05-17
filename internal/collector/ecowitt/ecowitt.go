@@ -124,14 +124,14 @@ type wh25Item struct {
 //   0x13 → rain yearly (mm)
 
 const (
-	idOutdoorTemp  = "0x02"
-	idHumidity     = "0x07"
-	idDewPoint     = "0x03"
-	idWindDir      = "0x0A"
-	idWindSpeed    = "0x0B"
-	idWindGust     = "0x0C"
-	idSolar        = "0x15"
-	idUVI          = "0x17"
+	idOutdoorTemp = "0x02"
+	idHumidity    = "0x07"
+	idDewPoint    = "0x03"
+	idWindDir     = "0x0A"
+	idWindSpeed   = "0x0B"
+	idWindGust    = "0x0C"
+	idSolar       = "0x15"
+	idUVI         = "0x17"
 	idRainRate    = "0x0E"
 	idRainEvent   = "0x0D"
 	idRainDaily   = "0x7C"
@@ -172,6 +172,7 @@ func (c *Collector) fetch() error {
 
 	temp := parseVal(common[idOutdoorTemp])
 	hum := parseVal(common[idHumidity])
+	dewPoint := parseVal(common[idDewPoint])
 	wind := parseVal(common[idWindSpeed])
 	solar := parseVal(common[idSolar]) // Klux
 
@@ -191,7 +192,7 @@ func (c *Collector) fetch() error {
 		RainMonthly:   parseVal(piezo[idRainMonthly]),
 		RainYearly:    parseVal(piezo[idRainYearly]),
 		Condition:     deriveCondition(solar, rainRate),
-		FeelsLike:     feelsLike(temp, hum, wind),
+		FeelsLike:     feelsLike(temp, dewPoint, wind),
 	}
 
 	// Pressure from the wh25 indoor/base module.
@@ -255,17 +256,25 @@ func deriveCondition(solarKlux, rainMmhr float64) string {
 	}
 }
 
-// feelsLike computes apparent temperature using Environment Canada's formulas.
-func feelsLike(tempC, humidityPct, windKmh float64) float64 {
+// feelsLike computes apparent temperature using Environment Canada's wind chill
+// and humidex formulas. Humidex is based on dew point/vapour pressure, not
+// relative humidity.
+func feelsLike(tempC, dewPointC, windKmh float64) float64 {
 	if tempC <= 0 && windKmh > 4.8 {
 		v := math.Pow(windKmh, 0.16)
 		return 13.12 + 0.6215*tempC - 11.37*v + 0.3965*tempC*v
 	}
-	if tempC >= 27 && humidityPct >= 40 {
-		T, H := tempC, humidityPct
-		return -8.78469 + 1.61139*T + 2.33855*H - 0.14611*T*H -
-			0.012308*T*T - 0.01642*H*H + 0.002211*T*H*H +
-			0.00072546*T*T*H - 0.000003582*T*T*H*H
+	if tempC >= 20 {
+		return math.Max(tempC, humidex(tempC, dewPointC))
 	}
 	return tempC
+}
+
+func humidex(tempC, dewPointC float64) float64 {
+	dewPointK := dewPointC + 273.15
+	if dewPointK <= 0 {
+		return tempC
+	}
+	vapourPressure := 6.11 * math.Exp(5417.7530*(1/273.16-1/dewPointK))
+	return tempC + 0.5555*(vapourPressure-10)
 }
