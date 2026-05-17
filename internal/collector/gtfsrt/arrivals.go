@@ -28,7 +28,7 @@ type ArrivalsCollector struct {
 	db             *store.GTFSSQLiteStore
 	loc            *time.Location  // local timezone for calendar queries
 	inFallback     map[string]bool // agency_id → currently serving static schedule
-	wake           chan struct{}    // buffered(1): nudges rtLoop to fetch immediately
+	wake           chan struct{}   // buffered(1): nudges rtLoop to fetch immediately
 	netCheck       func() bool
 }
 
@@ -238,19 +238,10 @@ func (c *ArrivalsCollector) fetchStaticForAgency(ag *Agency, wanted map[string]b
 			log.Printf("[gtfsrt] %s: static query %s: %v", ag.ID, key, err)
 			continue
 		}
-		if len(deps) == 0 {
-			continue
-		}
 
 		sa := stops[key]
 		if sa.AgencyID == "" {
-			sa = domain.StopArrivals{
-				AgencyID:  ag.ID,
-				RouteID:   routeID,
-				RouteName: ag.Schedule.RouteName(routeID),
-				StopID:    stopID,
-				StopName:  ag.Schedule.StopName(stopID),
-			}
+			sa = newStopArrivals(ag, routeID, stopID)
 		}
 		for _, dep := range deps {
 			sa.Arrivals = append(sa.Arrivals, domain.Arrival{
@@ -326,16 +317,20 @@ func collectArrivals(feed *pb.FeedMessage, ag *Agency, wanted map[string]bool, s
 
 			sa := stops[stateKey]
 			if sa.AgencyID == "" {
-				sa = domain.StopArrivals{
-					AgencyID:  ag.ID,
-					RouteID:   routeID,
-					RouteName: ag.Schedule.RouteName(routeID),
-					StopID:    stopID,
-					StopName:  ag.Schedule.StopName(stopID),
-				}
+				sa = newStopArrivals(ag, routeID, stopID)
 			}
 			sa.Arrivals = append(sa.Arrivals, arr)
 			stops[stateKey] = sa
 		}
+	}
+}
+
+func newStopArrivals(ag *Agency, routeID, stopID string) domain.StopArrivals {
+	return domain.StopArrivals{
+		AgencyID:  ag.ID,
+		RouteID:   routeID,
+		RouteName: ag.Schedule.RouteName(routeID),
+		StopID:    stopID,
+		StopName:  ag.Schedule.StopName(stopID),
 	}
 }
