@@ -50,9 +50,12 @@ test('weather hourly forecast widget renders populated data and icon URL', () =>
   assert.match(container.innerHTML, /hourly-period has-icon/);
   assert.match(container.innerHTML, /hp-temp-main">25&deg;/);
   assert.match(container.innerHTML, /hp-temp-actual">21&deg;/);
+  assert.match(container.innerHTML, /hp-temp-uv">UV 3/);
   assert.match(container.innerHTML, /21&deg;/);
-  assert.match(container.innerHTML, /POP 60%/);
-  assert.match(container.innerHTML, /hp-uv">UV 3/);
+  assert.match(container.innerHTML, /hourly-header/);
+  assert.match(container.innerHTML, /hp-pop">POP/);
+  assert.match(container.innerHTML, /hp-pop">60%/);
+  assert.doesNotMatch(container.innerHTML, /<span class="hp-uv"/);
   assert.doesNotMatch(container.innerHTML, /Feels/);
   assert.match(container.innerHTML, /SW 20 km\/h G 40/);
   assert.match(container.innerHTML, /https:\/\/weather\.gc\.ca\/weathericons\/small\/09\.png/);
@@ -85,6 +88,30 @@ test('weather hourly forecast widget omits image when icon URL is missing', () =
   assert.doesNotMatch(container.innerHTML, /<img/);
   assert.match(container.innerHTML, /hourly-period no-icon/);
   assert.match(container.innerHTML, /<span class="hp-condition">Clear<\/span>/);
+});
+
+test('weather hourly forecast widget omits UV subvalue when UV is absent', () => {
+  const widget = loadWidget();
+  const container = {};
+
+  widget.render(container, {
+    hours: [{
+      starts_at: '2999-05-17T13:00:00Z',
+      ends_at: '2999-05-17T14:00:00Z',
+      condition: 'Windy',
+      temperature: 19,
+      precip_chance: 30,
+      wind_direction: 'NW',
+      wind_speed: 20,
+    }],
+  });
+
+  assert.match(container.innerHTML, /hp-pop">POP/);
+  assert.match(container.innerHTML, /hp-pop">30%/);
+  assert.doesNotMatch(container.innerHTML, /hp-temp-uv/);
+  assert.doesNotMatch(container.innerHTML, /<span class="hp-uv"/);
+  assert.doesNotMatch(container.innerHTML, /POP 30%/);
+  assert.match(container.innerHTML, /NW 20 km\/h/);
 });
 
 test('weather hourly forecast widget handles mixed icon availability per row', () => {

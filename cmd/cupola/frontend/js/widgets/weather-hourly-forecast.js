@@ -51,12 +51,16 @@
   function displayTemp(h) {
     const apparent = h.humidex ?? h.wind_chill;
     const actual = h.temperature;
+    const uv = h.uv_index == null ? '' : `<span class="hp-temp-uv">UV ${rounded(h.uv_index)}</span>`;
     if (apparent == null) {
-      return actual == null ? '' : `<span class="hp-temp-main">${rounded(actual)}&deg;</span>`;
+      return actual == null ? uv : `<span class="hp-temp-line"><span class="hp-temp-main">${rounded(actual)}&deg;</span></span>${uv}`;
     }
     return `
-      <span class="hp-temp-main">${rounded(apparent)}&deg;</span>
-      ${actual == null ? '' : `<span class="hp-temp-actual">${rounded(actual)}&deg;</span>`}
+      <span class="hp-temp-line">
+        <span class="hp-temp-main">${rounded(apparent)}&deg;</span>
+        ${actual == null ? '' : `<span class="hp-temp-actual">${rounded(actual)}&deg;</span>`}
+      </span>
+      ${uv}
     `;
   }
 
@@ -114,6 +118,13 @@
     }
     container.innerHTML = `
       <div class="widget-weather-hourly">
+        <div class="hourly-header" aria-hidden="true">
+          <span class="hp-time">Time</span>
+          <span></span>
+          <span class="hp-temp">Temp</span>
+          <span class="hp-pop">POP</span>
+          <span class="hp-wind">Wind</span>
+        </div>
         ${hours.map((h, idx) => {
           const wind = [
             h.wind_direction || '',
@@ -127,8 +138,7 @@
               <span class="hp-icon-wrap">${hasIcon ? `<img class="hp-icon" src="${esc(h.icon_url)}" alt="${esc(h.condition)}" loading="lazy" onerror="const row=this.closest('.hourly-period');row?.classList.remove('has-icon');row?.classList.add('no-icon');this.hidden=true">` : ''}</span>
               <span class="hp-condition">${esc(h.condition || '')}</span>
               <span class="hp-temp">${displayTemp(h)}</span>
-              <span class="hp-uv">${h.uv_index == null ? '' : `UV ${rounded(h.uv_index)}`}</span>
-              <span class="hp-pop">${h.precip_chance == null ? '' : `POP ${h.precip_chance}%`}</span>
+              <span class="hp-pop">${h.precip_chance == null ? '' : `${h.precip_chance}%`}</span>
               <span class="hp-wind">${esc(wind)}</span>
               <span class="hp-extra">
                 ${h.wind_gust == null ? '' : metric('Gust', h.wind_gust, '')}

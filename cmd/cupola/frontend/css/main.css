@@ -1623,24 +1623,30 @@ button {
   cursor: pointer;
 }
 
-.hourly-period.has-icon {
-  grid-template-columns:
-    minmax(3.8rem, 0.9fr)
-    minmax(26px, 0.45fr)
-    minmax(3rem, 0.7fr)
-    minmax(2.6rem, 0.6fr)
-    minmax(4.2rem, 0.9fr)
-    minmax(5.5rem, 1.45fr);
+.hourly-header {
+  flex: 0 0 auto;
+  display: grid;
+  width: 100%;
+  align-items: center;
+  column-gap: clamp(5px, 1.8cqw, 12px);
+  padding: 0 0 clamp(2px, 1cqh, 4px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.46);
+  font-size: clamp(0.46rem, min(2.2cqw, 4.4cqh), 0.58rem);
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
-.hourly-period.no-icon {
+.hourly-header,
+.hourly-period {
   grid-template-columns:
-    minmax(3.8rem, 0.85fr)
-    minmax(7rem, 1.6fr)
-    minmax(3rem, 0.7fr)
-    minmax(2.6rem, 0.6fr)
-    minmax(4.2rem, 0.9fr)
-    minmax(5.5rem, 1.2fr);
+    minmax(4.5rem, 0.95fr)
+    minmax(26px, 0.55fr)
+    minmax(3rem, 0.65fr)
+    minmax(2.7rem, 0.55fr)
+    minmax(0, 1.35fr);
 }
 
 .hourly-period:hover,
@@ -1653,6 +1659,7 @@ button {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  align-self: center;
 }
 
 .hp-icon-wrap {
@@ -1673,20 +1680,34 @@ button {
   display: none;
 }
 
+.hourly-period.no-icon .hp-condition {
+  grid-column: 2;
+}
+
 .hp-condition,
 .hp-wind {
   opacity: 0.72;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  align-self: center;
 }
 
 .hp-temp {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  white-space: nowrap;
+  align-self: center;
+}
+
+.hp-temp-line {
+  display: flex;
   align-items: baseline;
   justify-content: center;
   gap: 4px;
-  white-space: nowrap;
 }
 
 .hp-temp-main {
@@ -1698,21 +1719,47 @@ button {
   font-size: 0.86em;
 }
 
-.hp-uv {
+.hp-temp-uv {
   opacity: 0.68;
-  text-align: center;
-  white-space: nowrap;
+  font-size: 0.78em;
+  line-height: 1.05;
 }
 
 .hp-pop {
   opacity: 0.68;
   white-space: nowrap;
   text-align: center;
+  align-self: center;
+}
+
+.hourly-period .hp-time,
+.hourly-period .hp-temp,
+.hourly-period .hp-pop,
+.hourly-period .hp-wind {
+  grid-row: 1 / span 2;
+}
+
+.hourly-header .hp-time,
+.hourly-header .hp-temp,
+.hourly-header .hp-pop,
+.hourly-header .hp-wind {
+  opacity: 1;
+}
+
+.hourly-header .hp-temp {
+  display: block;
+  text-align: center;
+}
+
+.hourly-header .hp-wind {
+  text-align: left;
 }
 
 .hp-extra {
-  grid-column: 2 / -1;
+  grid-column: 2;
+  grid-row: 2;
   display: flex;
+  justify-content: center;
   gap: 8px;
   min-width: 0;
   opacity: 0.55;
