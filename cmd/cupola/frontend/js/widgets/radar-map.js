@@ -19,6 +19,20 @@
     return _iconCache.get(emoji);
   }
 
+  let _homeIcon = null;
+  function homeIcon() {
+    if (!_homeIcon) {
+      _homeIcon = L.divIcon({
+        html: '<span class="map-home-marker-dot"></span><span class="map-home-marker-ring"></span>',
+        className: 'map-home-marker',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+        popupAnchor: [0, -13],
+      });
+    }
+    return _homeIcon;
+  }
+
   function esc(s) {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
@@ -55,6 +69,8 @@
     const aircraftLayer = L.layerGroup().addTo(map);
     const routeLayer    = L.layerGroup().addTo(map);
     const outageLayer   = L.layerGroup().addTo(map);
+    const homeLayer     = L.layerGroup().addTo(map);
+    updateHomeMarker(homeLayer, config);
 
     // ResizeObserver handles two problems in one:
     // 1. Leaflet is initialised before the cell is appended to the DOM grid, so
@@ -64,7 +80,23 @@
     const ro = new ResizeObserver(() => map.invalidateSize());
     ro.observe(mapDiv);
 
-    return { map, ro, incidentLayer, vehicleLayer, aircraftLayer, routeLayer, outageLayer };
+    return { map, ro, incidentLayer, vehicleLayer, aircraftLayer, routeLayer, outageLayer, homeLayer };
+  }
+
+  function configuredCenter(config) {
+    return [
+      config?.center_lat ?? window.CupolaConfig?.lat ?? 43.45,
+      config?.center_lon ?? window.CupolaConfig?.lon ?? -80.49,
+    ];
+  }
+
+  function updateHomeMarker(layerGroup, config) {
+    layerGroup.clearLayers();
+    if (config?.show_home_marker !== true) return;
+    const [lat, lon] = configuredCenter(config);
+    L.marker([lat, lon], { icon: homeIcon(), zIndexOffset: 1000 })
+      .bindPopup('You are here')
+      .addTo(layerGroup);
   }
 
   function updateRoutes(layerGroup, overlays, config) {
@@ -304,6 +336,7 @@
     updateIncidents(inst.incidentLayer, sm['traffic.incidents']?.incidents, config);
     updateVehicles(inst.vehicleLayer,   inst._lastVehicles,                 config, inst._activeOverlays);
     updateAircraft(inst.aircraftLayer,  sm['aircraft']?.aircraft,           config);
+    updateHomeMarker(inst.homeLayer, config);
   }
 
   window.CupolaWidgets.push({
@@ -327,6 +360,7 @@
       { key: 'layer_aircraft',  label: 'Show aircraft',       type: 'boolean', default: true },
       { key: 'layer_routes',    label: 'Show transit routes', type: 'boolean', default: true },
       { key: 'layer_outages',   label: 'Show alert overlays', type: 'boolean', default: true },
+      { key: 'show_home_marker', label: 'Show home marker',    type: 'boolean', default: false },
     ],
     subscriptionParams: () => null,
     render,

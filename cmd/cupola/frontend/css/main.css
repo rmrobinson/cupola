@@ -2405,6 +2405,35 @@ button {
 .map-emoji-icon { background: none !important; border: none !important; box-shadow: none !important; font-size: 18px; line-height: 20px; text-align: center; }
 .aircraft-svg-icon { background: none !important; border: none !important; box-shadow: none !important; }
 
+.map-home-marker {
+  background: none !important;
+  border: none !important;
+}
+
+.map-home-marker-dot,
+.map-home-marker-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+}
+
+.map-home-marker-dot {
+  width: 10px;
+  height: 10px;
+  background: #3b82f6;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.45);
+}
+
+.map-home-marker-ring {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(59,130,246,0.75);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.45);
+}
+
 /* ── Aircraft widget ───────────────────────────────────────────────────────── */
 
 .widget-aircraft {
