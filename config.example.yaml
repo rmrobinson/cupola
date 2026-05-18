@@ -86,7 +86,7 @@ collectors:
       parser: kitchener.snow
       url: "https://www.kitchener.ca/news/snow-events/"
       poll_interval: 30m
-      domain: municipal.events
+      domain: municipal.alerts
     - id: grca_flood
       parser: grca.flood
       url: "https://www.grandriver.ca/news/categories/flood-messages/"

@@ -69,7 +69,7 @@
     domain: 'municipal.events',
     defaultSize: { w: 7, h: 4 },
     configSchema: [
-      { key: 'source', label: 'Source filter (comma-sep)', type: 'text', default: '', placeholder: 'e.g. kitchener.snow' },
+      { key: 'source', label: 'Source filter (comma-sep)', type: 'text', default: '', placeholder: 'e.g. city.roadwork' },
     ],
     subscriptionParams: () => null,
     render(container, state, config)  { render(container, state, config); },

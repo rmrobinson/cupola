@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/rmrobinson/cupola/internal/domain"
 )
 
 func TestParseSuppressesInactiveSnowEvent(t *testing.T) {
@@ -37,16 +39,16 @@ func TestParseSuppressesInactiveSnowEvent(t *testing.T) {
 		Now:      func() time.Time { return time.Date(2026, time.May, 18, 12, 0, 0, 0, loc) },
 		Location: loc,
 	}
-	events, err := p.Parse(srv.URL)
+	alerts, err := p.Parse(srv.URL)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if len(events) != 0 {
-		t.Fatalf("len(events) = %d, want 0: %#v", len(events), events)
+	if len(alerts) != 0 {
+		t.Fatalf("len(alerts) = %d, want 0: %#v", len(alerts), alerts)
 	}
 }
 
-func TestParseSynthesizesActiveSnowEvent(t *testing.T) {
+func TestParseSynthesizesActiveSnowAlert(t *testing.T) {
 	loc := mustToronto(t)
 	srv := snowArchiveServer(t, []snowArchiveItem{
 		{
@@ -68,25 +70,31 @@ func TestParseSynthesizesActiveSnowEvent(t *testing.T) {
 		Now:      func() time.Time { return time.Date(2025, time.December, 10, 13, 0, 0, 0, loc) },
 		Location: loc,
 	}
-	events, err := p.Parse(srv.URL)
+	alerts, err := p.Parse(srv.URL)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if len(events) != 1 {
-		t.Fatalf("len(events) = %d, want 1", len(events))
+	if len(alerts) != 1 {
+		t.Fatalf("len(alerts) = %d, want 1", len(alerts))
 	}
-	ev := events[0]
-	if ev.ID != "kitchener.snow:active" {
-		t.Fatalf("ID = %q, want kitchener.snow:active", ev.ID)
+	alert := alerts[0]
+	if alert.ID != "kitchener.snow:active" {
+		t.Fatalf("ID = %q, want kitchener.snow:active", alert.ID)
 	}
-	if ev.StartsAt == nil || !ev.StartsAt.Equal(time.Date(2025, time.December, 10, 2, 0, 0, 0, loc)) {
-		t.Fatalf("StartsAt = %v", ev.StartsAt)
+	if alert.AlertType != "snow-event" {
+		t.Fatalf("AlertType = %q, want snow-event", alert.AlertType)
 	}
-	if ev.EndsAt == nil || !ev.EndsAt.Equal(time.Date(2025, time.December, 11, 12, 0, 0, 0, loc)) {
-		t.Fatalf("EndsAt = %v", ev.EndsAt)
+	if alert.Severity != domain.SeverityWarning {
+		t.Fatalf("Severity = %q, want warning", alert.Severity)
 	}
-	if ev.URL == nil || *ev.URL != srv.URL+"/news/posts/extend/" {
-		t.Fatalf("URL = %v, want extension URL", ev.URL)
+	if alert.StartsAt == nil || !alert.StartsAt.Equal(time.Date(2025, time.December, 10, 2, 0, 0, 0, loc)) {
+		t.Fatalf("StartsAt = %v", alert.StartsAt)
+	}
+	if alert.EndsAt == nil || !alert.EndsAt.Equal(time.Date(2025, time.December, 11, 12, 0, 0, 0, loc)) {
+		t.Fatalf("EndsAt = %v", alert.EndsAt)
+	}
+	if alert.URL == nil || *alert.URL != srv.URL+"/news/posts/extend/" {
+		t.Fatalf("URL = %v, want extension URL", alert.URL)
 	}
 }
 
@@ -95,13 +103,13 @@ func TestParseLive(t *testing.T) {
 		t.Skip("skipping live network test")
 	}
 	p := &Parser{}
-	events, err := p.Parse("https://www.kitchener.ca/news/snow-events/")
+	alerts, err := p.Parse("https://www.kitchener.ca/news/snow-events/")
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	t.Logf("got %d events", len(events))
-	for i, e := range events {
-		t.Logf("  [%d] %s | %s | published=%s", i, e.EventType, e.Title, e.PublishedAt.Format("2006-01-02"))
+	t.Logf("got %d alerts", len(alerts))
+	for i, a := range alerts {
+		t.Logf("  [%d] %s | %s | published=%s", i, a.AlertType, a.Title, a.PublishedAt.Format("2006-01-02"))
 		if i >= 4 {
 			break
 		}

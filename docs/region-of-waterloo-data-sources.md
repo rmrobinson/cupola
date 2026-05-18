@@ -136,7 +136,7 @@ limits.
 
 ## City of Kitchener — Snow Events
 
-**Collector:** `municipal` (events) / parser `kitchener.snow`
+**Collector:** `municipal` (alerts) / parser `kitchener.snow`
 **Source file:** `internal/collector/municipal/kitchenersnow/parser.go`
 
 ### How it was found
@@ -146,6 +146,10 @@ The City of Kitchener publishes snow-clearing event notices at
 GovDelivery news-feed markup (`gs-feed-list-item`, `gs-feed-list-title`,
 `gs-feed-list-date`, `gs-feed-list-description`) as the GRCA flood page,
 so the parsers share the same HTML extraction pattern.
+
+The parser synthesizes current state from declare, extend, and cancel
+posts. It emits a `municipal.alerts` warning only while a snow event is
+currently active; inactive or expired snow events emit no alert.
 
 **Config URL:** `https://www.kitchener.ca/news/snow-events/`
 

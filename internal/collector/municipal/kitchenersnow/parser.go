@@ -1,5 +1,5 @@
 // Package kitchenersnow parses the City of Kitchener snow-events news feed
-// (https://www.kitchener.ca/news/snow-events/) into municipal.events.
+// (https://www.kitchener.ca/news/snow-events/) into municipal.alerts.
 // Register via import side-effect: _ "github.com/rmrobinson/cupola/internal/collector/municipal/kitchenersnow"
 package kitchenersnow
 
@@ -20,19 +20,19 @@ import (
 )
 
 func init() {
-	municipal.RegisterEventsParser("kitchener.snow", func() municipal.EventsParser {
+	municipal.RegisterAlertsParser("kitchener.snow", func() municipal.AlertsParser {
 		return &Parser{}
 	})
 }
 
-// Parser implements municipal.EventsParser for the Kitchener snow-events page.
+// Parser implements municipal.AlertsParser for the Kitchener snow-events page.
 type Parser struct {
 	Now      func() time.Time
 	Location *time.Location
 }
 
 type snowPost struct {
-	event       domain.MunicipalEvent
+	alert       domain.MunicipalAlert
 	action      snowAction
 	effectiveAt time.Time
 }
@@ -46,7 +46,7 @@ const (
 	snowActionCancel
 )
 
-func (p *Parser) Parse(rawURL string) ([]domain.MunicipalEvent, error) {
+func (p *Parser) Parse(rawURL string) ([]domain.MunicipalAlert, error) {
 	client := &http.Client{Timeout: 20 * time.Second}
 	resp, err := client.Get(rawURL)
 	if err != nil {
@@ -75,7 +75,7 @@ func (p *Parser) Parse(rawURL string) ([]domain.MunicipalEvent, error) {
 			}
 		}
 	})
-	return synthesizeCurrentEvent(posts, now), nil
+	return synthesizeCurrentAlert(posts, now), nil
 }
 
 func (p *Parser) now() time.Time {
@@ -127,29 +127,30 @@ func extractPost(li *html.Node, base *url.URL, loc *time.Location) *snowPost {
 
 	pub := parseDate(dateStr)
 	id := "kitchener.snow:" + href
-	ev := domain.MunicipalEvent{
+	alert := domain.MunicipalAlert{
 		ID:          id,
 		Title:       title,
 		Description: description,
-		EventType:   "snow-event",
+		AlertType:   "snow-event",
+		Severity:    domain.SeverityWarning,
 		URL:         itemURL,
 		PublishedAt: pub,
 	}
 
 	action, effectiveAt := classifySnowPost(title, description, pub, loc)
 	return &snowPost{
-		event:       ev,
+		alert:       alert,
 		action:      action,
 		effectiveAt: effectiveAt,
 	}
 }
 
-func synthesizeCurrentEvent(posts []snowPost, now time.Time) []domain.MunicipalEvent {
+func synthesizeCurrentAlert(posts []snowPost, now time.Time) []domain.MunicipalAlert {
 	sort.SliceStable(posts, func(i, j int) bool {
-		if posts[i].event.PublishedAt.Equal(posts[j].event.PublishedAt) {
+		if posts[i].alert.PublishedAt.Equal(posts[j].alert.PublishedAt) {
 			return posts[i].effectiveAt.Before(posts[j].effectiveAt)
 		}
-		return posts[i].event.PublishedAt.Before(posts[j].event.PublishedAt)
+		return posts[i].alert.PublishedAt.Before(posts[j].alert.PublishedAt)
 	})
 
 	var (
@@ -172,7 +173,7 @@ func synthesizeCurrentEvent(posts []snowPost, now time.Time) []domain.MunicipalE
 			active = true
 		case snowActionExtend:
 			if start.IsZero() {
-				start = post.event.PublishedAt
+				start = post.alert.PublishedAt
 			}
 			end = post.effectiveAt
 			active = true
@@ -184,19 +185,20 @@ func synthesizeCurrentEvent(posts []snowPost, now time.Time) []domain.MunicipalE
 	}
 
 	if !active || latest == nil || start.IsZero() || end.IsZero() || now.Before(start) || !now.Before(end) {
-		return []domain.MunicipalEvent{}
+		return []domain.MunicipalAlert{}
 	}
 
-	url := latest.event.URL
-	return []domain.MunicipalEvent{{
+	url := latest.alert.URL
+	return []domain.MunicipalAlert{{
 		ID:          "kitchener.snow:active",
 		Title:       "Kitchener snow event active",
-		Description: latest.event.Description,
-		EventType:   "snow-event",
+		Description: latest.alert.Description,
+		AlertType:   "snow-event",
+		Severity:    domain.SeverityWarning,
 		StartsAt:    &start,
 		EndsAt:      &end,
 		URL:         url,
-		PublishedAt: latest.event.PublishedAt,
+		PublishedAt: latest.alert.PublishedAt,
 	}}
 }
 
