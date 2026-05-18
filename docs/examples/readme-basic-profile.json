@@ -1,0 +1,55 @@
+{
+  "id": "readme-basic",
+  "name": "README Basic Dashboard",
+  "description": "Example dashboard profile used for README screenshots.",
+  "layout": "landscape",
+  "grid_version": 2,
+  "widgets": [
+    {
+      "id": "readme-clock",
+      "type": "clock",
+      "pos": { "col": 0, "row": 0, "w": 5, "h": 2 },
+      "config": {}
+    },
+    {
+      "id": "readme-weather-current",
+      "type": "weather-current",
+      "pos": { "col": 5, "row": 0, "w": 4, "h": 4 },
+      "config": {}
+    },
+    {
+      "id": "readme-sunrise",
+      "type": "sunrise-sunset",
+      "pos": { "col": 9, "row": 0, "w": 3, "h": 4 },
+      "config": {}
+    },
+    {
+      "id": "readme-weather-forecast",
+      "type": "weather-forecast",
+      "pos": { "col": 0, "row": 2, "w": 7, "h": 8 },
+      "config": {}
+    },
+    {
+      "id": "readme-moon",
+      "type": "moon-phase",
+      "pos": { "col": 7, "row": 4, "w": 3, "h": 4 },
+      "config": {}
+    },
+    {
+      "id": "readme-alerts",
+      "type": "alerts",
+      "pos": { "col": 10, "row": 4, "w": 7, "h": 5 },
+      "config": {
+        "showWeather": true,
+        "showTransit": true,
+        "showMunicipal": true
+      }
+    },
+    {
+      "id": "readme-notes",
+      "type": "shared-notes",
+      "pos": { "col": 7, "row": 8, "w": 8, "h": 5 },
+      "config": {}
+    }
+  ]
+}

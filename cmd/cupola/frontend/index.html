@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0a1e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Cupola</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/grid.css">
+  <link rel="stylesheet" href="/css/horizon.css">
+  <link rel="stylesheet" href="/js/vendor/leaflet.css">
+</head>
+<body>
+  <div id="horizon-bg"></div>
+  <div id="alert-banner" class="alert-banner hidden" role="alert" aria-live="assertive"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <div id="landing" class="landing hidden"></div>
+  <div id="canvas" class="canvas hidden">
+    <div id="canvas-toolbar" class="canvas-toolbar">
+      <div class="canvas-brand" aria-label="Cupola">
+        <img src="/icons/icon-192.png" alt="" class="canvas-brand-icon">
+      </div>
+      <div class="canvas-toolbar-actions">
+        <button id="btn-add-widget" class="btn-small" title="Add widget">+ Widget</button>
+        <button id="btn-export-dashboard" class="btn-small" title="Export dashboard">Export</button>
+        <button id="btn-admin" class="btn-small" title="Open admin">Admin</button>
+      </div>
+    </div>
+    <div id="widget-grid" class="widget-grid"></div>
+  </div>
+  <div id="widget-picker" class="widget-picker hidden"></div>
+  <!-- Map libraries: loaded before widgets so radar-map.js can reference L and protomapsL -->
+  <script src="/js/vendor/leaflet.js"></script>
+  <script src="/js/vendor/protomaps-leaflet.js"></script>
+  <!-- load order: stream → subscriptions → overlays → widgets → profile → picker → grid → main -->
+  <script src="/js/app-ui.js"></script>
+  <script src="/js/dashboard-api.js"></script>
+  <script src="/js/details.js"></script>
+  <script src="/js/stream.js"></script>
+  <script src="/js/subscriptions.js"></script>
+  <script src="/js/overlays.js"></script>
+  <script src="/js/widgets/transit.js"></script>
+  <script src="/js/widgets/transit-station.js"></script>
+  <script src="/js/widgets/clock.js"></script>
+  <script src="/js/widgets/weather-current.js"></script>
+  <script src="/js/widgets/weather-forecast.js"></script>
+  <script src="/js/widgets/weather-hourly-forecast.js"></script>
+  <script src="/js/widgets/weather-rainfall.js"></script>
+  <script src="/js/widgets/moon-phase.js"></script>
+  <script src="/js/widgets/sunrise-sunset.js"></script>
+  <script src="/js/widgets/solar-activity.js"></script>
+  <script src="/js/widgets/solar-forecast.js"></script>
+  <script src="/js/widgets/flag-status.js"></script>
+  <script src="/js/widgets/traffic-incidents.js"></script>
+  <script src="/js/widgets/traffic-cameras.js"></script>
+  <script src="/js/widgets/traffic-road-conditions.js"></script>
+  <script src="/js/widgets/aircraft.js"></script>
+  <script src="/js/widgets/radar-map.js"></script>
+  <script src="/js/widgets/shared-notes.js"></script>
+  <script src="/js/widgets/waste-collection.js"></script>
+  <script src="/js/widgets/waterway.js"></script>
+  <script src="/js/widgets/alerts.js"></script>
+  <script src="/js/widgets/municipal-events.js"></script>
+  <script src="/js/profile.js"></script>
+  <script src="/js/widget-picker.js"></script>
+  <script src="/js/grid.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>

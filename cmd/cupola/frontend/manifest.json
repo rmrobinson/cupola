@@ -1,0 +1,24 @@
+{
+  "name": "Cupola",
+  "short_name": "Cupola",
+  "description": "Location-aware ambient dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0a0a1e",
+  "background_color": "#0a0a1e",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

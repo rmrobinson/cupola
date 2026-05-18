@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0a0a1e"/>
+  <!-- dome -->
+  <path d="M128 320 Q128 148 256 100 Q384 148 384 320 Z" fill="#1a78c2" opacity="0.85"/>
+  <path d="M128 320 Q128 148 256 100 Q384 148 384 320 Z" fill="none" stroke="#74b9ff" stroke-width="4" opacity="0.5"/>
+  <!-- drum / base ring -->
+  <rect x="96" y="316" width="320" height="40" rx="4" fill="#0c75d8" opacity="0.9"/>
+  <!-- lantern at apex -->
+  <rect x="242" y="88" width="28" height="28" rx="6" fill="#f7b733" opacity="0.95"/>
+  <!-- horizon glow -->
+  <ellipse cx="256" cy="320" rx="170" ry="16" fill="#74b9ff" opacity="0.15"/>
+</svg>

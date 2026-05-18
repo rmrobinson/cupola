@@ -1,0 +1,101 @@
+package collector
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"sort"
+	"time"
+
+	"github.com/rmrobinson/cupola/internal/domain"
+)
+
+// Collector is the interface all data-source collectors must implement.
+type Collector interface {
+	ID() string
+	Domain() domain.DomainType
+	Start(ctx context.Context) error
+	State() domain.DomainState
+}
+
+// EmailMessage is delivered to EmailHandler implementations by the IMAP dispatcher.
+type EmailMessage struct {
+	From    string
+	Subject string
+	Body    string
+	Date    time.Time
+}
+
+// EmailHandler is implemented by collectors that accept email-based input
+// from the shared IMAP dispatcher.
+type EmailHandler interface {
+	ID() string
+	SenderPatterns() []string  // exact sender addresses
+	SubjectPatterns() []string // regex patterns matched against subject
+	Handle(msg EmailMessage) error
+}
+
+// SubscriptionNotifiable is an optional interface collectors can implement to
+// receive a non-blocking nudge when a new subscription arrives for their domain.
+type SubscriptionNotifiable interface {
+	OnSubscription()
+}
+
+// Registry holds registered collectors, enforcing one per DomainType.
+type Registry struct {
+	collectors map[domain.DomainType]Collector
+}
+
+func NewRegistry() *Registry {
+	return &Registry{
+		collectors: make(map[domain.DomainType]Collector),
+	}
+}
+
+// Register adds c to the registry. It fatals if the domain is already taken.
+func (r *Registry) Register(c Collector) {
+	dt := c.Domain()
+	if existing, ok := r.collectors[dt]; ok {
+		log.Fatalf("duplicate collector for domain %q: already registered by %s, refusing %s",
+			dt, existing.ID(), c.ID())
+	}
+	r.collectors[dt] = c
+}
+
+// Domains returns the DomainType of every registered collector.
+func (r *Registry) Domains() []domain.DomainType {
+	out := make([]domain.DomainType, 0, len(r.collectors))
+	for dt := range r.collectors {
+		out = append(out, dt)
+	}
+	return out
+}
+
+// Collectors returns every registered collector ordered by collector ID.
+func (r *Registry) Collectors() []Collector {
+	out := make([]Collector, 0, len(r.collectors))
+	for _, c := range r.collectors {
+		out = append(out, c)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID() < out[j].ID() })
+	return out
+}
+
+// NotifySubscription nudges the collector for dt if it implements SubscriptionNotifiable.
+func (r *Registry) NotifySubscription(dt domain.DomainType) {
+	if c, ok := r.collectors[dt]; ok {
+		if sn, ok := c.(SubscriptionNotifiable); ok {
+			sn.OnSubscription()
+		}
+	}
+}
+
+// StartAll starts every registered collector. Returns on the first error.
+func (r *Registry) StartAll(ctx context.Context) error {
+	for _, c := range r.collectors {
+		if err := c.Start(ctx); err != nil {
+			return fmt.Errorf("start collector %s: %w", c.ID(), err)
+		}
+	}
+	return nil
+}

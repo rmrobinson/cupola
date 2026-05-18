@@ -1,0 +1,103 @@
+location:
+  name: "Home"
+  lat: 43.45
+  lon: -80.49
+  country_code: "CA"
+  timezone: "America/Toronto"
+
+server:
+  port: 8181
+  data_dir: "./data"
+  csp_img_src:
+    - "https://511on.ca"
+    - "https://511.alberta.ca"
+    - "https://www.drivebc.ca"
+    - "https://weather.gc.ca"
+
+tiles:
+  radius_km: 50
+  cache_path: "data/tiles/local.pmtiles"
+
+collectors:
+  weather_ecowitt:
+    enabled: true
+    url: "http://ecowitt.ktc1.net.faltung.ca"
+    poll_interval: 60s
+
+  weather_envcanada:
+    enabled: true
+    # Station auto-discovered from lat/lon; override if discovery fails:
+    # station_code: s0000585
+    # province: ON
+    poll_interval_forecast: 1h
+    poll_interval_alerts: 15m
+
+  solar_envcanada:
+    enabled: true
+    poll_interval: 1h
+    # region auto-selected from lat/lon; override with:
+    # region: 4
+
+  traffic_511:
+    enabled: true
+    provinces: [ON]
+    poll_interval_incidents: 15m
+    poll_interval_cameras: 24h
+
+  aircraft_dump1090:
+    enabled: true
+    url: "http://adsb.ktc1.net.faltung.ca/tar1090"
+    poll_interval: 5s
+    radius_km: 250
+
+  # house is deferred — see implementation plan
+  # house:
+  #   enabled: true
+  #   url: "http://localhost:9000"
+  #   poll_interval: 30s
+
+  flag_canada:
+    enabled: true
+    poll_interval: 4h
+
+  waterways:
+    - id: grand_river
+      parser: grca
+      url: "https://www.grandriver.ca/our-watershed/river-data/"
+      poll_interval: 15m
+      alert_on: [warning, emergency]
+
+  municipal:
+    - id: kitchener_snow
+      parser: kitchener.snow
+      url: "https://www.kitchener.ca/news/snow-events/"
+      poll_interval: 30m
+      domain: municipal.alerts
+    - id: grca_flood
+      parser: grca.flood
+      url: "https://www.grandriver.ca/news/categories/flood-messages/"
+      poll_interval: 15m
+      domain: municipal.alerts
+    - id: enova_power
+      parser: enova.power
+      url: "https://oms.enovapower.com/Outages/"
+      poll_interval: 10m
+      domain: municipal.alerts
+    - id: kitchener_utilities
+      parser: kitchener.utilities
+      url: "https://www.kitchenerutilities.ca/en/outages-and-news.aspx"
+      poll_interval: 10m
+      domain: municipal.alerts
+
+  waste_collection:
+    enabled: true
+    data_path: "data/kitchener_waste_collection_zone_b1_thursdays_2026.json"
+    week_start: sunday
+
+  imap:
+    enabled: false   # enable in phase 2 (IMAP dispatcher)
+    host: "imap.example.com"
+    port: 993
+    username: "alerts@example.com"
+    password: "${IMAP_PASSWORD}"
+    poll_interval: 2m

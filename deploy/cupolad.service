@@ -1,0 +1,24 @@
+[Unit]
+Description=Cupola dashboard daemon
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=cupolad
+Group=cupolad
+WorkingDirectory=/var/lib/cupolad
+EnvironmentFile=-/etc/cupolad/cupolad.env
+ExecStart=/opt/cupolad/cupolad -config /etc/cupolad/config.yaml
+Restart=on-failure
+RestartSec=5s
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/cupolad
+ReadOnlyPaths=/etc/cupolad /opt/cupolad
+
+[Install]
+WantedBy=multi-user.target
