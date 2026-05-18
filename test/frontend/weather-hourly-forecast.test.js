@@ -50,7 +50,7 @@ test('weather hourly forecast widget renders populated data and icon URL', () =>
   assert.match(container.innerHTML, /hourly-period has-icon/);
   assert.match(container.innerHTML, /hp-temp-main">25&deg;/);
   assert.match(container.innerHTML, /hp-temp-actual">21&deg;/);
-  assert.match(container.innerHTML, /hp-temp-uv">UV 3/);
+  assert.match(container.innerHTML, /hp-temp-uv" style="color:#f7b733">UV 3/);
   assert.match(container.innerHTML, /21&deg;/);
   assert.match(container.innerHTML, /hourly-header/);
   assert.match(container.innerHTML, /hp-pop">POP/);
@@ -112,6 +112,41 @@ test('weather hourly forecast widget omits UV subvalue when UV is absent', () =>
   assert.doesNotMatch(container.innerHTML, /<span class="hp-uv"/);
   assert.doesNotMatch(container.innerHTML, /POP 30%/);
   assert.match(container.innerHTML, /NW 20 km\/h/);
+});
+
+test('weather hourly forecast widget colors UV using current weather scale', () => {
+  const widget = loadWidget();
+  const container = {};
+
+  widget.render(container, {
+    hours: [
+      {
+        starts_at: '2999-05-17T13:00:00Z',
+        ends_at: '2999-05-17T14:00:00Z',
+        condition: 'Clear',
+        temperature: 19,
+        uv_index: 2,
+      },
+      {
+        starts_at: '2999-05-17T14:00:00Z',
+        ends_at: '2999-05-17T15:00:00Z',
+        condition: 'Sunny',
+        temperature: 21,
+        uv_index: 7,
+      },
+      {
+        starts_at: '2999-05-17T15:00:00Z',
+        ends_at: '2999-05-17T16:00:00Z',
+        condition: 'Sunny',
+        temperature: 22,
+        uv_index: 11,
+      },
+    ],
+  });
+
+  assert.match(container.innerHTML, /style="color:#57d9a3">UV 2/);
+  assert.match(container.innerHTML, /style="color:#fc7b1a">UV 7/);
+  assert.match(container.innerHTML, /style="color:#9c27b0">UV 11/);
 });
 
 test('weather hourly forecast widget handles mixed icon availability per row', () => {

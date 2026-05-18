@@ -23,6 +23,17 @@
     return value == null ? null : Math.round(value);
   }
 
+  // WHO/Health Canada UV risk scale. Keep colors in sync with weather-current.
+  function uvRisk(uv) {
+    if (uv == null) return null;
+    if (uv <= 0)  return { label: 'None',      color: 'rgba(255,255,255,0.35)' };
+    if (uv <= 2)  return { label: 'Low',       color: '#57d9a3' };
+    if (uv <= 5)  return { label: 'Moderate',  color: '#f7b733' };
+    if (uv <= 7)  return { label: 'High',      color: '#fc7b1a' };
+    if (uv <= 10) return { label: 'Very High', color: '#e53935' };
+    return              { label: 'Extreme',    color: '#9c27b0' };
+  }
+
   function metric(label, value, suffix) {
     if (value == null) return '';
     return `<span>${label} ${rounded(value)}${suffix || ''}</span>`;
@@ -51,16 +62,17 @@
   function displayTemp(h) {
     const apparent = h.humidex ?? h.wind_chill;
     const actual = h.temperature;
-    const uv = h.uv_index == null ? '' : `<span class="hp-temp-uv">UV ${rounded(h.uv_index)}</span>`;
+    const uv = uvRisk(h.uv_index);
+    const uvText = uv ? `<span class="hp-temp-uv" style="color:${uv.color}">UV ${rounded(h.uv_index)}</span>` : '';
     if (apparent == null) {
-      return actual == null ? uv : `<span class="hp-temp-line"><span class="hp-temp-main">${rounded(actual)}&deg;</span></span>${uv}`;
+      return actual == null ? uvText : `<span class="hp-temp-line"><span class="hp-temp-main">${rounded(actual)}&deg;</span></span>${uvText}`;
     }
     return `
       <span class="hp-temp-line">
         <span class="hp-temp-main">${rounded(apparent)}&deg;</span>
         ${actual == null ? '' : `<span class="hp-temp-actual">${rounded(actual)}&deg;</span>`}
       </span>
-      ${uv}
+      ${uvText}
     `;
   }
 
