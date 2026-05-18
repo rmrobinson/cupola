@@ -58,25 +58,12 @@ func (c *ArrivalsCollector) Start(ctx context.Context) error {
 }
 
 func (c *ArrivalsCollector) staticLoop(ctx context.Context, ready chan struct{}) {
-	// Initial load: unblock rtLoop after the first agency is ready, then wake
-	// it again after each subsequent agency so widgets update progressively.
-	readyClosed := false
-	for _, ag := range c.agencies.List() {
-		if err := c.agencies.RefreshStatic(ag.ID); err != nil {
-			log.Printf("[gtfsrt] %s: static refresh: %v", ag.ID, err)
-		}
-		if !readyClosed {
-			close(ready)
-			readyClosed = true
-		} else {
-			select {
-			case c.wake <- struct{}{}:
-			default:
-			}
-		}
-	}
-	if !readyClosed {
-		close(ready)
+	c.agencies.WarmCachedStatic(time.Now().In(c.loc))
+	close(ready)
+	c.refreshStatic()
+	select {
+	case c.wake <- struct{}{}:
+	default:
 	}
 
 	t := time.NewTicker(c.staticInterval)
@@ -222,6 +209,9 @@ func (c *ArrivalsCollector) fetchRTForAgency(ag *Agency, wanted map[string]bool,
 // for every key in wanted that belongs to ag. logTransition controls whether a
 // one-time "switching to static fallback" message is emitted when inFallback transitions.
 func (c *ArrivalsCollector) fetchStaticForAgency(ag *Agency, wanted map[string]bool, stops map[string]domain.StopArrivals, now time.Time, logTransition bool) {
+	if !ag.Schedule.HasRoutes() {
+		return
+	}
 	if logTransition && !c.inFallback[ag.ID] {
 		log.Printf("[gtfsrt] %s: RT unavailable, switching to static schedule fallback", ag.ID)
 		c.inFallback[ag.ID] = true

@@ -5,6 +5,7 @@ import (
 	"log"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/rmrobinson/cupola/internal/collector/gtfs"
 	"github.com/rmrobinson/cupola/internal/store"
@@ -14,6 +15,7 @@ type AgencySource interface {
 	List() []*Agency
 	Get(id string) *Agency
 	RefreshStatic(id string) error
+	WarmCachedStatic(now time.Time)
 }
 
 type AgencyManager struct {
@@ -136,6 +138,27 @@ func (m *AgencyManager) RefreshStatic(id string) error {
 		}
 		return gtfs.LoadAndPersist(ag.Schedule, ag.ID, ag.StaticURLs, m.cacheDir, m.gtfsDB)
 	})
+}
+
+func (m *AgencyManager) WarmCachedStatic(now time.Time) {
+	for _, ag := range m.List() {
+		if err := m.withRefreshLock(ag.ID, func() error {
+			current := m.Get(ag.ID)
+			if current == nil {
+				return nil
+			}
+			ok, err := gtfs.WarmFromCache(current.Schedule, current.ID, m.cacheDir, m.gtfsDB, now)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				log.Printf("[gtfsrt] %s: no valid static cache for startup warmup", current.ID)
+			}
+			return nil
+		}); err != nil {
+			log.Printf("[gtfsrt] %s: static cache warmup: %v", ag.ID, err)
+		}
+	}
 }
 
 func (m *AgencyManager) RefreshStaticAsync(id string) {

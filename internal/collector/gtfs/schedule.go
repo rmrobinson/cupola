@@ -104,6 +104,129 @@ func (s *Schedule) Stats() ScheduleStats {
 	}
 }
 
+func (s *Schedule) replaceFromMetadata(md *store.GTFSMetadata) {
+	routes := make(map[string]Route, len(md.Routes))
+	for _, r := range md.Routes {
+		routes[r.ID] = Route{
+			ID:        r.ID,
+			AgencyID:  r.AgencyID,
+			ShortName: r.ShortName,
+			LongName:  r.LongName,
+			Type:      r.Type,
+			Color:     r.Color,
+		}
+	}
+
+	stops := make(map[string]Stop, len(md.Stops))
+	for _, st := range md.Stops {
+		stops[st.ID] = Stop{
+			ID:   st.ID,
+			Code: st.Code,
+			Name: st.Name,
+			Lat:  st.Lat,
+			Lon:  st.Lon,
+		}
+	}
+
+	trips := make(map[string]Trip, len(md.Trips))
+	for _, tr := range md.Trips {
+		trips[tr.ID] = Trip{
+			ID:        tr.ID,
+			RouteID:   tr.RouteID,
+			Headsign:  tr.Headsign,
+			ShapeID:   tr.ShapeID,
+			ServiceID: tr.ServiceID,
+		}
+	}
+
+	routeStops := make(map[string][]string)
+	for _, rs := range md.RouteStops {
+		routeStops[rs.RouteID] = append(routeStops[rs.RouteID], rs.StopID)
+	}
+
+	shapes := make(map[string][]ShapePoint)
+	for _, pt := range md.Shapes {
+		shapes[pt.ShapeID] = append(shapes[pt.ShapeID], ShapePoint{
+			Lat:      pt.Lat,
+			Lon:      pt.Lon,
+			Sequence: pt.Sequence,
+		})
+	}
+
+	s.mu.Lock()
+	s.routes = routes
+	s.stops = stops
+	s.trips = trips
+	s.routeStops = routeStops
+	s.shapes = shapes
+	s.routeShapes = buildRouteShapes(trips)
+	s.mu.Unlock()
+}
+
+func metadataFromMaps(
+	routes map[string]Route,
+	stops map[string]Stop,
+	trips map[string]Trip,
+	routeStops map[string][]string,
+	shapes map[string][]ShapePoint,
+) *store.GTFSMetadata {
+	md := &store.GTFSMetadata{
+		Routes:     make([]store.GTFSRoute, 0, len(routes)),
+		Stops:      make([]store.GTFSStop, 0, len(stops)),
+		Trips:      make([]store.GTFSTrip, 0, len(trips)),
+		RouteStops: make([]store.GTFSRouteStop, 0),
+		Shapes:     make([]store.GTFSShapePoint, 0),
+	}
+	for _, r := range routes {
+		md.Routes = append(md.Routes, store.GTFSRoute{
+			ID:        r.ID,
+			AgencyID:  r.AgencyID,
+			ShortName: r.ShortName,
+			LongName:  r.LongName,
+			Type:      r.Type,
+			Color:     r.Color,
+		})
+	}
+	for _, st := range stops {
+		md.Stops = append(md.Stops, store.GTFSStop{
+			ID:   st.ID,
+			Code: st.Code,
+			Name: st.Name,
+			Lat:  st.Lat,
+			Lon:  st.Lon,
+		})
+	}
+	for _, tr := range trips {
+		md.Trips = append(md.Trips, store.GTFSTrip{
+			ID:        tr.ID,
+			RouteID:   tr.RouteID,
+			Headsign:  tr.Headsign,
+			ShapeID:   tr.ShapeID,
+			ServiceID: tr.ServiceID,
+		})
+	}
+	for routeID, stopIDs := range routeStops {
+		for i, stopID := range stopIDs {
+			md.RouteStops = append(md.RouteStops, store.GTFSRouteStop{
+				RouteID: routeID,
+				StopID:  stopID,
+				Ordinal: i,
+			})
+		}
+	}
+	for shapeID, pts := range shapes {
+		for _, pt := range pts {
+			md.Shapes = append(md.Shapes, store.GTFSShapePoint{
+				ShapeID:  shapeID,
+				Lat:      pt.Lat,
+				Lon:      pt.Lon,
+				Sequence: pt.Sequence,
+			})
+		}
+	}
+	return md
+}
+
 // Load downloads and merges all provided feed ZIP URLs into the schedule.
 // On success the existing data is atomically replaced.
 func (s *Schedule) Load(agencyID string, urls []string) error {

@@ -82,6 +82,57 @@ func (s *GTFSSQLiteStore) migrate() error {
 			ON gtfs_service_exceptions (agency_id, service_id, date)`,
 		`CREATE INDEX IF NOT EXISTS idx_gse
 			ON gtfs_service_exceptions (agency_id, service_id, date)`,
+		`CREATE TABLE IF NOT EXISTS gtfs_routes (
+			agency_id        TEXT    NOT NULL,
+			route_id         TEXT    NOT NULL,
+			route_agency_id  TEXT    NOT NULL DEFAULT '',
+			short_name       TEXT    NOT NULL DEFAULT '',
+			long_name        TEXT    NOT NULL DEFAULT '',
+			route_type       INTEGER NOT NULL DEFAULT 0,
+			color            TEXT    NOT NULL DEFAULT '',
+			PRIMARY KEY (agency_id, route_id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS gtfs_stops (
+			agency_id TEXT NOT NULL,
+			stop_id   TEXT NOT NULL,
+			code      TEXT NOT NULL DEFAULT '',
+			name      TEXT NOT NULL DEFAULT '',
+			lat       REAL NOT NULL DEFAULT 0,
+			lon       REAL NOT NULL DEFAULT 0,
+			PRIMARY KEY (agency_id, stop_id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS gtfs_trips (
+			agency_id TEXT NOT NULL,
+			trip_id   TEXT NOT NULL,
+			route_id  TEXT NOT NULL DEFAULT '',
+			headsign  TEXT NOT NULL DEFAULT '',
+			shape_id  TEXT NOT NULL DEFAULT '',
+			service_id TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY (agency_id, trip_id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS gtfs_route_stops (
+			agency_id TEXT    NOT NULL,
+			route_id  TEXT    NOT NULL,
+			stop_id   TEXT    NOT NULL,
+			ordinal   INTEGER NOT NULL,
+			PRIMARY KEY (agency_id, route_id, stop_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_grs_route
+			ON gtfs_route_stops (agency_id, route_id, ordinal)`,
+		`CREATE TABLE IF NOT EXISTS gtfs_shapes (
+			agency_id TEXT    NOT NULL,
+			shape_id  TEXT    NOT NULL,
+			lat       REAL    NOT NULL,
+			lon       REAL    NOT NULL,
+			sequence  INTEGER NOT NULL,
+			PRIMARY KEY (agency_id, shape_id, sequence)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_gsh_shape
+			ON gtfs_shapes (agency_id, shape_id, sequence)`,
+		`CREATE TABLE IF NOT EXISTS gtfs_cache_meta (
+			agency_id TEXT PRIMARY KEY NOT NULL,
+			loaded_at TEXT NOT NULL
+		)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.Exec(stmt); err != nil {

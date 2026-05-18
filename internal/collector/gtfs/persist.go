@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rmrobinson/cupola/internal/store"
 )
@@ -15,6 +16,7 @@ type timetableData struct {
 	stopTimes  []store.GTFSStopTime
 	services   []store.GTFSService
 	exceptions []store.GTFSServiceException
+	metadata   *store.GTFSMetadata
 }
 
 // LoadAndPersist is the primary entry point used at startup and during periodic
@@ -22,9 +24,8 @@ type timetableData struct {
 //  1. Attempts to download fresh ZIPs from urls.
 //  2. On success: parses in-memory metadata and timetable rows in one pass,
 //     saves ZIPs to disk cache, and replaces the SQLite timetable tables.
-//  3. On any download failure: falls back to the disk cache. If SQLite is
-//     already populated for this agency the cached ZIPs are only used to
-//     restore in-memory metadata; if SQLite is empty they also repopulate it.
+//  3. On any download failure: falls back to the disk cache and refreshes
+//     both in-memory metadata and SQLite from the cached ZIPs.
 func LoadAndPersist(s *Schedule, agencyID string, urls []string, cacheDir string, db *store.GTFSSQLiteStore) error {
 	blobs, downloadErr := tryDownload(urls)
 
@@ -51,12 +52,16 @@ func LoadAndPersist(s *Schedule, agencyID string, urls []string, cacheDir string
 			}
 			log.Printf("[gtfs] %s: persisting %d stop_times, %d services, %d exceptions",
 				agencyID, len(td.stopTimes), len(td.services), len(td.exceptions))
-			if err := db.ReplaceGTFSAgency(agencyID, td.stopTimes, td.services, td.exceptions); err != nil {
+			if err := db.ReplaceGTFSAgency(agencyID, td.stopTimes, td.services, td.exceptions, td.metadata); err != nil {
 				return fmt.Errorf("populate sqlite from cache: %w", err)
 			}
 		} else {
-			if err := s.parseFromBlobs(agencyID, cached); err != nil {
+			td, err := s.parseFromBlobsFull(agencyID, cached)
+			if err != nil {
 				return fmt.Errorf("parse cached zips: %w", err)
+			}
+			if err := db.ReplaceGTFSAgency(agencyID, td.stopTimes, td.services, td.exceptions, td.metadata); err != nil {
+				return fmt.Errorf("refresh sqlite from cache: %w", err)
 			}
 		}
 		return nil
@@ -73,11 +78,60 @@ func LoadAndPersist(s *Schedule, agencyID string, urls []string, cacheDir string
 
 	log.Printf("[gtfs] %s: persisting %d stop_times, %d services, %d exceptions",
 		agencyID, len(td.stopTimes), len(td.services), len(td.exceptions))
-	if err := db.ReplaceGTFSAgency(agencyID, td.stopTimes, td.services, td.exceptions); err != nil {
+	if err := db.ReplaceGTFSAgency(agencyID, td.stopTimes, td.services, td.exceptions, td.metadata); err != nil {
 		log.Printf("[gtfs] %s: persist timetable: %v (non-fatal)", agencyID, err)
 	}
 
 	return nil
+}
+
+// WarmFromCache hydrates the in-memory schedule from local GTFS cache only.
+// It returns false when the cache is absent, stale for now, or lacks metadata
+// that can be reconstructed from cached ZIPs.
+func WarmFromCache(s *Schedule, agencyID string, cacheDir string, db *store.GTFSSQLiteStore, now time.Time) (bool, error) {
+	active, err := db.HasActiveService(agencyID, now)
+	if err != nil {
+		return false, fmt.Errorf("check active service: %w", err)
+	}
+	if active {
+		hasMetadata, err := db.HasGTFSMetadata(agencyID)
+		if err != nil {
+			return false, fmt.Errorf("check metadata: %w", err)
+		}
+		if hasMetadata {
+			md, err := db.LoadGTFSMetadata(agencyID)
+			if err != nil {
+				return false, fmt.Errorf("load metadata: %w", err)
+			}
+			s.replaceFromMetadata(md)
+			log.Printf("[gtfs] %s: warmed static schedule from sqlite cache", agencyID)
+			return true, nil
+		}
+	}
+
+	cached, err := LoadZips(cacheDir, agencyID)
+	if err != nil {
+		return false, fmt.Errorf("load zip cache: %w", err)
+	}
+	if len(cached) == 0 {
+		return false, nil
+	}
+
+	td, err := s.parseFromBlobsFull(agencyID, cached)
+	if err != nil {
+		return false, fmt.Errorf("parse cached zips: %w", err)
+	}
+	active = gtfsDataActiveOn(td.services, td.exceptions, now)
+	if !active {
+		// Stale ZIP cache must not leave metadata visible in memory.
+		s.replaceFromMetadata(&store.GTFSMetadata{})
+		return false, nil
+	}
+	if err := db.ReplaceGTFSAgency(agencyID, td.stopTimes, td.services, td.exceptions, td.metadata); err != nil {
+		return false, fmt.Errorf("persist cached zips: %w", err)
+	}
+	log.Printf("[gtfs] %s: warmed static schedule from zip cache", agencyID)
+	return true, nil
 }
 
 // tryDownload fetches all URLs and returns the raw bytes. Returns the first
@@ -92,6 +146,31 @@ func tryDownload(urls []string) ([][]byte, error) {
 		blobs = append(blobs, data)
 	}
 	return blobs, nil
+}
+
+func gtfsDataActiveOn(services []store.GTFSService, exceptions []store.GTFSServiceException, now time.Time) bool {
+	dateStr := now.Format("20060102")
+	weekdayBit := 1 << int(now.Weekday())
+	removed := make(map[string]bool)
+	for _, e := range exceptions {
+		if e.Date != dateStr {
+			continue
+		}
+		if e.Added {
+			return true
+		} else {
+			removed[e.ServiceID] = true
+		}
+	}
+	for _, svc := range services {
+		if removed[svc.ServiceID] {
+			continue
+		}
+		if (svc.WeekdayMask&weekdayBit) != 0 && svc.StartDate <= dateStr && svc.EndDate >= dateStr {
+			return true
+		}
+	}
+	return false
 }
 
 // parseFromBlobsFull is like parseFromBlobs but collects timetable rows
@@ -116,6 +195,7 @@ func (s *Schedule) parseFromBlobsFull(agencyID string, blobs [][]byte) (*timetab
 		shapes[id] = pts
 	}
 	routeShapes := buildRouteShapes(trips)
+	td.metadata = metadataFromMaps(routes, stops, trips, routeStops, shapes)
 
 	s.mu.Lock()
 	s.routes = routes
