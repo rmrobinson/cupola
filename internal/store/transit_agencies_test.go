@@ -7,7 +7,7 @@ func TestTransitAgencyCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLiteStore() error = %v", err)
 	}
-	defer s.db.Close()
+	defer func() { _ = s.db.Close() }()
 
 	cfg := TransitAgencyConfig{
 		ID:                         "grt",

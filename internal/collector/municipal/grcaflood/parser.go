@@ -33,7 +33,7 @@ func (p *Parser) Parse(rawURL string) ([]domain.MunicipalAlert, error) {
 	if err != nil {
 		return nil, fmt.Errorf("grca.flood: get %s: %w", rawURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("grca.flood: get %s: status %d", rawURL, resp.StatusCode)
 	}

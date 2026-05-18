@@ -12,5 +12,5 @@ func (h *Handler) getDomains(w http.ResponseWriter, r *http.Request) {
 		return string(domains[i]) < string(domains[j])
 	})
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"domains": domains})
+	_ = json.NewEncoder(w).Encode(map[string]any{"domains": domains})
 }

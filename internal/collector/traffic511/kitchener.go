@@ -64,7 +64,7 @@ func fetchKitchenerRoadClosures(ctx context.Context, url string) ([]domain.Traff
 	if err != nil {
 		return nil, fmt.Errorf("get %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		io.Copy(io.Discard, io.LimitReader(resp.Body, 512)) //nolint:errcheck
 		return nil, fmt.Errorf("get %s: status %d", url, resp.StatusCode)

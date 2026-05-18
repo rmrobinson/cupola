@@ -49,7 +49,7 @@ func (p *Parser) Parse(rawURL string) ([]domain.MunicipalAlert, error) {
 	if err != nil {
 		return nil, fmt.Errorf("enova.power: post %s: %w", apiURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("enova.power: post %s: status %d", apiURL, resp.StatusCode)
 	}
@@ -272,7 +272,7 @@ func reverseGeocode(client *http.Client, latStr, lonStr string) string {
 		log.Printf("[enova.power] reverse geocode %.6f,%.6f: %v", latF, lonF, err)
 		return ""
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return ""
 	}

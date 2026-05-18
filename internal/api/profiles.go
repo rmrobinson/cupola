@@ -103,7 +103,7 @@ func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(profiles)
+	_ = json.NewEncoder(w).Encode(profiles)
 }
 
 func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
@@ -117,13 +117,12 @@ func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(p)
+	_ = json.NewEncoder(w).Encode(p)
 }
 
 func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 	var p store.Profile
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &p) {
 		return
 	}
 	if p.ID == "" {
@@ -169,7 +168,7 @@ func (h *Handler) validateProfileImport(w http.ResponseWriter, r *http.Request) 
 	}
 	resp := h.validateDashboardExport(export)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 func (h *Handler) importProfile(w http.ResponseWriter, r *http.Request) {
@@ -220,7 +219,7 @@ func (h *Handler) importProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(importResponse{Profile: profile, Skipped: skipped})
+	_ = json.NewEncoder(w).Encode(importResponse{Profile: profile, Skipped: skipped})
 }
 
 func (h *Handler) deleteProfile(w http.ResponseWriter, r *http.Request) {

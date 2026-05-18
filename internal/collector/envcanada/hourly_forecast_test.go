@@ -167,12 +167,12 @@ func TestStationHourlyForecastURLUsesRSSCoordinateFormatting(t *testing.T) {
 
 func TestHourlyForecastCollectorFetchPublishesState(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, hourlyFixture(`{"location":{"hourly":[{"epochTime":1716138000,"condition":"Sunny","temperature":{"metric":"20"},"iconCode":"00"}]}}`))
+		_, _ = fmt.Fprint(w, hourlyFixture(`{"location":{"hourly":[{"epochTime":1716138000,"condition":"Sunny","temperature":{"metric":"20"},"iconCode":"00"}]}}`))
 	}))
 	defer srv.Close()
 
 	stateStore := store.NewStateStore()
-	c := NewHourlyForecastCollector(1, 2, time.Minute, stateStore)
+	c := NewHourlyForecastCollector(1, 2, time.Minute, stateStore, StationOverride{})
 	if err := c.fetch(srv.URL); err != nil {
 		t.Fatalf("fetch: %v", err)
 	}

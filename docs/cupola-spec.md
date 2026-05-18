@@ -939,8 +939,11 @@ location:
   timezone: "America/Toronto"
 
 server:
+  host: "localhost"
   port: 8080
   data_dir: "./data"
+  # cors_allowed_origins:
+  #   - "http://localhost:8080"
 
 tiles:
   radius_km: 50

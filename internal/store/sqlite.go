@@ -47,7 +47,7 @@ func NewSQLiteStore(dataDir string) (*SQLiteStore, error) {
 
 	s := &SQLiteStore{db: db}
 	if err := s.migrate(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 	return s, nil
@@ -84,7 +84,6 @@ func (s *SQLiteStore) migrate() error {
 			created_at                     TEXT NOT NULL,
 			updated_at                     TEXT NOT NULL
 		)`,
-
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.Exec(stmt); err != nil {
@@ -103,7 +102,7 @@ func (s *SQLiteStore) ListProfiles() ([]ProfileMeta, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []ProfileMeta
 	for rows.Next() {
@@ -170,7 +169,7 @@ func (s *SQLiteStore) ListNotes() ([]domain.Note, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []domain.Note
 	for rows.Next() {

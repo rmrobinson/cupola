@@ -148,7 +148,7 @@ func (c *Collector) fetch() error {
 	if err != nil {
 		return fmt.Errorf("get %s: %w", c.url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("get %s: status %d", c.url, resp.StatusCode)
 	}

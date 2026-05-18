@@ -44,7 +44,7 @@ func (h *Handler) getTransitAgencies(w http.ResponseWriter, r *http.Request) {
 		out = append(out, agencyInfo{ID: ag.ID})
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 func (h *Handler) getTransitRoutes(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +56,7 @@ func (h *Handler) getTransitRoutes(w http.ResponseWriter, r *http.Request) {
 	if !ag.Schedule.HasRoutes() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
 		return
 	}
 	routes := ag.Schedule.AllRoutes()
@@ -65,7 +65,7 @@ func (h *Handler) getTransitRoutes(w http.ResponseWriter, r *http.Request) {
 		out = append(out, routeInfo{ID: rt.ID, ShortName: rt.ShortName, LongName: rt.LongName})
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 func (h *Handler) getTransitStops(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +77,7 @@ func (h *Handler) getTransitStops(w http.ResponseWriter, r *http.Request) {
 	if !ag.Schedule.HasRoutes() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
 		return
 	}
 	stops := ag.Schedule.StopsForRoute(chi.URLParam(r, "routeID"))
@@ -94,7 +94,7 @@ func (h *Handler) getTransitStops(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].DistanceKm < out[j].DistanceKm })
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 type geoJSONMultiLineString struct {
@@ -117,7 +117,7 @@ func (h *Handler) getTransitAllStops(w http.ResponseWriter, r *http.Request) {
 	if !ag.Schedule.HasRoutes() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
 		return
 	}
 	stops := ag.Schedule.AllStops()
@@ -134,7 +134,7 @@ func (h *Handler) getTransitAllStops(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].DistanceKm < out[j].DistanceKm })
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 func (h *Handler) getTransitRoutesForStop(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +146,7 @@ func (h *Handler) getTransitRoutesForStop(w http.ResponseWriter, r *http.Request
 	if !ag.Schedule.HasRoutes() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
 		return
 	}
 	routes := ag.Schedule.RoutesForStop(chi.URLParam(r, "stopID"))
@@ -155,7 +155,7 @@ func (h *Handler) getTransitRoutesForStop(w http.ResponseWriter, r *http.Request
 		out = append(out, routeInfo{ID: rt.ID, ShortName: rt.ShortName, LongName: rt.LongName})
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 func (h *Handler) getTransitRouteShape(w http.ResponseWriter, r *http.Request) {
@@ -167,13 +167,13 @@ func (h *Handler) getTransitRouteShape(w http.ResponseWriter, r *http.Request) {
 	if !ag.Schedule.HasRoutes() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "static schedule metadata not loaded"})
 		return
 	}
 	if !ag.Schedule.HasShapes() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "no shape data available"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "no shape data available"})
 		return
 	}
 	routeID := chi.URLParam(r, "routeID")
@@ -198,7 +198,7 @@ func (h *Handler) getTransitRouteShape(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(routeShapeResponse{
+	_ = json.NewEncoder(w).Encode(routeShapeResponse{
 		RouteID: routeID,
 		Color:   cssColor,
 		Geometry: geoJSONMultiLineString{
@@ -219,7 +219,7 @@ func (h *Handler) listTransitAgencyConfigs(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(cfgs)
+	_ = json.NewEncoder(w).Encode(cfgs)
 }
 
 func (h *Handler) getTransitAgencyConfig(w http.ResponseWriter, r *http.Request) {
@@ -233,13 +233,12 @@ func (h *Handler) getTransitAgencyConfig(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(cfg)
+	_ = json.NewEncoder(w).Encode(cfg)
 }
 
 func (h *Handler) createTransitAgencyConfig(w http.ResponseWriter, r *http.Request) {
 	var cfg store.TransitAgencyConfig
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &cfg) {
 		return
 	}
 	cfg = normalizeTransitAgencyConfig(cfg)
@@ -260,7 +259,7 @@ func (h *Handler) createTransitAgencyConfig(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	created, _ := h.db.GetTransitAgency(cfg.ID)
-	json.NewEncoder(w).Encode(created)
+	_ = json.NewEncoder(w).Encode(created)
 }
 
 func (h *Handler) updateTransitAgencyConfig(w http.ResponseWriter, r *http.Request) {
@@ -276,8 +275,7 @@ func (h *Handler) updateTransitAgencyConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	var patch transitAgencyConfigPatch
-	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &patch) {
 		return
 	}
 	if patch.ID != nil && *patch.ID != id {
@@ -318,7 +316,7 @@ func (h *Handler) updateTransitAgencyConfig(w http.ResponseWriter, r *http.Reque
 	h.notifyTransitCollectors()
 	w.Header().Set("Content-Type", "application/json")
 	updated, _ := h.db.GetTransitAgency(id)
-	json.NewEncoder(w).Encode(updated)
+	_ = json.NewEncoder(w).Encode(updated)
 }
 
 func (h *Handler) deleteTransitAgencyConfig(w http.ResponseWriter, r *http.Request) {

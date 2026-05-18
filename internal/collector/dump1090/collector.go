@@ -120,7 +120,7 @@ func (c *Collector) fetch() {
 		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "error", Message: err.Error()})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		msg := fmt.Sprintf("HTTP %d", resp.StatusCode)
 		log.Printf("[dump1090] %s", msg)

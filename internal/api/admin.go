@@ -95,7 +95,7 @@ func (h *Handler) getAdminCollectors(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(out)
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 func (h *Handler) patchConnectivity(w http.ResponseWriter, r *http.Request) {
@@ -106,8 +106,7 @@ func (h *Handler) patchConnectivity(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		ForcedDown bool `json:"forced_down"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &body) {
 		return
 	}
 	h.connectivity.SetForceDown(body.ForcedDown)

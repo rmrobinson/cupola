@@ -27,7 +27,7 @@ func (h *Handler) getDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(detail)
+	_ = json.NewEncoder(w).Encode(detail)
 }
 
 func (h *Handler) detailFor(dt domain.DomainType, id string) (domain.Detail, bool) {

@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -20,30 +21,76 @@ var allProvinces = []string{
 
 // ecStation is one entry from the embedded station JSON on each province page.
 type ecStation struct {
-	Name     string  `json:"display_name"`
-	Lat      float64 `json:"lat"`
-	Lon      float64 `json:"lon"`
-	Province string  `json:"province"`
+	Name        string  `json:"display_name"`
+	Code        string  `json:"code"`
+	SiteCode    string  `json:"site_code"`
+	StationCode string  `json:"station_code"`
+	ID          string  `json:"id"`
+	Lat         float64 `json:"lat"`
+	Lon         float64 `json:"lon"`
+	Province    string  `json:"province"`
+}
+
+// StationOverride selects a specific Environment Canada station from a
+// province/territory station list instead of auto-discovering the nearest one.
+type StationOverride struct {
+	Code     string
+	Province string
 }
 
 // stationCache holds the single discovered station for this server's lifetime.
 var stationCache struct {
-	once sync.Once
-	lat  float64
-	lon  float64
-	name string
-	err  error
+	mu    sync.Mutex
+	ready bool
+	lat   float64
+	lon   float64
+	name  string
 }
 
 // getNearestStation returns the lat/lon of the EC reporting station closest to
 // (userLat, userLon).  The result is computed once and cached for the process
-// lifetime — all 13 province pages are fetched concurrently on the first call.
+// lifetime after a successful discovery. Failed discovery is intentionally not
+// cached so collectors can recover when internet connectivity returns.
 func getNearestStation(userLat, userLon float64) (lat, lon float64, err error) {
-	stationCache.once.Do(func() {
-		stationCache.lat, stationCache.lon, stationCache.name, stationCache.err =
-			discoverNearestStation(userLat, userLon)
-	})
-	return stationCache.lat, stationCache.lon, stationCache.err
+	stationCache.mu.Lock()
+	defer stationCache.mu.Unlock()
+	if stationCache.ready {
+		return stationCache.lat, stationCache.lon, nil
+	}
+	lat, lon, name, err := discoverNearestStation(userLat, userLon)
+	if err != nil {
+		return 0, 0, err
+	}
+	stationCache.lat, stationCache.lon, stationCache.name = lat, lon, name
+	stationCache.ready = true
+	return lat, lon, nil
+}
+
+func resolveStation(userLat, userLon float64, override StationOverride) (lat, lon float64, err error) {
+	if strings.TrimSpace(override.Code) == "" {
+		return getNearestStation(userLat, userLon)
+	}
+	return discoverStationByCode(override)
+}
+
+func discoverStationByCode(override StationOverride) (lat, lon float64, err error) {
+	code := strings.TrimSpace(override.Code)
+	province := strings.ToUpper(strings.TrimSpace(override.Province))
+	if province == "" {
+		return 0, 0, fmt.Errorf("province is required when station_code is set")
+	}
+	client := &http.Client{Timeout: 20 * time.Second}
+	stations, err := fetchProvinceStations(client, province)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, s := range stations {
+		if s.matchesCode(code) {
+			log.Printf("[envcanada] configured station: %s (%.3f, %.3f)", s.Name, s.Lat, s.Lon)
+			return s.Lat, s.Lon, nil
+		}
+	}
+	return 0, 0, fmt.Errorf("station_code %q not found in province %s", code, province)
 }
 
 // discoverNearestStation fetches all province pages concurrently, aggregates
@@ -93,6 +140,16 @@ func discoverNearestStation(userLat, userLon float64) (lat, lon float64, name st
 	return nearest.Lat, nearest.Lon, nearest.Name, nil
 }
 
+func (s ecStation) matchesCode(code string) bool {
+	code = strings.ToLower(strings.TrimSpace(code))
+	for _, candidate := range []string{s.Code, s.SiteCode, s.StationCode, s.ID} {
+		if strings.ToLower(strings.TrimSpace(candidate)) == code {
+			return true
+		}
+	}
+	return false
+}
+
 // fetchProvinceStations downloads one province page and extracts its embedded
 // station JSON array.
 func fetchProvinceStations(client *http.Client, province string) ([]ecStation, error) {
@@ -102,7 +159,7 @@ func fetchProvinceStations(client *http.Client, province string) ([]ecStation, e
 		return nil, fmt.Errorf("get %s: %w", url, err)
 	}
 	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", url, err)
 	}

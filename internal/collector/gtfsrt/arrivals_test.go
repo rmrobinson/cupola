@@ -22,7 +22,7 @@ func TestFetchStaticForAgencyPublishesEmptyStopArrivalsWithNames(t *testing.T) {
 	ag := &Agency{ID: "test", Schedule: gtfs.New()}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/zip")
-		w.Write(minimalGTFSZip(t))
+		_, _ = w.Write(minimalGTFSZip(t))
 	}))
 	defer srv.Close()
 

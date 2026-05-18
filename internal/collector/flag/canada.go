@@ -108,7 +108,7 @@ func (c *Canada) fetch() error {
 		return fmt.Errorf("get %s: %w", c.url, err)
 	}
 	body, readErr := io.ReadAll(resp.Body)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if readErr != nil {
 		return fmt.Errorf("read: %w", readErr)
 	}

@@ -125,7 +125,7 @@ func (c *Checker) probe(ctx context.Context) {
 	resp, err := c.client.Do(req)
 	if err == nil {
 		io.Copy(io.Discard, io.LimitReader(resp.Body, 256)) //nolint:errcheck
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	up := err == nil

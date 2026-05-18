@@ -105,7 +105,7 @@ make screenshots SCREENSHOT_BASE_URL=http://localhost:8181
 `config.example.yaml` is the canonical starting point. Important sections include:
 
 - `location`: name, latitude, longitude, timezone, and country code.
-- `server`: port, data directory, and extra CSP image sources.
+- `server`: listen host/port, data directory, CORS origins, and extra CSP image sources.
 - `tiles`: local PMTiles cache settings.
 - `connectivity`: public internet probe URL and interval.
 - `collectors`: per-source configuration for weather, transit, traffic, aircraft, RSS, flag status, waterways, municipal sources, waste collection, and future IMAP.

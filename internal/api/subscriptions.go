@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -18,8 +17,7 @@ type subscriptionRequest struct {
 
 func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request) {
 	var req subscriptionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.WidgetID == "" || req.SessionID == "" || req.Domain == "" {

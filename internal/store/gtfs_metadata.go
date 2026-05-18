@@ -12,7 +12,7 @@ func (s *GTFSSQLiteStore) loadRoutes(agencyID string) ([]GTFSRoute, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []GTFSRoute
 	for rows.Next() {
@@ -35,7 +35,7 @@ func (s *GTFSSQLiteStore) loadStops(agencyID string) ([]GTFSStop, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []GTFSStop
 	for rows.Next() {
@@ -58,7 +58,7 @@ func (s *GTFSSQLiteStore) loadTrips(agencyID string) ([]GTFSTrip, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []GTFSTrip
 	for rows.Next() {
@@ -81,7 +81,7 @@ func (s *GTFSSQLiteStore) loadRouteStops(agencyID string) ([]GTFSRouteStop, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []GTFSRouteStop
 	for rows.Next() {
@@ -104,7 +104,7 @@ func (s *GTFSSQLiteStore) loadShapePoints(agencyID string) ([]GTFSShapePoint, er
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []GTFSShapePoint
 	for rows.Next() {

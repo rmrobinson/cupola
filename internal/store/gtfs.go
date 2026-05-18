@@ -218,7 +218,7 @@ func (s *GTFSSQLiteStore) QueryUpcomingDepartures(
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	midnight := time.Date(after.Year(), after.Month(), after.Day(), 0, 0, 0, 0, after.Location())
 

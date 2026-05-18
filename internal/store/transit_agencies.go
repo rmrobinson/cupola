@@ -29,7 +29,7 @@ func (s *SQLiteStore) ListTransitAgencies() ([]TransitAgencyConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []TransitAgencyConfig
 	for rows.Next() {

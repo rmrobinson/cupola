@@ -48,9 +48,11 @@ type LocationConfig struct {
 }
 
 type ServerConfig struct {
-	Port      int      `yaml:"port"`
-	DataDir   string   `yaml:"data_dir"`
-	CSPImgSrc []string `yaml:"csp_img_src"` // extra external image sources for Content-Security-Policy img-src
+	Host               string   `yaml:"host"`                 // hostname or address to listen on; defaults to "localhost"
+	Port               int      `yaml:"port"`                 // defaults to 8080
+	DataDir            string   `yaml:"data_dir"`             // defaults to "./data"
+	CSPImgSrc          []string `yaml:"csp_img_src"`          // extra external image sources for Content-Security-Policy img-src
+	CORSAllowedOrigins []string `yaml:"cors_allowed_origins"` // exact browser origins allowed for cross-origin API access
 }
 
 type TilesConfig struct {

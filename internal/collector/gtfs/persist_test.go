@@ -101,7 +101,7 @@ func loadTestGTFSCache(t *testing.T) (*store.GTFSSQLiteStore, string) {
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/zip")
-		w.Write(minimalGTFSZip(t))
+		_, _ = w.Write(minimalGTFSZip(t))
 	}))
 	t.Cleanup(srv.Close)
 

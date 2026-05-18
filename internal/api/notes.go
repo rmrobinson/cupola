@@ -34,13 +34,12 @@ func (h *Handler) listNotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(notes)
+	_ = json.NewEncoder(w).Encode(notes)
 }
 
 func (h *Handler) createNote(w http.ResponseWriter, r *http.Request) {
 	var req noteCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	now := time.Now().UTC()
@@ -63,13 +62,12 @@ func (h *Handler) createNote(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(n)
+	_ = json.NewEncoder(w).Encode(n)
 }
 
 func (h *Handler) updateNote(w http.ResponseWriter, r *http.Request) {
 	var req notePatchRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	updated, err := h.db.UpdateNote(chi.URLParam(r, "id"), store.NoteUpdate{
@@ -91,7 +89,7 @@ func (h *Handler) updateNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(updated)
+	_ = json.NewEncoder(w).Encode(updated)
 }
 
 func (h *Handler) deleteNote(w http.ResponseWriter, r *http.Request) {

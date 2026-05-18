@@ -498,7 +498,7 @@ func downloadZip(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
@@ -682,7 +682,7 @@ func parseCSV(f *zip.File, fn func(headers map[string]int, row []string)) error 
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	r := csv.NewReader(rc)
 	r.LazyQuotes = true

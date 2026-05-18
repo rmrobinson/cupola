@@ -93,7 +93,7 @@ func (c *Collector) fetchFeed(f config.RSSFeedConfig) error {
 	if err != nil {
 		return fmt.Errorf("get %s: %w", f.URL, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("get %s: status %d", f.URL, resp.StatusCode)
 	}

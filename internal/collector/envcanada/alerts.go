@@ -2,7 +2,6 @@ package envcanada
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strings"
 	"sync"
@@ -18,6 +17,7 @@ import (
 type AlertsCollector struct {
 	userLat    float64
 	userLon    float64
+	station    StationOverride
 	interval   time.Duration
 	stateStore *store.StateStore
 	netCheck   func() bool
@@ -25,10 +25,11 @@ type AlertsCollector struct {
 	state      domain.WeatherAlerts
 }
 
-func NewAlertsCollector(lat, lon float64, interval time.Duration, stateStore *store.StateStore) *AlertsCollector {
+func NewAlertsCollector(lat, lon float64, interval time.Duration, stateStore *store.StateStore, station StationOverride) *AlertsCollector {
 	return &AlertsCollector{
 		userLat:    lat,
 		userLon:    lon,
+		station:    station,
 		interval:   interval,
 		stateStore: stateStore,
 	}
@@ -41,16 +42,19 @@ func (c *AlertsCollector) Domain() domain.DomainType { return domain.DomainWeath
 
 func (c *AlertsCollector) Start(ctx context.Context) error {
 	go func() {
-		stLat, stLon, err := getNearestStation(c.userLat, c.userLon)
-		if err != nil {
-			log.Printf("[envcanada.alerts] station discovery: %v", err)
-			c.stateStore.PublishSystem(store.SystemEvent{
-				CollectorID: c.ID(), Status: "error", Message: err.Error(),
-			})
-			return
-		}
-		url := stationRSSURL("alerts", stLat, stLon)
+		var url string
 		if c.netCheck == nil || c.netCheck() {
+			resolved, err := c.resolveURL()
+			if err != nil {
+				log.Printf("[envcanada.alerts] station discovery: %v", err)
+				c.stateStore.PublishSystem(store.SystemEvent{
+					CollectorID: c.ID(), Status: "error", Message: err.Error(),
+				})
+			} else {
+				url = resolved
+			}
+		}
+		if url != "" {
 			if err := c.fetch(url); err != nil {
 				log.Printf("[envcanada.alerts] initial fetch: %v", err)
 			}
@@ -77,6 +81,17 @@ func (c *AlertsCollector) loop(ctx context.Context, url string) {
 			if c.netCheck != nil && !c.netCheck() {
 				continue
 			}
+			if url == "" {
+				resolved, err := c.resolveURL()
+				if err != nil {
+					log.Printf("[envcanada.alerts] station discovery: %v", err)
+					c.stateStore.PublishSystem(store.SystemEvent{
+						CollectorID: c.ID(), Status: "error", Message: err.Error(),
+					})
+					continue
+				}
+				url = resolved
+			}
 			if err := c.fetch(url); err != nil {
 				log.Printf("[envcanada.alerts] fetch: %v", err)
 				c.stateStore.PublishSystem(store.SystemEvent{
@@ -87,6 +102,14 @@ func (c *AlertsCollector) loop(ctx context.Context, url string) {
 			}
 		}
 	}
+}
+
+func (c *AlertsCollector) resolveURL() (string, error) {
+	stLat, stLon, err := resolveStation(c.userLat, c.userLon, c.station)
+	if err != nil {
+		return "", err
+	}
+	return stationRSSURL("alerts", stLat, stLon), nil
 }
 
 func (c *AlertsCollector) fetch(url string) error {
@@ -150,9 +173,4 @@ func alertSeverity(title string) domain.AlertSeverity {
 	default:
 		return domain.SeverityInfo
 	}
-}
-
-// fmtCoord formats a float coordinate without trailing zeros for use in RSS URLs.
-func fmtCoord(f float64) string {
-	return fmt.Sprintf("%v", f)
 }

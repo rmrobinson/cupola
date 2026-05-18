@@ -6,8 +6,13 @@ location:
   country_code: "CA"
 
 server:
+  host: "0.0.0.0"
   port: 8181
   data_dir: "/var/lib/cupolad"
+  # Set this when the dashboard is accessed through a DNS name, reverse proxy,
+  # or HTTPS origin that differs from server.host/server.port.
+  # cors_allowed_origins:
+  #   - "http://dashboard.local:8181"
   csp_img_src:
     - "https://511on.ca"
     - "https://511.alberta.ca"

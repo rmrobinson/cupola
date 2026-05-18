@@ -101,7 +101,7 @@ func findLatestSourceKey(ctx context.Context) (string, error) {
 			if err != nil {
 				continue
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				return key, nil
 			}

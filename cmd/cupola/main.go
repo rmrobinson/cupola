@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"io/fs"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -90,9 +91,10 @@ func main() {
 		}
 		log.Printf("envcanada: registering weather collectors for %.3f,%.3f",
 			cfg.Location.Lat, cfg.Location.Lon)
-		registry.Register(envcanada.NewForecastCollector(cfg.Location.Lat, cfg.Location.Lon, fcInterval, stateStore))
-		registry.Register(envcanada.NewHourlyForecastCollector(cfg.Location.Lat, cfg.Location.Lon, hourlyInterval, stateStore))
-		registry.Register(envcanada.NewAlertsCollector(cfg.Location.Lat, cfg.Location.Lon, alertInterval, stateStore))
+		station := envcanada.StationOverride{Code: c.StationCode, Province: c.Province}
+		registry.Register(envcanada.NewForecastCollector(cfg.Location.Lat, cfg.Location.Lon, fcInterval, stateStore, station))
+		registry.Register(envcanada.NewHourlyForecastCollector(cfg.Location.Lat, cfg.Location.Lon, hourlyInterval, stateStore, station))
+		registry.Register(envcanada.NewAlertsCollector(cfg.Location.Lat, cfg.Location.Lon, alertInterval, stateStore, station))
 	}
 
 	// Canada flag status: HTML scrape of canada.ca.
@@ -272,18 +274,28 @@ func main() {
 		}
 	}
 
-	handler := api.NewHandler(registry, stateStore, sqliteStore, subManager, notesCol.Refresh, tileHandler, webFS,
-		transitAgencies, cfg.Location.Lat, cfg.Location.Lon, cfg.Location.CountryCode, cfg.Server.CSPImgSrc)
-	handler.SetConnectivity(netChecker)
-
 	port := cfg.Server.Port
 	if port == 0 {
 		port = 8080
 	}
+	host := strings.TrimSpace(cfg.Server.Host)
+	if host == "" {
+		host = "localhost"
+	}
+	corsOrigins := cfg.Server.CORSAllowedOrigins
+	if len(corsOrigins) == 0 {
+		corsOrigins = defaultCORSOrigins(host, port)
+	}
+
+	handler := api.NewHandler(registry, stateStore, sqliteStore, subManager, notesCol.Refresh, tileHandler, webFS,
+		transitAgencies, cfg.Location.Lat, cfg.Location.Lon, cfg.Location.CountryCode, cfg.Server.CSPImgSrc, corsOrigins)
+	handler.SetConnectivity(netChecker)
+
 	srv := &http.Server{
-		Addr:        fmt.Sprintf(":%d", port),
-		Handler:     handler.Router(),
-		BaseContext: func(_ net.Listener) context.Context { return ctx },
+		Addr:              net.JoinHostPort(host, strconv.Itoa(port)),
+		Handler:           handler.Router(),
+		BaseContext:       func(_ net.Listener) context.Context { return ctx },
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	netChecker.Start(ctx)
@@ -311,4 +323,15 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown: %v", err)
 	}
+}
+
+func defaultCORSOrigins(host string, port int) []string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return nil
+	}
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		host = strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
+	}
+	return []string{"http://" + net.JoinHostPort(host, strconv.Itoa(port))}
 }

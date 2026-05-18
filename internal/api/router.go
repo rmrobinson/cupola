@@ -29,6 +29,7 @@ type Handler struct {
 	homeLon      float64
 	countryCode  string
 	cspImgSrc    []string
+	corsOrigins  []string
 	connectivity connectivityChecker // nil if not wired
 }
 
@@ -50,6 +51,7 @@ func NewHandler(
 	homeLat, homeLon float64,
 	countryCode string,
 	cspImgSrc []string,
+	corsOrigins []string,
 ) *Handler {
 	return &Handler{
 		registry:     registry,
@@ -64,6 +66,7 @@ func NewHandler(
 		homeLon:      homeLon,
 		countryCode:  countryCode,
 		cspImgSrc:    cspImgSrc,
+		corsOrigins:  normalizeCORSOrigins(corsOrigins),
 	}
 }
 
@@ -72,7 +75,7 @@ func (h *Handler) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(corsMiddleware)
+	r.Use(h.corsMiddleware)
 	r.Use(h.securityHeadersMiddleware)
 
 	r.Get("/api/v1/config", h.getConfig)
@@ -180,15 +183,75 @@ func normalizeCSPSource(raw string) string {
 	return u.Scheme + "://" + u.Host
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+func (h *Handler) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			if h.corsOriginAllowed(origin) {
+				w.Header().Set("Vary", "Origin")
+				if h.corsAllowsWildcard() {
+					w.Header().Set("Access-Control-Allow-Origin", "*")
+				} else {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+				}
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			} else if r.Method == http.MethodOptions {
+				http.Error(w, "origin not allowed", http.StatusForbidden)
+				return
+			}
+		}
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func normalizeCORSOrigins(origins []string) []string {
+	out := make([]string, 0, len(origins))
+	seen := make(map[string]bool, len(origins))
+	for _, raw := range origins {
+		raw = strings.TrimSpace(raw)
+		if raw == "" || seen[raw] {
+			continue
+		}
+		if raw == "*" {
+			out = append(out, raw)
+			seen[raw] = true
+			continue
+		}
+		u, err := url.Parse(raw)
+		if err != nil || u.Scheme == "" || u.Host == "" || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+			continue
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			continue
+		}
+		origin := u.Scheme + "://" + u.Host
+		if !seen[origin] {
+			out = append(out, origin)
+			seen[origin] = true
+		}
+	}
+	return out
+}
+
+func (h *Handler) corsOriginAllowed(origin string) bool {
+	for _, allowed := range h.corsOrigins {
+		if allowed == "*" || allowed == origin {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *Handler) corsAllowsWildcard() bool {
+	for _, allowed := range h.corsOrigins {
+		if allowed == "*" {
+			return true
+		}
+	}
+	return false
 }

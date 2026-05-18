@@ -5,8 +5,16 @@ location:
   timezone: "America/Toronto"
 
 server:
+  # Host/address to bind. Use "localhost" for local-only access, "0.0.0.0"
+  # for LAN access, or a specific hostname/address for tighter binding.
+  host: "localhost"
   port: 8181
   data_dir: "./data"
+  # Exact browser origins allowed to call the API cross-origin. If omitted,
+  # Cupola allows only http://{server.host}:{server.port}. Same-origin browser
+  # access does not require CORS.
+  # cors_allowed_origins:
+  #   - "http://localhost:8181"
   # Extra external image origins allowed by Content-Security-Policy img-src.
   # Used for traffic camera snapshots and Environment Canada hourly icons.
   csp_img_src:

@@ -167,8 +167,8 @@ func (c *SolarCurrentCollector) loop(ctx context.Context) {
 
 // ── SolarForecastCollector ────────────────────────────────────────────────────
 
-func (c *SolarForecastCollector) ID() string                { return "envcanada.solar.forecast" }
-func (c *SolarForecastCollector) Domain() domain.DomainType { return domain.DomainSolarWeatherForecast }
+func (c *SolarForecastCollector) ID() string                    { return "envcanada.solar.forecast" }
+func (c *SolarForecastCollector) Domain() domain.DomainType     { return domain.DomainSolarWeatherForecast }
 func (c *SolarForecastCollector) Start(_ context.Context) error { return nil }
 
 func (c *SolarForecastCollector) State() domain.DomainState {
@@ -190,7 +190,7 @@ func (c *SolarCurrentCollector) fetch() error {
 	if err != nil {
 		return fmt.Errorf("get NOAA Kp: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("get NOAA Kp: status %d", resp.StatusCode)
 	}
@@ -310,5 +310,5 @@ func extractKpFromRow(raw json.RawMessage) (float64, error) {
 			}
 		}
 	}
-	return 0, fmt.Errorf("Kp key not found in object row")
+	return 0, fmt.Errorf("kp key not found in object row")
 }

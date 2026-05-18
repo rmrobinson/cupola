@@ -2,7 +2,7 @@
   window.CupolaWidgets = window.CupolaWidgets || [];
 
   function esc(s) {
-    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   // Severity heuristic: anything other than "Bare and dry road" is noteworthy.

@@ -67,7 +67,7 @@ func (h *Handler) getStream(w http.ResponseWriter, r *http.Request) {
 
 		case <-heartbeat.C:
 			// SSE comment keeps the connection alive through proxies
-			fmt.Fprintf(w, ":\n\n")
+			_, _ = fmt.Fprintf(w, ":\n\n")
 			flusher.Flush()
 
 		case <-r.Context().Done():

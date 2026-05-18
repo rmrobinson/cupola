@@ -25,6 +25,7 @@ import (
 type ForecastCollector struct {
 	userLat    float64
 	userLon    float64
+	station    StationOverride
 	interval   time.Duration
 	stateStore *store.StateStore
 	netCheck   func() bool
@@ -32,10 +33,11 @@ type ForecastCollector struct {
 	state      domain.WeatherForecast
 }
 
-func NewForecastCollector(lat, lon float64, interval time.Duration, stateStore *store.StateStore) *ForecastCollector {
+func NewForecastCollector(lat, lon float64, interval time.Duration, stateStore *store.StateStore, station StationOverride) *ForecastCollector {
 	return &ForecastCollector{
 		userLat:    lat,
 		userLon:    lon,
+		station:    station,
 		interval:   interval,
 		stateStore: stateStore,
 	}
@@ -48,16 +50,19 @@ func (c *ForecastCollector) Domain() domain.DomainType { return domain.DomainWea
 
 func (c *ForecastCollector) Start(ctx context.Context) error {
 	go func() {
-		stLat, stLon, err := getNearestStation(c.userLat, c.userLon)
-		if err != nil {
-			log.Printf("[envcanada.forecast] station discovery: %v", err)
-			c.stateStore.PublishSystem(store.SystemEvent{
-				CollectorID: c.ID(), Status: "error", Message: err.Error(),
-			})
-			return
-		}
-		url := stationRSSURL("weather", stLat, stLon)
+		var url string
 		if c.netCheck == nil || c.netCheck() {
+			resolved, err := c.resolveURL("weather")
+			if err != nil {
+				log.Printf("[envcanada.forecast] station discovery: %v", err)
+				c.stateStore.PublishSystem(store.SystemEvent{
+					CollectorID: c.ID(), Status: "error", Message: err.Error(),
+				})
+			} else {
+				url = resolved
+			}
+		}
+		if url != "" {
 			if err := c.fetch(url); err != nil {
 				log.Printf("[envcanada.forecast] initial fetch: %v", err)
 			}
@@ -84,6 +89,17 @@ func (c *ForecastCollector) loop(ctx context.Context, url string) {
 			if c.netCheck != nil && !c.netCheck() {
 				continue
 			}
+			if url == "" {
+				resolved, err := c.resolveURL("weather")
+				if err != nil {
+					log.Printf("[envcanada.forecast] station discovery: %v", err)
+					c.stateStore.PublishSystem(store.SystemEvent{
+						CollectorID: c.ID(), Status: "error", Message: err.Error(),
+					})
+					continue
+				}
+				url = resolved
+			}
 			if err := c.fetch(url); err != nil {
 				log.Printf("[envcanada.forecast] fetch: %v", err)
 				c.stateStore.PublishSystem(store.SystemEvent{
@@ -94,6 +110,14 @@ func (c *ForecastCollector) loop(ctx context.Context, url string) {
 			}
 		}
 	}
+}
+
+func (c *ForecastCollector) resolveURL(feedType string) (string, error) {
+	stLat, stLon, err := resolveStation(c.userLat, c.userLon, c.station)
+	if err != nil {
+		return "", err
+	}
+	return stationRSSURL(feedType, stLat, stLon), nil
 }
 
 func (c *ForecastCollector) fetch(url string) error {
@@ -113,10 +137,6 @@ func (c *ForecastCollector) fetch(url string) error {
 			issueTime = parseAtomTime(e.Updated)
 		}
 		periods = append(periods, parseForecastEntry(e, len(periods), issueTime))
-	}
-
-	if issueTime.IsZero() {
-		issueTime = time.Now()
 	}
 
 	now := time.Now()
@@ -233,7 +253,7 @@ func fetchAtom(url string) (*atomFeed, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("get %s: status %d", url, resp.StatusCode)
 	}
