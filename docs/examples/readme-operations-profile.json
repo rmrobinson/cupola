@@ -1,0 +1,66 @@
+{
+  "id": "readme-operations",
+  "name": "README Operations Dashboard",
+  "description": "Example dashboard profile used for README screenshots.",
+  "layout": "landscape",
+  "grid_version": 2,
+  "widgets": [
+    {
+      "id": "readme-radar-map",
+      "type": "radar-map",
+      "pos": { "col": 0, "row": 0, "w": 12, "h": 8 },
+      "config": {
+        "zoom": 12,
+        "theme": "grayscale",
+        "layer_incidents": true,
+        "layer_transit": true,
+        "layer_aircraft": true,
+        "layer_routes": true,
+        "layer_outages": true,
+        "show_home_marker": true
+      }
+    },
+    {
+      "id": "readme-traffic",
+      "type": "traffic-incidents",
+      "pos": { "col": 12, "row": 0, "w": 6, "h": 5 },
+      "config": {}
+    },
+    {
+      "id": "readme-waterway",
+      "type": "waterway",
+      "pos": { "col": 12, "row": 5, "w": 5, "h": 2 },
+      "config": {
+        "source": "",
+        "limit": 5
+      }
+    },
+    {
+      "id": "readme-waste",
+      "type": "waste-collection",
+      "pos": { "col": 0, "row": 8, "w": 5, "h": 2 },
+      "config": {}
+    },
+    {
+      "id": "readme-solar",
+      "type": "solar-activity",
+      "pos": { "col": 5, "row": 8, "w": 3, "h": 4 },
+      "config": {}
+    },
+    {
+      "id": "readme-flag",
+      "type": "flag-status",
+      "pos": { "col": 8, "row": 8, "w": 3, "h": 4 },
+      "config": {}
+    },
+    {
+      "id": "readme-municipal",
+      "type": "municipal-events",
+      "pos": { "col": 11, "row": 8, "w": 7, "h": 4 },
+      "config": {
+        "source": "",
+        "limit": 6
+      }
+    }
+  ]
+}
