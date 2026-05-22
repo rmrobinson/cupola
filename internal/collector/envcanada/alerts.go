@@ -23,6 +23,7 @@ type AlertsCollector struct {
 	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.WeatherAlerts
+	wake       chan struct{}
 }
 
 func NewAlertsCollector(lat, lon float64, interval time.Duration, stateStore *store.StateStore, station StationOverride) *AlertsCollector {
@@ -32,10 +33,18 @@ func NewAlertsCollector(lat, lon float64, interval time.Duration, stateStore *st
 		station:    station,
 		interval:   interval,
 		stateStore: stateStore,
+		wake:       make(chan struct{}, 1),
 	}
 }
 
 func (c *AlertsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
+
+func (c *AlertsCollector) OnSubscription() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+}
 
 func (c *AlertsCollector) ID() string                { return "envcanada.alerts" }
 func (c *AlertsCollector) Domain() domain.DomainType { return domain.DomainWeatherAlerts }
@@ -78,30 +87,37 @@ func (c *AlertsCollector) loop(ctx context.Context, url string) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if c.netCheck != nil && !c.netCheck() {
-				continue
-			}
-			if url == "" {
-				resolved, err := c.resolveURL()
-				if err != nil {
-					log.Printf("[envcanada.alerts] station discovery: %v", err)
-					c.stateStore.PublishSystem(store.SystemEvent{
-						CollectorID: c.ID(), Status: "error", Message: err.Error(),
-					})
-					continue
-				}
-				url = resolved
-			}
-			if err := c.fetch(url); err != nil {
-				log.Printf("[envcanada.alerts] fetch: %v", err)
-				c.stateStore.PublishSystem(store.SystemEvent{
-					CollectorID: c.ID(), Status: "error", Message: err.Error(),
-				})
-			} else {
-				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
-			}
+			url = c.fetchIfReady(url)
+		case <-c.wake:
+			url = c.fetchIfReady(url)
 		}
 	}
+}
+
+func (c *AlertsCollector) fetchIfReady(url string) string {
+	if c.netCheck != nil && !c.netCheck() {
+		return url
+	}
+	if url == "" {
+		resolved, err := c.resolveURL()
+		if err != nil {
+			log.Printf("[envcanada.alerts] station discovery: %v", err)
+			c.stateStore.PublishSystem(store.SystemEvent{
+				CollectorID: c.ID(), Status: "error", Message: err.Error(),
+			})
+			return url
+		}
+		url = resolved
+	}
+	if err := c.fetch(url); err != nil {
+		log.Printf("[envcanada.alerts] fetch: %v", err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.ID(), Status: "error", Message: err.Error(),
+		})
+	} else {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
+	}
+	return url
 }
 
 func (c *AlertsCollector) resolveURL() (string, error) {

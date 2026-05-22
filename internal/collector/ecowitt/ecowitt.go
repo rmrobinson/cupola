@@ -30,6 +30,7 @@ type Collector struct {
 	stateStore *store.StateStore
 	mu         sync.RWMutex
 	state      domain.WeatherCurrent
+	wake       chan struct{}
 }
 
 func New(baseURL string, interval time.Duration, stateStore *store.StateStore) *Collector {
@@ -37,11 +38,19 @@ func New(baseURL string, interval time.Duration, stateStore *store.StateStore) *
 		url:        strings.TrimRight(baseURL, "/") + "/get_livedata_info",
 		interval:   interval,
 		stateStore: stateStore,
+		wake:       make(chan struct{}, 1),
 	}
 }
 
 func (c *Collector) ID() string                { return "ecowitt.current" }
 func (c *Collector) Domain() domain.DomainType { return domain.DomainWeatherCurrent }
+
+func (c *Collector) OnSubscription() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+}
 
 func (c *Collector) Start(ctx context.Context) error {
 	go func() {
@@ -67,15 +76,21 @@ func (c *Collector) loop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if err := c.fetch(); err != nil {
-				log.Printf("[ecowitt.current] fetch: %v", err)
-				c.stateStore.PublishSystem(store.SystemEvent{
-					CollectorID: c.ID(), Status: "error", Message: err.Error(),
-				})
-			} else {
-				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
-			}
+			c.fetchAndPublishHealth()
+		case <-c.wake:
+			c.fetchAndPublishHealth()
 		}
+	}
+}
+
+func (c *Collector) fetchAndPublishHealth() {
+	if err := c.fetch(); err != nil {
+		log.Printf("[ecowitt.current] fetch: %v", err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.ID(), Status: "error", Message: err.Error(),
+		})
+	} else {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
 	}
 }
 

@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rmrobinson/cupola/internal/collector/astro"
 	"github.com/rmrobinson/cupola/internal/domain"
 	"github.com/rmrobinson/cupola/internal/store"
 )
@@ -31,10 +32,12 @@ type Canada struct {
 	lat, lon   float64
 	province   string // 2-letter code derived from lat/lon
 	interval   time.Duration
+	loc        *time.Location
 	stateStore *store.StateStore
 	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.FlagStatus
+	wake       chan struct{}
 }
 
 func (c *Canada) SetNetCheck(fn func() bool) { c.netCheck = fn }
@@ -44,8 +47,15 @@ func NewCanada(lat, lon float64, interval time.Duration, stateStore *store.State
 }
 
 func NewCanadaWithURL(url string, lat, lon float64, interval time.Duration, stateStore *store.StateStore) *Canada {
+	return NewCanadaWithURLInLocation(url, lat, lon, interval, stateStore, time.Local)
+}
+
+func NewCanadaWithURLInLocation(url string, lat, lon float64, interval time.Duration, stateStore *store.StateStore, loc *time.Location) *Canada {
 	if url == "" {
 		url = defaultNoticesURL
+	}
+	if loc == nil {
+		loc = time.Local
 	}
 	return &Canada{
 		url:        url,
@@ -53,12 +63,21 @@ func NewCanadaWithURL(url string, lat, lon float64, interval time.Duration, stat
 		lon:        lon,
 		province:   provinceCode(lat, lon),
 		interval:   interval,
+		loc:        loc,
 		stateStore: stateStore,
+		wake:       make(chan struct{}, 1),
 	}
 }
 
 func (c *Canada) ID() string                { return "canada.flag" }
 func (c *Canada) Domain() domain.DomainType { return domain.DomainFlagStatus }
+
+func (c *Canada) OnSubscription() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+}
 
 func (c *Canada) Start(ctx context.Context) error {
 	go func() {
@@ -86,18 +105,24 @@ func (c *Canada) loop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if c.netCheck != nil && !c.netCheck() {
-				continue
-			}
-			if err := c.fetch(); err != nil {
-				log.Printf("[canada.flag] fetch: %v", err)
-				c.stateStore.PublishSystem(store.SystemEvent{
-					CollectorID: c.ID(), Status: "error", Message: err.Error(),
-				})
-			} else {
-				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
-			}
+			c.fetchIfReady()
+		case <-c.wake:
+			c.fetchIfReady()
 		}
+	}
+}
+
+func (c *Canada) fetchIfReady() {
+	if c.netCheck != nil && !c.netCheck() {
+		return
+	}
+	if err := c.fetch(); err != nil {
+		log.Printf("[canada.flag] fetch: %v", err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.ID(), Status: "error", Message: err.Error(),
+		})
+	} else {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
 	}
 }
 
@@ -116,7 +141,7 @@ func (c *Canada) fetch() error {
 		return fmt.Errorf("get %s: status %d", c.url, resp.StatusCode)
 	}
 
-	notices := parseNotices(string(body))
+	notices := parseNoticesInLocation(string(body), c.loc, c.lat, c.lon)
 	notices = resolveNoticeUpdates(notices)
 	relevant := filterActive(notices, c.province)
 	state := buildStatus(relevant, c.url)
@@ -185,7 +210,8 @@ var (
 	hiddenTSRe   = regexp.MustCompile(`<span[^>]*class="hidden"[^>]*>(\d+)</span>`)
 	anyTagRe     = regexp.MustCompile(`<[^>]+>`)
 	dateRe       = regexp.MustCompile(
-		`(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})`)
+		`(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})`)
+	timeRe = regexp.MustCompile(`(?i)\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\b`)
 )
 
 // maxNoticAge is how far back we look for notices without an explicit end date.
@@ -209,6 +235,13 @@ type halfMastNotice struct {
 }
 
 func parseNotices(html string) []halfMastNotice {
+	return parseNoticesInLocation(html, time.UTC, 0, 0)
+}
+
+func parseNoticesInLocation(html string, loc *time.Location, lat, lon float64) []halfMastNotice {
+	if loc == nil {
+		loc = time.UTC
+	}
 	// Restrict parsing to the table body so we don't pick up nav/footer links.
 	tbody := tableBodyRe.FindString(html)
 	if tbody == "" {
@@ -226,11 +259,6 @@ func parseNotices(html string) []halfMastNotice {
 		periodRaw := cellText(cells[1][1])
 		locationRaw := cellText(cells[2][1])
 
-		updated := strings.HasPrefix(reasonRaw, "Updated ")
-		reason := extractNoticeReason(reasonRaw)
-		since, until := parsePeriod(periodRaw)
-		province := detectProvince(locationRaw)
-
 		// Extract the publication timestamp from the hidden span so we can
 		// reject old open-ended notices (the table is a full historical archive).
 		var createdAt time.Time
@@ -239,6 +267,11 @@ func parseNotices(html string) []halfMastNotice {
 				createdAt = time.Unix(ms/1000, 0)
 			}
 		}
+
+		updated := strings.HasPrefix(reasonRaw, "Updated ")
+		reason := extractNoticeReason(reasonRaw)
+		since, until := parsePeriodAtLocationWithPublished(periodRaw, loc, lat, lon, createdAt)
+		province := detectProvince(locationRaw)
 
 		notices = append(notices, halfMastNotice{
 			province:  province,
@@ -277,46 +310,146 @@ func extractNoticeReason(text string) string {
 	return text
 }
 
-// parsePeriod extracts since and until from a "Masting period: From … to …" string.
-// until is set to 23:59:59 UTC of the last date found so a notice stays active
-// through its final day.  Returns (nil,nil) if no dates are parseable.
-func parsePeriod(text string) (since, until *time.Time) {
+func parsePeriodAtLocation(text string, loc *time.Location, lat, lon float64) (since, until *time.Time) {
+	return parsePeriodAtLocationWithPublished(text, loc, lat, lon, time.Time{})
+}
+
+func parsePeriodAtLocationWithPublished(text string, loc *time.Location, lat, lon float64, published time.Time) (since, until *time.Time) {
+	if loc == nil {
+		loc = time.UTC
+	}
+	lower := strings.ToLower(text)
 	// "date to be determined" → until remains nil (indefinitely active)
-	tbd := strings.Contains(strings.ToLower(text), "date to be determined") ||
-		strings.Contains(strings.ToLower(text), "to be determined")
+	tbd := strings.Contains(lower, "date to be determined") ||
+		strings.Contains(lower, "to be determined")
 
 	matches := dateRe.FindAllStringSubmatch(text, -1)
 	if len(matches) == 0 {
 		return nil, nil
 	}
 
-	parseDate := func(m []string, endOfDay bool) *time.Time {
+	parseDate := func(m []string, h, min, sec int) *time.Time {
 		month, ok := monthNums[m[1]]
 		if !ok {
 			return nil
 		}
 		day, _ := strconv.Atoi(m[2])
 		year, _ := strconv.Atoi(m[3])
-		h, min, sec := 0, 0, 0
-		if endOfDay {
-			h, min, sec = 23, 59, 59
-		}
-		t := time.Date(year, month, day, h, min, sec, 0, time.UTC)
+		t := time.Date(year, month, day, h, min, sec, 0, loc)
 		return &t
 	}
 
-	s := parseDate(matches[0], false) // start of since date
-	if tbd || len(matches) == 1 {
-		// Single date → "sunrise to sunset on DATE"; until = end of that day
-		u := parseDate(matches[0], true)
-		if tbd {
-			u = nil
-		}
-		return s, u
+	startDate := parseDate(matches[0], 0, 1, 0)
+	endDate := parseDate(matches[len(matches)-1], 23, 59, 59)
+	if startDate == nil || endDate == nil {
+		return nil, nil
 	}
-	// Range → since = first date, until = end of last date
-	u := parseDate(matches[len(matches)-1], true)
-	return s, u
+
+	s := *startDate
+	u := *endDate
+	if strings.Contains(lower, "from now") && !published.IsZero() {
+		s = published.In(loc)
+	}
+
+	if startClock, endClock, ok := explicitTimeWindow(text); ok {
+		s = withClock(s, startClock, loc)
+		u = withClock(u, endClock, loc)
+	} else {
+		if strings.Contains(lower, "sunrise") {
+			if rise, ok := astro.Sunrise(s, lat, lon); ok {
+				s = rise.In(loc)
+			}
+		}
+		if strings.Contains(lower, "sunset") {
+			if set, ok := astro.Sunset(u, lat, lon); ok {
+				u = set.In(loc)
+			}
+		}
+	}
+
+	if !u.After(s) {
+		u = u.Add(24 * time.Hour)
+	}
+	if tbd {
+		return &s, nil
+	}
+	return &s, &u
+}
+
+type clockTime struct {
+	hour   int
+	minute int
+}
+
+func explicitTimeWindow(text string) (clockTime, clockTime, bool) {
+	matches := timeRe.FindAllStringSubmatch(text, -1)
+	raw := make([]struct {
+		hour     int
+		minute   int
+		meridiem string
+	}, 0, 2)
+	for _, m := range matches {
+		if len(m) < 4 || (m[2] == "" && m[3] == "") {
+			continue
+		}
+		hour, err := strconv.Atoi(m[1])
+		if err != nil || hour < 0 || hour > 23 {
+			continue
+		}
+		if m[3] != "" && (hour < 1 || hour > 12) {
+			continue
+		}
+		minute := 0
+		if m[2] != "" {
+			minute, err = strconv.Atoi(m[2])
+			if err != nil || minute < 0 || minute > 59 {
+				continue
+			}
+		}
+		raw = append(raw, struct {
+			hour     int
+			minute   int
+			meridiem string
+		}{hour: hour, minute: minute, meridiem: m[3]})
+	}
+	if len(raw) < 2 {
+		return clockTime{}, clockTime{}, false
+	}
+	startMeridiem := raw[0].meridiem
+	endMeridiem := raw[1].meridiem
+	if startMeridiem == "" {
+		startMeridiem = endMeridiem
+	}
+	if endMeridiem == "" {
+		endMeridiem = startMeridiem
+	}
+	if startMeridiem == "" && endMeridiem == "" {
+		return clockTime{hour: raw[0].hour, minute: raw[0].minute}, clockTime{hour: raw[1].hour, minute: raw[1].minute}, true
+	}
+	if startMeridiem == "" || endMeridiem == "" || raw[0].hour == 0 || raw[1].hour == 0 {
+		return clockTime{}, clockTime{}, false
+	}
+	start := normalizeClock(raw[0].hour, raw[0].minute, startMeridiem)
+	end := normalizeClock(raw[1].hour, raw[1].minute, endMeridiem)
+	return start, end, true
+}
+
+func normalizeClock(hour, minute int, meridiem string) clockTime {
+	if isPM(meridiem) && hour != 12 {
+		hour += 12
+	}
+	if !isPM(meridiem) && hour == 12 {
+		hour = 0
+	}
+	return clockTime{hour: hour, minute: minute}
+}
+
+func withClock(date time.Time, clock clockTime, loc *time.Location) time.Time {
+	return time.Date(date.Year(), date.Month(), date.Day(), clock.hour, clock.minute, 0, 0, loc)
+}
+
+func isPM(s string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.ReplaceAll(s, ".", "")), "p")
 }
 
 // ── Province detection ────────────────────────────────────────────────────────
@@ -439,6 +572,12 @@ func filterActive(notices []halfMastNotice, province string) []halfMastNotice {
 func filterActiveAt(notices []halfMastNotice, province string, now time.Time) []halfMastNotice {
 	var out []halfMastNotice
 	for _, n := range notices {
+		// If the period could not be parsed at all, do not treat a recent row
+		// as open-ended. The Canada page includes future notices with ordinals
+		// and historical "see rules" rows; unknown periods are safer hidden.
+		if n.since == nil && n.until == nil {
+			continue
+		}
 		// Drop expired notices
 		if n.until != nil && !n.until.After(now) {
 			continue

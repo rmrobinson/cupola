@@ -103,7 +103,7 @@ func main() {
 		if interval == 0 {
 			interval = 4 * time.Hour
 		}
-		registry.Register(flagcollector.NewCanadaWithURL(c.URL, cfg.Location.Lat, cfg.Location.Lon, interval, stateStore))
+		registry.Register(flagcollector.NewCanadaWithURLInLocation(c.URL, cfg.Location.Lat, cfg.Location.Lon, interval, stateStore, loc))
 	}
 
 	// Ecowitt GW2000 local weather station.

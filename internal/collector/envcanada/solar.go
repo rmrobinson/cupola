@@ -90,6 +90,7 @@ type SolarCurrentCollector struct {
 	interval   time.Duration
 	stateStore *store.StateStore
 	netCheck   func() bool
+	wake       chan struct{}
 }
 
 func (c *SolarCurrentCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
@@ -99,6 +100,7 @@ func (c *SolarCurrentCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 type SolarForecastCollector struct {
 	shared     *sharedSolar
 	stateStore *store.StateStore
+	wake       func()
 }
 
 // NewSolarCollectors creates a pair of collectors that share one NOAA SWPC fetch per cycle.
@@ -114,8 +116,9 @@ func NewSolarCollectors(lat, lon float64, interval time.Duration, stateStore *st
 		lat:        lat,
 		interval:   interval,
 		stateStore: stateStore,
+		wake:       make(chan struct{}, 1),
 	}
-	fc := &SolarForecastCollector{shared: shared, stateStore: stateStore}
+	fc := &SolarForecastCollector{shared: shared, stateStore: stateStore, wake: cur.OnSubscription}
 	return cur, fc
 }
 
@@ -123,6 +126,13 @@ func NewSolarCollectors(lat, lon float64, interval time.Duration, stateStore *st
 
 func (c *SolarCurrentCollector) ID() string                { return "envcanada.solar" }
 func (c *SolarCurrentCollector) Domain() domain.DomainType { return domain.DomainSolarWeatherCurrent }
+
+func (c *SolarCurrentCollector) OnSubscription() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+}
 
 func (c *SolarCurrentCollector) Start(ctx context.Context) error {
 	go func() {
@@ -150,18 +160,24 @@ func (c *SolarCurrentCollector) loop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if c.netCheck != nil && !c.netCheck() {
-				continue
-			}
-			if err := c.fetch(); err != nil {
-				log.Printf("[envcanada.solar] fetch: %v", err)
-				c.stateStore.PublishSystem(store.SystemEvent{
-					CollectorID: c.ID(), Status: "error", Message: err.Error(),
-				})
-			} else {
-				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
-			}
+			c.fetchIfReady()
+		case <-c.wake:
+			c.fetchIfReady()
 		}
+	}
+}
+
+func (c *SolarCurrentCollector) fetchIfReady() {
+	if c.netCheck != nil && !c.netCheck() {
+		return
+	}
+	if err := c.fetch(); err != nil {
+		log.Printf("[envcanada.solar] fetch: %v", err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.ID(), Status: "error", Message: err.Error(),
+		})
+	} else {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
 	}
 }
 
@@ -170,6 +186,12 @@ func (c *SolarCurrentCollector) loop(ctx context.Context) {
 func (c *SolarForecastCollector) ID() string                    { return "envcanada.solar.forecast" }
 func (c *SolarForecastCollector) Domain() domain.DomainType     { return domain.DomainSolarWeatherForecast }
 func (c *SolarForecastCollector) Start(_ context.Context) error { return nil }
+
+func (c *SolarForecastCollector) OnSubscription() {
+	if c.wake != nil {
+		c.wake()
+	}
+}
 
 func (c *SolarForecastCollector) State() domain.DomainState {
 	c.shared.mu.RLock()

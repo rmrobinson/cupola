@@ -39,8 +39,8 @@ func NewCollectors(incidentInterval, cameraInterval time.Duration, stateStore *s
 		cameraInterval = defaultCameraInterval
 	}
 	return NewIncidentsCollector(incidentInterval, stateStore, NewON511IncidentsSource(), NewKitchenerRoadClosuresSource()),
-		&CamerasCollector{interval: cameraInterval, stateStore: stateStore},
-		&RoadConditionsCollector{interval: incidentInterval, stateStore: stateStore}
+		&CamerasCollector{interval: cameraInterval, stateStore: stateStore, wake: make(chan struct{}, 1)},
+		&RoadConditionsCollector{interval: incidentInterval, stateStore: stateStore, wake: make(chan struct{}, 1)}
 }
 
 // ── Incidents ─────────────────────────────────────────────────────────────────
@@ -57,16 +57,24 @@ type IncidentsCollector struct {
 	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.TrafficIncidents
+	wake       chan struct{}
 }
 
 func NewIncidentsCollector(interval time.Duration, stateStore *store.StateStore, sources ...IncidentSource) *IncidentsCollector {
 	if interval == 0 {
 		interval = defaultIncidentInterval
 	}
-	return &IncidentsCollector{interval: interval, stateStore: stateStore, sources: sources}
+	return &IncidentsCollector{interval: interval, stateStore: stateStore, sources: sources, wake: make(chan struct{}, 1)}
 }
 
 func (c *IncidentsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
+
+func (c *IncidentsCollector) OnSubscription() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+}
 
 func (c *IncidentsCollector) ID() string                { return "traffic.incidents" }
 func (c *IncidentsCollector) Domain() domain.DomainType { return domain.DomainTrafficIncidents }
@@ -90,21 +98,27 @@ func (c *IncidentsCollector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				if c.netCheck != nil && !c.netCheck() {
-					continue
-				}
-				if err := c.fetch(ctx); err != nil {
-					log.Printf("[traffic.incidents] fetch: %v", err)
-					c.stateStore.PublishSystem(store.SystemEvent{
-						CollectorID: c.ID(), Status: "error", Message: err.Error(),
-					})
-				} else {
-					c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
-				}
+				c.fetchIfReady(ctx)
+			case <-c.wake:
+				c.fetchIfReady(ctx)
 			}
 		}
 	}()
 	return nil
+}
+
+func (c *IncidentsCollector) fetchIfReady(ctx context.Context) {
+	if c.netCheck != nil && !c.netCheck() {
+		return
+	}
+	if err := c.fetch(ctx); err != nil {
+		log.Printf("[traffic.incidents] fetch: %v", err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.ID(), Status: "error", Message: err.Error(),
+		})
+	} else {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
+	}
 }
 
 func (c *IncidentsCollector) State() domain.DomainState {
@@ -234,9 +248,17 @@ type CamerasCollector struct {
 	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.TrafficCameras
+	wake       chan struct{}
 }
 
 func (c *CamerasCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
+
+func (c *CamerasCollector) OnSubscription() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+}
 
 func (c *CamerasCollector) ID() string                { return "511on.cameras" }
 func (c *CamerasCollector) Domain() domain.DomainType { return domain.DomainTrafficCameras }
@@ -260,21 +282,27 @@ func (c *CamerasCollector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				if c.netCheck != nil && !c.netCheck() {
-					continue
-				}
-				if err := c.fetch(ctx); err != nil {
-					log.Printf("[511on.cameras] fetch: %v", err)
-					c.stateStore.PublishSystem(store.SystemEvent{
-						CollectorID: c.ID(), Status: "error", Message: err.Error(),
-					})
-				} else {
-					c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
-				}
+				c.fetchIfReady(ctx)
+			case <-c.wake:
+				c.fetchIfReady(ctx)
 			}
 		}
 	}()
 	return nil
+}
+
+func (c *CamerasCollector) fetchIfReady(ctx context.Context) {
+	if c.netCheck != nil && !c.netCheck() {
+		return
+	}
+	if err := c.fetch(ctx); err != nil {
+		log.Printf("[511on.cameras] fetch: %v", err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.ID(), Status: "error", Message: err.Error(),
+		})
+	} else {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
+	}
 }
 
 func (c *CamerasCollector) State() domain.DomainState {
@@ -354,9 +382,17 @@ type RoadConditionsCollector struct {
 	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.TrafficRoadConditions
+	wake       chan struct{}
 }
 
 func (c *RoadConditionsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
+
+func (c *RoadConditionsCollector) OnSubscription() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+}
 
 func (c *RoadConditionsCollector) ID() string { return "511on.road_conditions" }
 func (c *RoadConditionsCollector) Domain() domain.DomainType {
@@ -382,21 +418,27 @@ func (c *RoadConditionsCollector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				if c.netCheck != nil && !c.netCheck() {
-					continue
-				}
-				if err := c.fetch(ctx); err != nil {
-					log.Printf("[511on.road_conditions] fetch: %v", err)
-					c.stateStore.PublishSystem(store.SystemEvent{
-						CollectorID: c.ID(), Status: "error", Message: err.Error(),
-					})
-				} else {
-					c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
-				}
+				c.fetchIfReady(ctx)
+			case <-c.wake:
+				c.fetchIfReady(ctx)
 			}
 		}
 	}()
 	return nil
+}
+
+func (c *RoadConditionsCollector) fetchIfReady(ctx context.Context) {
+	if c.netCheck != nil && !c.netCheck() {
+		return
+	}
+	if err := c.fetch(ctx); err != nil {
+		log.Printf("[511on.road_conditions] fetch: %v", err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.ID(), Status: "error", Message: err.Error(),
+		})
+	} else {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
+	}
 }
 
 func (c *RoadConditionsCollector) State() domain.DomainState {

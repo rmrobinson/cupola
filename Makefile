@@ -7,7 +7,7 @@ SCREENSHOT_DIR := docs/screenshots
 .PHONY: build test lint clean vendor-frontend screenshots
 
 build: $(FRONTEND_VENDOR)/.stamp
-	go build ./cmd/cupola
+	go build -o cupolad ./cmd/cupola
 
 # vendor-frontend: always re-downloads; build uses stamp so it's skipped when up to date
 vendor-frontend:

@@ -28,6 +28,7 @@ type HourlyForecastCollector struct {
 	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.WeatherHourlyForecast
+	wake       chan struct{}
 }
 
 func NewHourlyForecastCollector(lat, lon float64, interval time.Duration, stateStore *store.StateStore, station StationOverride) *HourlyForecastCollector {
@@ -37,10 +38,18 @@ func NewHourlyForecastCollector(lat, lon float64, interval time.Duration, stateS
 		station:    station,
 		interval:   interval,
 		stateStore: stateStore,
+		wake:       make(chan struct{}, 1),
 	}
 }
 
 func (c *HourlyForecastCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
+
+func (c *HourlyForecastCollector) OnSubscription() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+}
 
 func (c *HourlyForecastCollector) ID() string { return "envcanada.hourly_forecast" }
 func (c *HourlyForecastCollector) Domain() domain.DomainType {
@@ -85,30 +94,37 @@ func (c *HourlyForecastCollector) loop(ctx context.Context, url string) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if c.netCheck != nil && !c.netCheck() {
-				continue
-			}
-			if url == "" {
-				resolved, err := c.resolveURL()
-				if err != nil {
-					log.Printf("[envcanada.hourly_forecast] station discovery: %v", err)
-					c.stateStore.PublishSystem(store.SystemEvent{
-						CollectorID: c.ID(), Status: "error", Message: err.Error(),
-					})
-					continue
-				}
-				url = resolved
-			}
-			if err := c.fetch(url); err != nil {
-				log.Printf("[envcanada.hourly_forecast] fetch: %v", err)
-				c.stateStore.PublishSystem(store.SystemEvent{
-					CollectorID: c.ID(), Status: "error", Message: err.Error(),
-				})
-			} else {
-				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
-			}
+			url = c.fetchIfReady(url)
+		case <-c.wake:
+			url = c.fetchIfReady(url)
 		}
 	}
+}
+
+func (c *HourlyForecastCollector) fetchIfReady(url string) string {
+	if c.netCheck != nil && !c.netCheck() {
+		return url
+	}
+	if url == "" {
+		resolved, err := c.resolveURL()
+		if err != nil {
+			log.Printf("[envcanada.hourly_forecast] station discovery: %v", err)
+			c.stateStore.PublishSystem(store.SystemEvent{
+				CollectorID: c.ID(), Status: "error", Message: err.Error(),
+			})
+			return url
+		}
+		url = resolved
+	}
+	if err := c.fetch(url); err != nil {
+		log.Printf("[envcanada.hourly_forecast] fetch: %v", err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.ID(), Status: "error", Message: err.Error(),
+		})
+	} else {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
+	}
+	return url
 }
 
 func (c *HourlyForecastCollector) resolveURL() (string, error) {

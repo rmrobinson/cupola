@@ -107,6 +107,18 @@ func sunTime(date time.Time, lat, lon, elevation float64, rise bool) (time.Time,
 	return minutesUTC(y, m, d, offsetMin), true
 }
 
+// Sunrise returns the UTC sunrise time for the local calendar date carried by date.
+func Sunrise(date time.Time, lat, lon float64) (time.Time, bool) {
+	y, m, d := date.Date()
+	return sunTime(time.Date(y, m, d, 12, 0, 0, 0, time.UTC), lat, lon, -0.833, true)
+}
+
+// Sunset returns the UTC sunset time for the local calendar date carried by date.
+func Sunset(date time.Time, lat, lon float64) (time.Time, bool) {
+	y, m, d := date.Date()
+	return sunTime(time.Date(y, m, d, 12, 0, 0, 0, time.UTC), lat, lon, -0.833, false)
+}
+
 // minutesUTC converts a minute offset from midnight UTC into a time.Time.
 // Offsets outside [0, 1440) roll over to adjacent days correctly.
 func minutesUTC(y int, m time.Month, d int, mins float64) time.Time {

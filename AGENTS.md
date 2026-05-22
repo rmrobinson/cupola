@@ -26,6 +26,8 @@ The frontend has no bundler or build step. Vendor libraries in `cmd/cupola/front
 - Widgets register into `window.CupolaWidgets`; modules are plain browser JS globals.
 - Widget flow: initial state snapshot, subscription registration, SSE updates, cleanup on removal.
 - Escape user/source text before interpolating HTML; many widgets use a local `esc()` helper.
+- Frontend refactors and updates must consider both desktop and mobile layouts. Verify grid/widget sizing, overflow, and interaction ergonomics at phone, tablet, and desktop widths.
+- Mouse and touch inputs are both first-class. Drag, resize, scrolling, buttons, menus, and config controls should work with pointer/mouse and coarse touch input without hidden or desktop-only affordances.
 
 ## Current Status
 
