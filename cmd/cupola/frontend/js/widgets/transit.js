@@ -127,7 +127,7 @@
 
   function render(container, state, config) {
     const key  = stopKey(config);
-    const maxN = config?.max_trips > 0 ? Number(config.max_trips) : 4;
+    const maxN = maxTrips(config);
 
     if (!key) {
       container.innerHTML = `
@@ -199,6 +199,12 @@
 
   function esc(s) {
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function maxTrips(config) {
+    const n = Number(config?.max_trips);
+    if (!Number.isFinite(n) || n <= 0) return 4;
+    return Math.min(20, Math.floor(n));
   }
 
   // ── Custom config panel ───────────────────────────────────────────────────
@@ -368,7 +374,7 @@
       const route   = (config?.route   || '').trim();
       const stop_id = (config?.stop_id || '').trim();
       if (!agency || !route || !stop_id) return null;
-      return { agency, route, stop_id };
+      return { agency, route, stop_id, max_trips: maxTrips(config) };
     },
     render(container, state, config)   { render(container, state, config); },
     onUpdate(container, data, config)  { render(container, data,  config); },

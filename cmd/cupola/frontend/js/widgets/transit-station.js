@@ -91,7 +91,12 @@
         const ak = arrivalStateKey(agency_id, rt.id, stop_id);
         container._stationSubKeys.push(sk);
         container._stationArrivalKeys.add(ak);
-        Subscriptions.create(sk, 'transit.arrivals', { agency: agency_id, route: rt.id, stop_id });
+        Subscriptions.create(sk, 'transit.arrivals', {
+          agency: agency_id,
+          route: rt.id,
+          stop_id,
+          max_trips: maxDepartures(config),
+        });
       }
     });
 
@@ -115,7 +120,7 @@
 
   function renderDepartures(container, config) {
     const stationName = config?.station_name || 'Station';
-    const maxDep = config?.max_departures > 0 ? Number(config.max_departures) : 8;
+    const maxDep = maxDepartures(config);
     const windowMin = config?.time_window_minutes >= 0 ? Number(config.time_window_minutes) : 60;
     const now = Date.now();
 
@@ -162,6 +167,12 @@
         </div>
         ${rows}
       </div>`;
+  }
+
+  function maxDepartures(config) {
+    const n = Number(config?.max_departures);
+    if (!Number.isFinite(n) || n <= 0) return 8;
+    return Math.min(20, Math.floor(n));
   }
 
   function departureRow(a) {
