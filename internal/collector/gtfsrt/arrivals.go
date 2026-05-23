@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/rmrobinson/cupola/internal/store"
 )
 
-const maxArrivalsPerStop = 8
+const maxArrivalsPerStop = 20
 
 // ArrivalsCollector polls GTFS-RT trip updates and publishes transit.arrivals.
 // Only (agency:route:stop_id) combinations that have active widget subscriptions
@@ -118,14 +119,19 @@ func (c *ArrivalsCollector) rtLoop(ctx context.Context, ready chan struct{}) {
 func (c *ArrivalsCollector) fetch() {
 	activeSubs := c.subs.ActiveParams(domain.DomainTransitArrivals)
 
-	// Build set of canonical state keys we actually need to fill.
-	wanted := make(map[string]bool, len(activeSubs))
+	// Build set of canonical state keys we actually need to fill. The value is
+	// the largest requested row count for that stop across active widgets.
+	wanted := make(map[string]int, len(activeSubs))
 	for _, p := range activeSubs {
 		agency, _ := p["agency"].(string)
 		route, _ := p["route"].(string)
 		stop, _ := p["stop_id"].(string)
 		if agency != "" && route != "" && stop != "" {
-			wanted[agency+":"+route+":"+stop] = true
+			key := agency + ":" + route + ":" + stop
+			limit := requestedArrivalLimit(p["max_trips"])
+			if limit > wanted[key] {
+				wanted[key] = limit
+			}
 		}
 	}
 
@@ -141,23 +147,28 @@ func (c *ArrivalsCollector) fetch() {
 		if c.db == nil {
 			continue
 		}
-		// For any wanted stop that RT didn't populate, fall back to the static
-		// schedule. This covers both full RT outages and cases where the RT feed
-		// returns HTTP 200 but has no trips for a specific subscribed stop.
-		missing := make(map[string]bool)
-		for k := range wanted {
+		// For any wanted stop that RT didn't fully populate, top up from the
+		// static schedule. This covers full RT outages, per-stop misses, and RT
+		// feeds that publish only the next few trips.
+		staticWanted := make(map[string]int)
+		missingCount := 0
+		for k, limit := range wanted {
 			parts := strings.SplitN(k, ":", 3)
 			if len(parts) == 3 && parts[0] == ag.ID {
-				if _, found := stops[k]; !found {
-					missing[k] = true
+				sa, found := stops[k]
+				if !found {
+					staticWanted[k] = limit
+					missingCount++
+				} else if len(sa.Arrivals) < limit {
+					staticWanted[k] = limit
 				}
 			}
 		}
-		if len(missing) > 0 {
+		if len(staticWanted) > 0 {
 			// Only log the fallback transition when RT was configured but failed
 			// HTTP-level; per-stop misses on a live feed are silent.
-			logTransition := !rtOK && len(ag.TripUpdatesURLs) > 0
-			c.fetchStaticForAgency(ag, missing, stops, now, logTransition)
+			logTransition := !rtOK && len(ag.TripUpdatesURLs) > 0 && missingCount > 0
+			c.fetchStaticForAgency(ag, staticWanted, stops, now, logTransition)
 		}
 	}
 
@@ -165,8 +176,12 @@ func (c *ArrivalsCollector) fetch() {
 		sort.Slice(sa.Arrivals, func(i, j int) bool {
 			return sa.Arrivals[i].Scheduled.Before(sa.Arrivals[j].Scheduled)
 		})
-		if len(sa.Arrivals) > maxArrivalsPerStop {
-			sa.Arrivals = sa.Arrivals[:maxArrivalsPerStop]
+		limit := wanted[key]
+		if limit <= 0 {
+			limit = maxArrivalsPerStop
+		}
+		if len(sa.Arrivals) > limit {
+			sa.Arrivals = sa.Arrivals[:limit]
 		}
 		stops[key] = sa
 	}
@@ -180,7 +195,7 @@ func (c *ArrivalsCollector) fetch() {
 // fetchRTForAgency tries each trip-updates URL for ag. Returns true if at least
 // one URL succeeded and contributed data. Also clears the per-agency fallback
 // flag and logs a recovery message the first time RT is restored after an outage.
-func (c *ArrivalsCollector) fetchRTForAgency(ag *Agency, wanted map[string]bool, stops map[string]domain.StopArrivals, now time.Time) bool {
+func (c *ArrivalsCollector) fetchRTForAgency(ag *Agency, wanted map[string]int, stops map[string]domain.StopArrivals, now time.Time) bool {
 	if len(ag.TripUpdatesURLs) == 0 {
 		return false
 	}
@@ -208,7 +223,7 @@ func (c *ArrivalsCollector) fetchRTForAgency(ag *Agency, wanted map[string]bool,
 // fetchStaticForAgency populates stops with schedule-based arrivals from SQLite
 // for every key in wanted that belongs to ag. logTransition controls whether a
 // one-time "switching to static fallback" message is emitted when inFallback transitions.
-func (c *ArrivalsCollector) fetchStaticForAgency(ag *Agency, wanted map[string]bool, stops map[string]domain.StopArrivals, now time.Time, logTransition bool) {
+func (c *ArrivalsCollector) fetchStaticForAgency(ag *Agency, wanted map[string]int, stops map[string]domain.StopArrivals, now time.Time, logTransition bool) {
 	if !ag.Schedule.HasRoutes() {
 		return
 	}
@@ -216,14 +231,14 @@ func (c *ArrivalsCollector) fetchStaticForAgency(ag *Agency, wanted map[string]b
 		log.Printf("[gtfsrt] %s: RT unavailable, switching to static schedule fallback", ag.ID)
 		c.inFallback[ag.ID] = true
 	}
-	for key := range wanted {
+	for key, limit := range wanted {
 		parts := strings.SplitN(key, ":", 3)
 		if len(parts) != 3 || parts[0] != ag.ID {
 			continue
 		}
 		routeID, stopID := parts[1], parts[2]
 
-		deps, err := c.db.QueryUpcomingDepartures(ag.ID, routeID, stopID, now, maxArrivalsPerStop)
+		deps, err := c.db.QueryUpcomingDepartures(ag.ID, routeID, stopID, now, limit)
 		if err != nil {
 			log.Printf("[gtfsrt] %s: static query %s: %v", ag.ID, key, err)
 			continue
@@ -234,17 +249,32 @@ func (c *ArrivalsCollector) fetchStaticForAgency(ag *Agency, wanted map[string]b
 			sa = newStopArrivals(ag, routeID, stopID)
 		}
 		for _, dep := range deps {
-			sa.Arrivals = append(sa.Arrivals, domain.Arrival{
+			arr := domain.Arrival{
 				TripID:    dep.TripID,
 				Headsign:  dep.Headsign,
 				Scheduled: dep.DepartureTime,
-			})
+			}
+			if !hasArrival(sa.Arrivals, arr) {
+				sa.Arrivals = append(sa.Arrivals, arr)
+			}
 		}
 		stops[key] = sa
 	}
 }
 
-func collectArrivals(feed *pb.FeedMessage, ag *Agency, wanted map[string]bool, stops map[string]domain.StopArrivals, now time.Time) {
+func hasArrival(arrivals []domain.Arrival, candidate domain.Arrival) bool {
+	for _, existing := range arrivals {
+		if candidate.TripID != "" && existing.TripID == candidate.TripID {
+			return true
+		}
+		if existing.Scheduled.Equal(candidate.Scheduled) && existing.Headsign == candidate.Headsign {
+			return true
+		}
+	}
+	return false
+}
+
+func collectArrivals(feed *pb.FeedMessage, ag *Agency, wanted map[string]int, stops map[string]domain.StopArrivals, now time.Time) {
 	for _, entity := range feed.GetEntity() {
 		tu := entity.GetTripUpdate()
 		if tu == nil {
@@ -259,7 +289,7 @@ func collectArrivals(feed *pb.FeedMessage, ag *Agency, wanted map[string]bool, s
 			}
 			stopID := stu.GetStopId()
 			stateKey := ag.ID + ":" + routeID + ":" + stopID
-			if !wanted[stateKey] {
+			if _, ok := wanted[stateKey]; !ok {
 				continue
 			}
 
@@ -313,6 +343,29 @@ func collectArrivals(feed *pb.FeedMessage, ag *Agency, wanted map[string]bool, s
 			stops[stateKey] = sa
 		}
 	}
+}
+
+func requestedArrivalLimit(raw any) int {
+	var n int
+	switch v := raw.(type) {
+	case int:
+		n = v
+	case int64:
+		n = int(v)
+	case float64:
+		n = int(v)
+	case string:
+		if parsed, err := strconv.Atoi(v); err == nil {
+			n = parsed
+		}
+	}
+	if n <= 0 {
+		return 4
+	}
+	if n > maxArrivalsPerStop {
+		return maxArrivalsPerStop
+	}
+	return n
 }
 
 func newStopArrivals(ag *Agency, routeID, stopID string) domain.StopArrivals {
