@@ -26,6 +26,7 @@ type Collector struct {
 	siteLat    float64
 	siteLon    float64
 	stateStore *store.StateStore
+	wake       chan struct{}
 }
 
 // New creates a Collector. baseURL is the root of the dump1090/readsb HTTP server
@@ -39,12 +40,20 @@ func New(baseURL string, interval time.Duration, siteLat, siteLon, radiusKM floa
 		siteLat:    siteLat,
 		siteLon:    siteLon,
 		stateStore: stateStore,
+		wake:       make(chan struct{}, 1),
 	}
 }
 
 func (c *Collector) ID() string                { return "dump1090" }
 func (c *Collector) Domain() domain.DomainType { return domain.DomainAircraft }
 func (c *Collector) State() domain.DomainState { return c.stateStore.Get(c.Domain()) }
+
+func (c *Collector) OnSubscription() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+}
 
 func (c *Collector) Start(ctx context.Context) error {
 	go func() {
@@ -56,6 +65,8 @@ func (c *Collector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
+				c.fetch()
+			case <-c.wake:
 				c.fetch()
 			}
 		}

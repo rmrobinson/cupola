@@ -116,7 +116,8 @@ const Grid = (() => {
     inner.appendChild(resizeHandle);
     cell.appendChild(inner);
 
-    initResize(inner, cell, wc);
+    initResize(inner, cell, wc, { hitTest: true });
+    initResize(resizeHandle, cell, wc);
 
     chrome.addEventListener('pointerdown', e => {
       if (e.target.closest('button,input,select,textarea,a')) return;
@@ -409,9 +410,9 @@ const Grid = (() => {
 
   // ── Resize ────────────────────────────────────────────────────────────
 
-  function initResize(hitTarget, cell, wc) {
+  function initResize(hitTarget, cell, wc, opts = {}) {
     hitTarget.addEventListener('pointerdown', e => {
-      if (!isResizeHit(e, hitTarget)) return;
+      if (opts.hitTest && !isResizeHit(e, hitTarget)) return;
       e.preventDefault();
       e.stopPropagation();
       hitTarget.setPointerCapture(e.pointerId);

@@ -40,6 +40,7 @@ type Collector struct {
 	mu       sync.RWMutex
 	schedule []scheduleEntry
 	state    domain.WasteCollection
+	wake     chan struct{}
 }
 
 func New(dataPath string, weekStart time.Weekday, stateStore *store.StateStore) *Collector {
@@ -47,11 +48,19 @@ func New(dataPath string, weekStart time.Weekday, stateStore *store.StateStore) 
 		dataPath:   dataPath,
 		weekStart:  weekStart,
 		stateStore: stateStore,
+		wake:       make(chan struct{}, 1),
 	}
 }
 
 func (c *Collector) ID() string                { return "waste.collection" }
 func (c *Collector) Domain() domain.DomainType { return domain.DomainWasteCollection }
+
+func (c *Collector) OnSubscription() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
+}
 
 func (c *Collector) Start(ctx context.Context) error {
 	if err := c.load(); err != nil {
@@ -67,6 +76,8 @@ func (c *Collector) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
+				c.publish()
+			case <-c.wake:
 				c.publish()
 			}
 		}

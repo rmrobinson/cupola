@@ -50,6 +50,7 @@ func RegisterAlertsParser(name string, factory func() AlertsParser) {
 type eventsSource struct {
 	cfg    config.MunicipalConfig
 	parser EventsParser
+	wake   chan struct{}
 }
 
 // EventsCollector polls one or more HTTP sources and aggregates their output
@@ -64,6 +65,15 @@ type EventsCollector struct {
 
 func (c *EventsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
+func (c *EventsCollector) OnSubscription() {
+	for _, s := range c.sources {
+		select {
+		case s.wake <- struct{}{}:
+		default:
+		}
+	}
+}
+
 func NewEventsCollector(cfgs []config.MunicipalConfig, stateStore *store.StateStore) *EventsCollector {
 	c := &EventsCollector{
 		stateStore: stateStore,
@@ -77,7 +87,7 @@ func NewEventsCollector(cfgs []config.MunicipalConfig, stateStore *store.StateSt
 			log.Printf("[municipal.events] unknown parser %q for source %s — skipping", cfg.Parser, cfg.ID)
 			continue
 		}
-		c.sources = append(c.sources, eventsSource{cfg: cfg, parser: factory()})
+		c.sources = append(c.sources, eventsSource{cfg: cfg, parser: factory(), wake: make(chan struct{}, 1)})
 	}
 	return c
 }
@@ -118,18 +128,24 @@ func (c *EventsCollector) runSource(ctx context.Context, s eventsSource) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if c.netCheck != nil && !c.netCheck() {
-				continue
-			}
-			if err := c.fetchSource(s); err != nil {
-				log.Printf("[municipal.events] %s fetch: %v", s.cfg.ID, err)
-				c.stateStore.PublishSystem(store.SystemEvent{
-					CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
-				})
-			} else {
-				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.sourceID(s.cfg.ID), Status: "ok"})
-			}
+			c.fetchSourceIfReady(s)
+		case <-s.wake:
+			c.fetchSourceIfReady(s)
 		}
+	}
+}
+
+func (c *EventsCollector) fetchSourceIfReady(s eventsSource) {
+	if c.netCheck != nil && !c.netCheck() {
+		return
+	}
+	if err := c.fetchSource(s); err != nil {
+		log.Printf("[municipal.events] %s fetch: %v", s.cfg.ID, err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
+		})
+	} else {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.sourceID(s.cfg.ID), Status: "ok"})
 	}
 }
 
@@ -175,6 +191,7 @@ func (c *EventsCollector) buildState() domain.MunicipalEvents {
 type alertsSource struct {
 	cfg    config.MunicipalConfig
 	parser AlertsParser
+	wake   chan struct{}
 }
 
 // AlertsCollector polls one or more HTTP sources and aggregates their output
@@ -189,6 +206,15 @@ type AlertsCollector struct {
 
 func (c *AlertsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 
+func (c *AlertsCollector) OnSubscription() {
+	for _, s := range c.sources {
+		select {
+		case s.wake <- struct{}{}:
+		default:
+		}
+	}
+}
+
 func NewAlertsCollector(cfgs []config.MunicipalConfig, stateStore *store.StateStore) *AlertsCollector {
 	c := &AlertsCollector{
 		stateStore: stateStore,
@@ -202,7 +228,7 @@ func NewAlertsCollector(cfgs []config.MunicipalConfig, stateStore *store.StateSt
 			log.Printf("[municipal.alerts] unknown parser %q for source %s — skipping", cfg.Parser, cfg.ID)
 			continue
 		}
-		c.sources = append(c.sources, alertsSource{cfg: cfg, parser: factory()})
+		c.sources = append(c.sources, alertsSource{cfg: cfg, parser: factory(), wake: make(chan struct{}, 1)})
 	}
 	return c
 }
@@ -243,18 +269,24 @@ func (c *AlertsCollector) runSource(ctx context.Context, s alertsSource) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if c.netCheck != nil && !c.netCheck() {
-				continue
-			}
-			if err := c.fetchSource(s); err != nil {
-				log.Printf("[municipal.alerts] %s fetch: %v", s.cfg.ID, err)
-				c.stateStore.PublishSystem(store.SystemEvent{
-					CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
-				})
-			} else {
-				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.sourceID(s.cfg.ID), Status: "ok"})
-			}
+			c.fetchSourceIfReady(s)
+		case <-s.wake:
+			c.fetchSourceIfReady(s)
 		}
+	}
+}
+
+func (c *AlertsCollector) fetchSourceIfReady(s alertsSource) {
+	if c.netCheck != nil && !c.netCheck() {
+		return
+	}
+	if err := c.fetchSource(s); err != nil {
+		log.Printf("[municipal.alerts] %s fetch: %v", s.cfg.ID, err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
+		})
+	} else {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.sourceID(s.cfg.ID), Status: "ok"})
 	}
 }
 

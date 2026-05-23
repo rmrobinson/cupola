@@ -730,7 +730,8 @@ button {
   width: 16px;
   height: 16px;
   cursor: se-resize;
-  pointer-events: none;
+  pointer-events: auto;
+  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -752,8 +753,15 @@ button {
 }
 
 @media (hover: none), (pointer: coarse) {
+  .widget-resize-handle {
+    width: 44px;
+    height: 44px;
+    bottom: 0;
+    right: 0;
+  }
+
   .widget-resize-handle::after {
-    opacity: 0;
+    opacity: 0.32;
   }
 
   .widget-resizing .widget-resize-handle::after {
@@ -1561,6 +1569,19 @@ button {
   height: 100%;
   border-radius: 3px;
   transition: width 0.5s, background 0.5s;
+}
+
+@media (max-width: 479px) {
+  .wc-temp,
+  .wc-condition,
+  .wc-uv {
+    flex-shrink: 0;
+  }
+
+  .wc-details {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
 }
 
 /* ── Weather forecast widget ───────────────────────────────────────────── */

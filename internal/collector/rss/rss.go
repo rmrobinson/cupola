@@ -19,22 +19,40 @@ import (
 // Collector polls one or more RSS/Atom feeds and aggregates their items into
 // the domain.Feeds state, newest items first.
 type Collector struct {
-	feeds      []config.RSSFeedConfig
+	feeds      []feedSource
 	stateStore *store.StateStore
 	netCheck   func() bool
 	mu         sync.RWMutex
 	items      map[string][]domain.FeedItem // feedID → items
 }
 
+type feedSource struct {
+	cfg  config.RSSFeedConfig
+	wake chan struct{}
+}
+
 func New(feeds []config.RSSFeedConfig, stateStore *store.StateStore) *Collector {
+	sources := make([]feedSource, 0, len(feeds))
+	for _, f := range feeds {
+		sources = append(sources, feedSource{cfg: f, wake: make(chan struct{}, 1)})
+	}
 	return &Collector{
-		feeds:      feeds,
+		feeds:      sources,
 		stateStore: stateStore,
 		items:      make(map[string][]domain.FeedItem),
 	}
 }
 
 func (c *Collector) SetNetCheck(fn func() bool) { c.netCheck = fn }
+
+func (c *Collector) OnSubscription() {
+	for _, f := range c.feeds {
+		select {
+		case f.wake <- struct{}{}:
+		default:
+		}
+	}
+}
 
 func (c *Collector) ID() string                { return "rss" }
 func (c *Collector) Domain() domain.DomainType { return domain.DomainFeeds }
@@ -52,16 +70,16 @@ func (c *Collector) State() domain.DomainState {
 	return c.buildState()
 }
 
-func (c *Collector) runFeed(ctx context.Context, f config.RSSFeedConfig) {
+func (c *Collector) runFeed(ctx context.Context, f feedSource) {
 	if c.netCheck == nil || c.netCheck() {
-		if err := c.fetchFeed(f); err != nil {
-			log.Printf("[rss] %s initial fetch: %v", f.ID, err)
+		if err := c.fetchFeed(f.cfg); err != nil {
+			log.Printf("[rss] %s initial fetch: %v", f.cfg.ID, err)
 			c.stateStore.PublishSystem(store.SystemEvent{
-				CollectorID: c.sourceID(f.ID), Status: "error", Message: err.Error(),
+				CollectorID: c.sourceID(f.cfg.ID), Status: "error", Message: err.Error(),
 			})
 		}
 	}
-	interval := f.PollInterval.Duration
+	interval := f.cfg.PollInterval.Duration
 	if interval == 0 {
 		interval = 15 * time.Minute
 	}
@@ -72,18 +90,24 @@ func (c *Collector) runFeed(ctx context.Context, f config.RSSFeedConfig) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if c.netCheck != nil && !c.netCheck() {
-				continue
-			}
-			if err := c.fetchFeed(f); err != nil {
-				log.Printf("[rss] %s fetch: %v", f.ID, err)
-				c.stateStore.PublishSystem(store.SystemEvent{
-					CollectorID: c.sourceID(f.ID), Status: "error", Message: err.Error(),
-				})
-			} else {
-				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.sourceID(f.ID), Status: "ok"})
-			}
+			c.fetchFeedIfReady(f.cfg)
+		case <-f.wake:
+			c.fetchFeedIfReady(f.cfg)
 		}
+	}
+}
+
+func (c *Collector) fetchFeedIfReady(f config.RSSFeedConfig) {
+	if c.netCheck != nil && !c.netCheck() {
+		return
+	}
+	if err := c.fetchFeed(f); err != nil {
+		log.Printf("[rss] %s fetch: %v", f.ID, err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.sourceID(f.ID), Status: "error", Message: err.Error(),
+		})
+	} else {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.sourceID(f.ID), Status: "ok"})
 	}
 }
 

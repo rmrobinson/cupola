@@ -33,6 +33,7 @@ func RegisterGaugeSource(name string, factory func() GaugeSource) {
 type sourceEntry struct {
 	cfg    config.WaterwayConfig
 	source GaugeSource
+	wake   chan struct{}
 }
 
 // Collector polls one or more waterway gauge sources and publishes the
@@ -49,6 +50,15 @@ type Collector struct {
 }
 
 func (c *Collector) SetNetCheck(fn func() bool) { c.netCheck = fn }
+
+func (c *Collector) OnSubscription() {
+	for _, s := range c.sources {
+		select {
+		case s.wake <- struct{}{}:
+		default:
+		}
+	}
+}
 
 func NewCollector(
 	cfgs []config.WaterwayConfig,
@@ -68,7 +78,7 @@ func NewCollector(
 			log.Printf("[waterway] unknown parser %q for source %s — skipping", cfg.Parser, cfg.ID)
 			continue
 		}
-		c.sources = append(c.sources, sourceEntry{cfg: cfg, source: factory()})
+		c.sources = append(c.sources, sourceEntry{cfg: cfg, source: factory(), wake: make(chan struct{}, 1)})
 	}
 	return c
 }
@@ -109,18 +119,24 @@ func (c *Collector) runSource(ctx context.Context, s sourceEntry) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if c.netCheck != nil && !c.netCheck() {
-				continue
-			}
-			if err := c.fetchSource(ctx, s); err != nil {
-				log.Printf("[waterway] %s fetch: %v", s.cfg.ID, err)
-				c.stateStore.PublishSystem(store.SystemEvent{
-					CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
-				})
-			} else {
-				c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.sourceID(s.cfg.ID), Status: "ok"})
-			}
+			c.fetchSourceIfReady(ctx, s)
+		case <-s.wake:
+			c.fetchSourceIfReady(ctx, s)
 		}
+	}
+}
+
+func (c *Collector) fetchSourceIfReady(ctx context.Context, s sourceEntry) {
+	if c.netCheck != nil && !c.netCheck() {
+		return
+	}
+	if err := c.fetchSource(ctx, s); err != nil {
+		log.Printf("[waterway] %s fetch: %v", s.cfg.ID, err)
+		c.stateStore.PublishSystem(store.SystemEvent{
+			CollectorID: c.sourceID(s.cfg.ID), Status: "error", Message: err.Error(),
+		})
+	} else {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.sourceID(s.cfg.ID), Status: "ok"})
 	}
 }
 

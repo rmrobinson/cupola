@@ -61,6 +61,17 @@ Collectors run independently and push normalized state into a central in-memory 
 
 **Subscription system** (`internal/api/subscriptions.go`): Reference-counted per `(domain, params)` pair. Widgets register on load, deregister on removal. SSE disconnect drops all subscriptions for that session. For parameterized domains (e.g. `transit.arrivals` keyed by `"{agency}:{route}:{stop_id}"`), the backend only fetches data for active subscriptions.
 
+**Subscription refresh wakeups**: Any collector that polls external or periodically refreshed data for a widget domain should implement `collector.SubscriptionNotifiable` with `OnSubscription()`. Use a buffered `wake chan struct{}` of size 1 and select on it in the collector's existing poll loop, next to the ticker. This lets widget load, config save, and SSE reconnect re-posted subscriptions trigger an immediate refresh instead of showing stale retained state until the next poll. Keep the send non-blocking to coalesce repeated subscriptions:
+```go
+func (c *Collector) OnSubscription() {
+    select {
+    case c.wake <- struct{}{}:
+    default:
+    }
+}
+```
+For aggregate collectors with multiple configured sources (RSS, municipal, waterway), give each source its own wake channel and have `OnSubscription()` nudge every source. Respect `SetNetCheck` inside the wake path just like the normal ticker path. Pure local/derived domains such as notes and astro generally do not need this pattern unless they depend on periodic recomputation.
+
 **Persistence** (`internal/store/sqlite.go`): SQLite stores dashboard profiles, shared notes, transit agency config, and cached GTFS timetable data used for transit static-schedule fallback. It is not used for sensor, alert, or other time-series data.
 
 **Tiles** (`internal/tiles/pmtiles.go`): On startup, checks for a `.pmtiles` cache. If absent, fetches a tile extract from Protomaps/build sources bounded by the configured location and radius, saves to disk, and serves at `GET /tiles/{z}/{x}/{y}`. Subsequent starts use the cache.
