@@ -75,7 +75,12 @@ self.addEventListener('fetch', evt => {
   const { request } = evt;
   if (request.method !== 'GET') return;
 
-  const { pathname } = new URL(request.url);
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  const { pathname } = url;
 
   // Live API responses must not be replayed from cache on a situational dashboard.
   if (pathname.startsWith('/api/')) {
