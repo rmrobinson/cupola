@@ -98,9 +98,9 @@ func (c *SolarCurrentCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
 // SolarForecastCollector is a lightweight companion that publishes solar.weather.forecast
 // whenever SolarCurrentCollector refreshes the shared state.
 type SolarForecastCollector struct {
-	shared     *sharedSolar
-	stateStore *store.StateStore
-	wake       func()
+	shared         *sharedSolar
+	stateStore     *store.StateStore
+	requestRefresh func()
 }
 
 // NewSolarCollectors creates a pair of collectors that share one NOAA SWPC fetch per cycle.
@@ -118,7 +118,7 @@ func NewSolarCollectors(lat, lon float64, interval time.Duration, stateStore *st
 		stateStore: stateStore,
 		wake:       make(chan struct{}, 1),
 	}
-	fc := &SolarForecastCollector{shared: shared, stateStore: stateStore, wake: cur.OnSubscription}
+	fc := &SolarForecastCollector{shared: shared, stateStore: stateStore, requestRefresh: cur.OnSubscription}
 	return cur, fc
 }
 
@@ -188,8 +188,8 @@ func (c *SolarForecastCollector) Domain() domain.DomainType     { return domain.
 func (c *SolarForecastCollector) Start(_ context.Context) error { return nil }
 
 func (c *SolarForecastCollector) OnSubscription() {
-	if c.wake != nil {
-		c.wake()
+	if c.requestRefresh != nil {
+		c.requestRefresh()
 	}
 }
 
