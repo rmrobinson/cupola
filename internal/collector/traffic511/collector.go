@@ -145,6 +145,12 @@ func (c *IncidentsCollector) fetch(ctx context.Context) error {
 		log.Printf("[%s] fetched %d incidents", source.ID(), len(items))
 	}
 
+	var duplicateCount int
+	incidents, duplicateCount = dedupeTrafficIncidents(incidents)
+	if duplicateCount > 0 {
+		log.Printf("[traffic.incidents] dropped %d duplicate incident(s)", duplicateCount)
+	}
+
 	state := domain.TrafficIncidents{
 		StateBase: domain.StateBase{UpdatedAt: time.Now().UTC()},
 		Incidents: incidents,
@@ -159,6 +165,31 @@ func (c *IncidentsCollector) fetch(ctx context.Context) error {
 		return fmt.Errorf("all traffic incident sources failed: %s", strings.Join(failed, "; "))
 	}
 	return nil
+}
+
+func dedupeTrafficIncidents(incidents []domain.TrafficIncident) ([]domain.TrafficIncident, int) {
+	if len(incidents) < 2 {
+		return incidents, 0
+	}
+	seen := make(map[string]struct{}, len(incidents))
+	deduped := make([]domain.TrafficIncident, 0, len(incidents))
+	var duplicates int
+	for _, inc := range incidents {
+		if inc.ID == "" {
+			deduped = append(deduped, inc)
+			continue
+		}
+		if _, ok := seen[inc.ID]; ok {
+			duplicates++
+			continue
+		}
+		seen[inc.ID] = struct{}{}
+		deduped = append(deduped, inc)
+	}
+	if duplicates == 0 {
+		return incidents, 0
+	}
+	return deduped, duplicates
 }
 
 type ON511IncidentsSource struct{}
