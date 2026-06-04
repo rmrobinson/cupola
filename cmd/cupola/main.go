@@ -25,6 +25,7 @@ import (
 	municipalcollector "github.com/rmrobinson/cupola/internal/collector/municipal"
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/enovapower"
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/grcaflood"
+	_ "github.com/rmrobinson/cupola/internal/collector/municipal/kitchenerroadclosures"
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/kitchenersnow"
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/kitchenerutilities"
 	notescollector "github.com/rmrobinson/cupola/internal/collector/notes"

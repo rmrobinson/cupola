@@ -126,6 +126,7 @@ The municipal collector is a reusable framework. Each source is configured with 
 
 Initial parser implementations:
 - `kitchener.snow` — parses https://www.kitchener.ca/news/snow-events/ → `municipal.alerts`; IMAP phase 2
+- `kitchener.roadclosures` — parses https://app2.kitchener.ca/roadclosures/list.asp → `municipal.alerts`
 - `grca.flood` — parses https://www.grandriver.ca/news/categories/flood-messages/ → `municipal.alerts`; IMAP phase 2
 - `enova.power` — parses https://oms.enovapower.com/Outages/ → `municipal.alerts`
 - `kitchener.utilities` — parses https://www.kitchenerutilities.ca/en/outages-and-news.aspx → `municipal.alerts`
@@ -666,7 +667,7 @@ type MunicipalAlert struct {
 }
 ```
 
-*Initial parsers:* `kitchener.snow` (HTTP scrape → IMAP phase 2), `grca.flood` (HTTP scrape → IMAP phase 2), `enova.power` (HTTP scrape), `kitchener.utilities` (HTTP scrape)
+*Initial parsers:* `kitchener.snow` (HTTP scrape → IMAP phase 2), `kitchener.roadclosures` (HTTP scrape), `grca.flood` (HTTP scrape → IMAP phase 2), `enova.power` (HTTP scrape), `kitchener.utilities` (HTTP scrape)
 
 ---
 
@@ -1007,6 +1008,11 @@ collectors:
       url: "https://www.kitchener.ca/news/snow-events/"
       poll_interval: 30m
       domain: municipal.alerts
+    - id: kitchener_roadclosures
+      parser: kitchener.roadclosures
+      url: "https://app2.kitchener.ca/roadclosures/list.asp"
+      poll_interval: 15m
+      domain: municipal.alerts
     - id: grca_flood
       parser: grca.flood
       url: "https://www.grandriver.ca/news/categories/flood-messages/"
@@ -1154,7 +1160,7 @@ cupola/
 16. **Solar weather collector** — region mapping, RSS parsing, `solar.weather.current` + forecast, solar-activity widget
 17. **Waterway collector** — GRCA parser, gauge auto-selection, waterway widget, alert promotion to `municipal.alerts`
 18. **Municipal collector framework** — generic HTTP scrape collector + Parser interface
-19. **Municipal parsers** — `kitchener.snow`, `grca.flood`, `enova.power`, `kitchener.utilities`
+19. **Municipal parsers** — `kitchener.snow`, `kitchener.roadclosures`, `grca.flood`, `enova.power`, `kitchener.utilities`
 20. **Alerts widget** — aggregates `weather.alerts`, `transit.alerts`, `municipal.alerts`; source filter
 21. **Municipal events widget**
 22. **RSS + flag + notes collectors**

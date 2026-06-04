@@ -155,6 +155,27 @@ currently active; inactive or expired snow events emit no alert.
 
 ---
 
+## City of Kitchener — Road Closures
+
+**Collector:** `municipal` (alerts) / parser `kitchener.roadclosures`
+**Source file:** `internal/collector/municipal/kitchenerroadclosures/parser.go`
+
+### How it was found
+
+The City of Kitchener publishes current road closures through an
+ASP.NET list endpoint at
+<https://app2.kitchener.ca/roadclosures/list.asp>. The public landing
+page is <https://www.kitchener.ca/roadclosures>.
+
+The parser reads the closure tables and emits `municipal.alerts` for
+emergency closures and special-event closures. Special-event closures are
+informational alerts. The source does not expose reliable coordinates in
+the table, so the parser does not infer map geometry.
+
+**Config URL:** `https://app2.kitchener.ca/roadclosures/list.asp`
+
+---
+
 ## Kitchener Utilities — Water Service Disruptions
 
 **Collector:** `municipal` (alerts) / parser `kitchener.utilities`

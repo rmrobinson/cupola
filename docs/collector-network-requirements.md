@@ -48,5 +48,5 @@ The probe URL and interval are configurable via `connectivity.check_url` and `co
 - The `imap` dispatcher (Phase 23/24) is not yet implemented. When it is, it will require outbound access to an IMAP server, which may be local or internet-hosted depending on the mail provider. It will also be gated by the connectivity checker.
 - Collectors not listed in `config.yaml` are not loaded at startup and impose no network requirements.
 - For collectors with configurable URLs (`gtfs`, `gtfsrt`, `municipal`, `rss`, `waterway`), network requirements depend entirely on where those URLs resolve.
-- The `traffic511` collector includes `kitchener.roadclosures` as a sub-source alongside `511on.ca`; both are gated at the `IncidentsCollector` level.
+- City of Kitchener road closures are configured as a `municipal.alerts` source using the `kitchener.roadclosures` parser; like other municipal HTTP sources, they are gated by the municipal alerts collector's internet check.
 - Weather widgets that render provider icons require the icon origin to be allowed by `server.csp_img_src`. Environment Canada hourly icons use `https://weather.gc.ca`; future providers should either emit CSP-allowed `icon_url` values or omit `icon_url`.
