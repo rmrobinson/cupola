@@ -134,6 +134,44 @@ func TestGetDetailSupportsSlashContainingID(t *testing.T) {
 	}
 }
 
+func TestGetDetailMunicipalEvent(t *testing.T) {
+	st := store.NewStateStore()
+	startsAt := time.Date(2026, 6, 7, 10, 0, 0, 0, time.UTC)
+	endsAt := time.Date(2026, 6, 7, 14, 0, 0, 0, time.UTC)
+	publishedAt := time.Date(2026, 6, 1, 9, 30, 0, 0, time.UTC)
+	sourceURL := "https://www.kitchener.ca/roadclosures"
+	st.Set(domain.MunicipalEvents{
+		StateBase: domain.StateBase{UpdatedAt: time.Now().UTC()},
+		Events: []domain.MunicipalEvent{{
+			ID:          "kitchener.roadclosures:event-1",
+			SourceID:    "kitchener.roadclosures",
+			Title:       "King St road closure",
+			Description: "Closed for a special event",
+			EventType:   "road-closure",
+			StartsAt:    &startsAt,
+			EndsAt:      &endsAt,
+			URL:         &sourceURL,
+			PublishedAt: publishedAt,
+		}},
+	})
+
+	h := &Handler{store: st}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/details/municipal.events?id="+url.QueryEscape("kitchener.roadclosures:event-1"), nil)
+	rr := httptest.NewRecorder()
+	h.Router().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `"domain":"municipal.events"`) ||
+		!strings.Contains(body, `"title":"King St road closure"`) ||
+		!strings.Contains(body, `"key":"event_type","value":"road-closure"`) ||
+		!strings.Contains(body, `"source_url":"https://www.kitchener.ca/roadclosures"`) {
+		t.Fatalf("response missing expected municipal event detail fields: %s", body)
+	}
+}
+
 func TestGetDetailDropsUnsafeSourceURL(t *testing.T) {
 	st := store.NewStateStore()
 	st.Set(domain.TrafficIncidents{

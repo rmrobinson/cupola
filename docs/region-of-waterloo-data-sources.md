@@ -157,7 +157,7 @@ currently active; inactive or expired snow events emit no alert.
 
 ## City of Kitchener — Road Closures
 
-**Collector:** `municipal` (alerts) / parser `kitchener.roadclosures`
+**Collector:** `municipal` (events) / parser `kitchener.roadclosures`
 **Source file:** `internal/collector/municipal/kitchenerroadclosures/parser.go`
 
 ### How it was found
@@ -167,12 +167,35 @@ ASP.NET list endpoint at
 <https://app2.kitchener.ca/roadclosures/list.asp>. The public landing
 page is <https://www.kitchener.ca/roadclosures>.
 
-The parser reads the closure tables and emits `municipal.alerts` for
-emergency closures and special-event closures. Special-event closures are
-informational alerts. The source does not expose reliable coordinates in
-the table, so the parser does not infer map geometry.
+The parser reads the closure tables and emits `municipal.events` for
+emergency closures and special-event closures. The source does not expose
+reliable coordinates in the table, so the parser does not infer map
+geometry.
 
 **Config URL:** `https://app2.kitchener.ca/roadclosures/list.asp`
+
+---
+
+## Region of Waterloo — Regional Road Closures
+
+**Collector:** `traffic` / source `region.waterloo.roadclosures`
+**Source file:** `internal/collector/traffic/region_waterloo.go`
+
+### How it was found
+
+The Region of Waterloo publishes current and future closures through an
+ArcGIS MapServer:
+<https://gis.regionofwaterloo.ca/wamap/rest/services/RegionalClosures/MapServer>.
+
+Layer `0` is `Current Closures`; layer `1` is `Future Closures`. The
+traffic collector queries layer `0` as GeoJSON so current road closures
+can appear in the traffic incidents widget and on the radar map using the
+provided line geometry. Emergency closures are also promoted into
+`municipal.alerts`.
+
+**Service URL:** `https://gis.regionofwaterloo.ca/wamap/rest/services/RegionalClosures/MapServer`
+
+**Config source type:** `region-waterloo-roadclosures`
 
 ---
 

@@ -149,16 +149,26 @@
     layerGroup.clearLayers();
     if (!incidents?.length || config?.layer_incidents === false) return;
     for (const inc of incidents) {
+      const popup = `<b>${esc(inc.type)}</b><br>${esc(inc.road_name)}<br>${esc(inc.description)}<br><i>${esc(inc.severity)}</i>${detailButton('traffic.incidents', inc.id)}`;
+      const color = INC_COLORS[inc.severity] || '#95a5a6';
+      if (inc.lines?.length) {
+        for (const line of inc.lines) {
+          if (!line?.length) continue;
+          const latLngs = line.map(([lon, lat]) => [lat, lon]);
+          L.polyline(latLngs, { color, weight: inc.severity === 'major' ? 5 : 4, opacity: 0.9 })
+            .bindPopup(popup)
+            .addTo(layerGroup);
+        }
+        continue;
+      }
       if (inc.approximate_location) continue;
       if (!inc.lat || !inc.lon) continue;
-      const popup = `<b>${esc(inc.type)}</b><br>${esc(inc.road_name)}<br>${esc(inc.description)}<br><i>${esc(inc.severity)}</i>${detailButton('traffic.incidents', inc.id)}`;
       let marker;
       if (inc.type === 'construction') {
         marker = L.marker([inc.lat, inc.lon], { icon: emojiIcon('🚧') });
       } else if (inc.type === 'collision') {
         marker = L.marker([inc.lat, inc.lon], { icon: emojiIcon('💥') });
       } else {
-        const color = INC_COLORS[inc.severity] || '#95a5a6';
         marker = L.circleMarker([inc.lat, inc.lon], {
           radius: 8, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 0.9,
         });

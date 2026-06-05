@@ -39,39 +39,31 @@ func TestParseKitchenerRoadClosuresFiltersEmergencyAndSpecialEvents(t *testing.T
 		</section>
 	`
 
-	alerts, err := (&Parser{}).parse(strings.NewReader(html))
+	events, err := (&Parser{}).parse(strings.NewReader(html))
 	if err != nil {
 		t.Fatalf("parse() error = %v", err)
 	}
-	if len(alerts) != 2 {
-		t.Fatalf("expected 2 alerts, got %d: %+v", len(alerts), alerts)
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events, got %d: %+v", len(events), events)
 	}
 
-	if alerts[0].Title != "FREDERICK ST road closure" || alerts[0].Severity != domain.SeverityWarning {
-		t.Fatalf("unexpected emergency alert: %+v", alerts[0])
+	if events[0].Title != "FREDERICK ST road closure" || events[0].EventType != "road-closure" {
+		t.Fatalf("unexpected emergency event: %+v", events[0])
 	}
-	if alerts[0].Area == nil || *alerts[0].Area != "FREDERICK ST: EDNA ST to ANN ST" {
-		t.Fatalf("unexpected emergency area: %+v", alerts[0].Area)
+	if !strings.Contains(events[0].Description, "From EDNA ST to ANN ST") {
+		t.Fatalf("expected emergency from/to in description: %+v", events[0])
 	}
-	if alerts[1].Title != "KING ST W road closure" || alerts[1].Severity != domain.SeverityInfo {
-		t.Fatalf("unexpected special event alert: %+v", alerts[1])
+	if events[1].Title != "KING ST W road closure" || events[1].EventType != "road-closure" {
+		t.Fatalf("unexpected special event: %+v", events[1])
 	}
-	if alerts[1].StartsAt == nil || alerts[1].EndsAt == nil {
-		t.Fatalf("expected parsed date range: %+v", alerts[1])
+	if events[1].StartsAt == nil || events[1].EndsAt == nil {
+		t.Fatalf("expected parsed date range: %+v", events[1])
 	}
-	if alerts[1].AlertType != "road-closure" {
-		t.Fatalf("AlertType = %q, want road-closure", alerts[1].AlertType)
+	if !events[0].PublishedAt.IsZero() {
+		t.Fatalf("emergency event without date should not synthesize PublishedAt: %+v", events[0])
 	}
-	if !alerts[0].PublishedAt.IsZero() {
-		t.Fatalf("emergency alert without date should not synthesize PublishedAt: %+v", alerts[0])
-	}
-	if alerts[1].StartsAt == nil || !alerts[1].PublishedAt.Equal(alerts[1].StartsAt.UTC()) {
-		t.Fatalf("special event PublishedAt should use StartsAt, got alert: %+v", alerts[1])
-	}
-	for _, alert := range alerts {
-		if len(alert.Polygon) != 0 {
-			t.Fatalf("road closure parser should not infer map geometry: %+v", alert.Polygon)
-		}
+	if events[1].StartsAt == nil || !events[1].PublishedAt.Equal(events[1].StartsAt.UTC()) {
+		t.Fatalf("special event PublishedAt should use StartsAt, got event: %+v", events[1])
 	}
 }
 
@@ -94,66 +86,80 @@ func TestParseKitchenerRoadClosuresDedupesRepeatedRowsByID(t *testing.T) {
 		</table>
 	`
 
-	alerts, err := (&Parser{}).parse(strings.NewReader(html))
+	events, err := (&Parser{}).parse(strings.NewReader(html))
 	if err != nil {
 		t.Fatalf("parse() error = %v", err)
 	}
-	if len(alerts) != 1 {
-		t.Fatalf("expected duplicate row to be dropped, got %d alerts: %+v", len(alerts), alerts)
+	if len(events) != 1 {
+		t.Fatalf("expected duplicate row to be dropped, got %d events: %+v", len(events), events)
 	}
 }
 
-func TestDedupeMunicipalAlertsByIDKeepsFirstDuplicateID(t *testing.T) {
-	alerts := []domain.MunicipalAlert{
+func TestDedupeMunicipalEventsByIDKeepsFirstDuplicateID(t *testing.T) {
+	events := []testMunicipalEvent{
 		{ID: "a", Title: "FIRST"},
 		{ID: "b", Title: "SECOND"},
 		{ID: "a", Title: "DUPLICATE"},
 		{ID: "c", Title: "THIRD"},
 	}
 
-	got, duplicateCount := dedupeMunicipalAlertsByID(alerts)
+	got, duplicateCount := dedupeMunicipalEventsByID(toDomainEvents(events))
 	if duplicateCount != 1 {
 		t.Fatalf("expected 1 duplicate, got %d", duplicateCount)
 	}
 	if len(got) != 3 {
-		t.Fatalf("expected 3 alerts, got %d: %+v", len(got), got)
+		t.Fatalf("expected 3 events, got %d: %+v", len(got), got)
 	}
 	if got[0].Title != "FIRST" || got[1].Title != "SECOND" || got[2].Title != "THIRD" {
 		t.Fatalf("dedupe did not preserve order and first occurrence: %+v", got)
 	}
 }
 
-func TestDedupeMunicipalAlertsByIDPreservesEmptyIDs(t *testing.T) {
-	alerts := []domain.MunicipalAlert{
+func TestDedupeMunicipalEventsByIDPreservesEmptyIDs(t *testing.T) {
+	events := []testMunicipalEvent{
 		{Title: "NO ID 1"},
 		{ID: "a", Title: "WITH ID"},
 		{Title: "NO ID 2"},
 		{ID: "a", Title: "DUPLICATE"},
 	}
 
-	got, duplicateCount := dedupeMunicipalAlertsByID(alerts)
+	got, duplicateCount := dedupeMunicipalEventsByID(toDomainEvents(events))
 	if duplicateCount != 1 {
 		t.Fatalf("expected 1 duplicate, got %d", duplicateCount)
 	}
 	if len(got) != 3 {
-		t.Fatalf("expected 3 alerts, got %d: %+v", len(got), got)
+		t.Fatalf("expected 3 events, got %d: %+v", len(got), got)
 	}
 	if got[0].Title != "NO ID 1" || got[1].Title != "WITH ID" || got[2].Title != "NO ID 2" {
-		t.Fatalf("dedupe should preserve empty-ID alerts: %+v", got)
+		t.Fatalf("dedupe should preserve empty-ID events: %+v", got)
 	}
 }
 
-func TestDedupeMunicipalAlertsByIDReturnsOriginalWhenNoDuplicates(t *testing.T) {
-	alerts := []domain.MunicipalAlert{
+func TestDedupeMunicipalEventsByIDReturnsOriginalWhenNoDuplicates(t *testing.T) {
+	events := []testMunicipalEvent{
 		{ID: "a", Title: "FIRST"},
 		{ID: "b", Title: "SECOND"},
 	}
 
-	got, duplicateCount := dedupeMunicipalAlertsByID(alerts)
+	got, duplicateCount := dedupeMunicipalEventsByID(toDomainEvents(events))
 	if duplicateCount != 0 {
 		t.Fatalf("expected 0 duplicates, got %d", duplicateCount)
 	}
 	if len(got) != 2 || got[0].ID != "a" || got[1].ID != "b" {
 		t.Fatalf("unexpected alerts: %+v", got)
 	}
+}
+
+type testMunicipalEvent struct {
+	ID    string
+	Title string
+}
+
+func toDomainEvents(events []testMunicipalEvent) []domain.MunicipalEvent {
+	out := make([]domain.MunicipalEvent, len(events))
+	for i, ev := range events {
+		out[i].ID = ev.ID
+		out[i].Title = ev.Title
+	}
+	return out
 }

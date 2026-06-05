@@ -1,5 +1,5 @@
 // Package kitchenerroadclosures parses the City of Kitchener road-closures
-// page into municipal.alerts.
+// page into municipal.events.
 //
 // Register via import side-effect:
 //
@@ -24,17 +24,15 @@ import (
 const publicURL = "https://www.kitchener.ca/roadclosures"
 
 func init() {
-	municipal.RegisterAlertsParser("kitchener.roadclosures", func() municipal.AlertsParser {
+	municipal.RegisterEventsParser("kitchener.roadclosures", func() municipal.EventsParser {
 		return &Parser{}
 	})
 }
 
-// Parser implements municipal.AlertsParser for Kitchener road closures.
-type Parser struct {
-	Now func() time.Time
-}
+// Parser implements municipal.EventsParser for Kitchener road closures.
+type Parser struct{}
 
-func (p *Parser) Parse(rawURL string) ([]domain.MunicipalAlert, error) {
+func (p *Parser) Parse(rawURL string) ([]domain.MunicipalEvent, error) {
 	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("kitchener.roadclosures: create request %s: %w", rawURL, err)
@@ -51,14 +49,14 @@ func (p *Parser) Parse(rawURL string) ([]domain.MunicipalAlert, error) {
 	return p.parse(resp.Body)
 }
 
-func (p *Parser) parse(r io.Reader) ([]domain.MunicipalAlert, error) {
+func (p *Parser) parse(r io.Reader) ([]domain.MunicipalEvent, error) {
 	doc, err := html.Parse(r)
 	if err != nil {
 		return nil, fmt.Errorf("kitchener.roadclosures: parse HTML: %w", err)
 	}
 
 	url := publicURL
-	var alerts []domain.MunicipalAlert
+	var events []domain.MunicipalEvent
 	for _, table := range htmlElements(doc, "table") {
 		section := roadClosureSectionTitle(table)
 		for _, row := range htmlElements(table, "tr") {
@@ -92,22 +90,11 @@ func (p *Parser) parse(r io.Reader) ([]domain.MunicipalAlert, error) {
 				description = appendSentence(description, "From "+fromTo)
 			}
 
-			var area *string
-			if fromTo != "" {
-				a := street + ": " + fromTo
-				area = &a
-			} else {
-				a := street
-				area = &a
-			}
-
-			alerts = append(alerts, domain.MunicipalAlert{
+			events = append(events, domain.MunicipalEvent{
 				ID:          "kitchener.roadclosures:" + stableClosureID(section, street, fromTo, fields["date"], reason),
 				Title:       street + " road closure",
 				Description: description,
-				AlertType:   "road-closure",
-				Severity:    closureSeverity(section, reason, details),
-				Area:        area,
+				EventType:   "road-closure",
 				StartsAt:    startsAt,
 				EndsAt:      endsAt,
 				URL:         &url,
@@ -116,8 +103,8 @@ func (p *Parser) parse(r io.Reader) ([]domain.MunicipalAlert, error) {
 		}
 	}
 
-	alerts, _ = dedupeMunicipalAlertsByID(alerts)
-	return alerts, nil
+	events, _ = dedupeMunicipalEventsByID(events)
+	return events, nil
 }
 
 func includeClosure(section, reason, details string) bool {
@@ -132,35 +119,27 @@ func publishedAtFromStartsAt(startsAt *time.Time) time.Time {
 	return startsAt.UTC()
 }
 
-func closureSeverity(section, reason, details string) domain.AlertSeverity {
-	text := strings.ToLower(section + " " + reason + " " + details)
-	if strings.Contains(text, "emergency") {
-		return domain.SeverityWarning
+func dedupeMunicipalEventsByID(events []domain.MunicipalEvent) ([]domain.MunicipalEvent, int) {
+	if len(events) < 2 {
+		return events, 0
 	}
-	return domain.SeverityInfo
-}
-
-func dedupeMunicipalAlertsByID(alerts []domain.MunicipalAlert) ([]domain.MunicipalAlert, int) {
-	if len(alerts) < 2 {
-		return alerts, 0
-	}
-	seen := make(map[string]struct{}, len(alerts))
-	deduped := make([]domain.MunicipalAlert, 0, len(alerts))
+	seen := make(map[string]struct{}, len(events))
+	deduped := make([]domain.MunicipalEvent, 0, len(events))
 	var duplicates int
-	for _, alert := range alerts {
-		if alert.ID == "" {
-			deduped = append(deduped, alert)
+	for _, event := range events {
+		if event.ID == "" {
+			deduped = append(deduped, event)
 			continue
 		}
-		if _, ok := seen[alert.ID]; ok {
+		if _, ok := seen[event.ID]; ok {
 			duplicates++
 			continue
 		}
-		seen[alert.ID] = struct{}{}
-		deduped = append(deduped, alert)
+		seen[event.ID] = struct{}{}
+		deduped = append(deduped, event)
 	}
 	if duplicates == 0 {
-		return alerts, 0
+		return events, 0
 	}
 	return deduped, duplicates
 }

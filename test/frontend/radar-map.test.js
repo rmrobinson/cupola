@@ -6,6 +6,7 @@ const vm = require('node:vm');
 
 function loadWidget() {
   const markers = [];
+  const polylines = [];
   const views = [];
 
   function layerGroup() {
@@ -54,7 +55,16 @@ function loadWidget() {
         };
         return marker;
       },
-      polyline() { return { addTo() { return this; } }; },
+      polyline(latLngs, opts) {
+        const line = {
+          latLngs,
+          opts,
+          popup: '',
+          bindPopup(html) { this.popup = html; return this; },
+          addTo(layer) { polylines.push(this); this.layer = layer; return this; },
+        };
+        return line;
+      },
       polygon() { return { bindPopup() { return this; }, addTo() { return this; } }; },
       circleMarker() { return { bindPopup() { return this; }, addTo() { return this; } }; },
     },
@@ -65,7 +75,7 @@ function loadWidget() {
   vm.createContext(context);
   const file = path.join(__dirname, '../../cmd/cupola/frontend/js/widgets/radar-map.js');
   vm.runInContext(fs.readFileSync(file, 'utf8'), context);
-  return { widget: context.window.CupolaWidgets[0], markers, views };
+  return { widget: context.window.CupolaWidgets[0], markers, polylines, views };
 }
 
 test('radar map config includes home marker toggle', () => {
@@ -104,4 +114,28 @@ test('radar map does not show home marker by default', () => {
   widget.render(container, {}, {});
 
   assert.equal(markers.length, 0);
+});
+
+test('radar map renders traffic incident line geometry as polylines', () => {
+  const { widget, markers, polylines } = loadWidget();
+  const container = { innerHTML: '', appendChild() {} };
+
+  widget.render(container, {
+    'traffic.incidents': {
+      incidents: [{
+        id: 'region-waterloo-roadclosures:test',
+        type: 'closure',
+        road_name: 'King St',
+        description: 'Status: Lane Reduced',
+        severity: 'moderate',
+        lines: [[[-80.5, 43.4], [-80.6, 43.5]]],
+      }],
+    },
+  }, {});
+
+  assert.equal(markers.length, 0);
+  assert.equal(polylines.length, 1);
+  assert.equal(JSON.stringify(polylines[0].latLngs), JSON.stringify([[43.4, -80.5], [43.5, -80.6]]));
+  assert.equal(polylines[0].opts.color, '#f39c12');
+  assert.match(polylines[0].popup, /traffic\.incidents/);
 });

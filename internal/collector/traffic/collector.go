@@ -1,4 +1,4 @@
-package traffic511
+package traffic
 
 import (
 	"context"
@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	eventsURL   = "https://511on.ca/api/v2/get/event?format=json&lang=en"
-	camerasURL  = "https://511on.ca/api/v2/get/Cameras?format=json&lang=en"
-	roadCondURL = "https://511on.ca/api/v3/get/RoadConditions?format=json&lang=en"
-	publicURL   = "https://511on.ca"
+	on511EventsURL   = "https://511on.ca/api/v2/get/event?format=json&lang=en"
+	on511CamerasURL  = "https://511on.ca/api/v2/get/Cameras?format=json&lang=en"
+	on511RoadCondURL = "https://511on.ca/api/v3/get/RoadConditions?format=json&lang=en"
+	on511PublicURL   = "https://511on.ca"
 
 	defaultIncidentInterval = 15 * time.Minute
 	defaultCameraInterval   = 24 * time.Hour
@@ -27,18 +27,117 @@ const (
 
 var client = &http.Client{Timeout: 30 * time.Second}
 
-// NewCollectors returns incidents, cameras, and road-conditions collectors for ON511.
-// incidentInterval applies to both incidents and road conditions; cameraInterval applies to cameras.
-func NewCollectors(incidentInterval, cameraInterval time.Duration, stateStore *store.StateStore) (*IncidentsCollector, *CamerasCollector, *RoadConditionsCollector) {
-	if incidentInterval == 0 {
-		incidentInterval = defaultIncidentInterval
+type SourceSpec struct {
+	ID                string
+	Type              string
+	Province          string
+	URL               string
+	IncidentsURL      string
+	CamerasURL        string
+	RoadConditionsURL string
+	PublicURL         string
+}
+
+type Sources struct {
+	Incidents      []IncidentSource
+	Cameras        []CameraSource
+	RoadConditions []RoadConditionSource
+}
+
+func NewSources(specs []SourceSpec) (Sources, []string) {
+	var sources Sources
+	var skipped []string
+	for _, spec := range specs {
+		sourceType := strings.ToLower(strings.TrimSpace(spec.Type))
+		switch sourceType {
+		case "511", "on511", "511on":
+			api511, warnings := newAPI511Source(spec)
+			skipped = append(skipped, warnings...)
+			if api511 == nil {
+				continue
+			}
+			if api511.eventsURL != "" {
+				sources.Incidents = append(sources.Incidents, api511)
+			}
+			if api511.camerasURL != "" {
+				sources.Cameras = append(sources.Cameras, api511)
+			}
+			if api511.roadConditionsURL != "" {
+				sources.RoadConditions = append(sources.RoadConditions, api511)
+			}
+		case "region-waterloo-roadclosures", "region.waterloo.roadclosures":
+			if spec.URL != "" {
+				sources.Incidents = append(sources.Incidents, NewRegionWaterlooClosuresSourceWithURL(spec.URL))
+			} else {
+				sources.Incidents = append(sources.Incidents, NewRegionWaterlooClosuresSource())
+			}
+		default:
+			skipped = append(skipped, fmt.Sprintf("%s: unknown traffic source type %q", sourceID(spec), spec.Type))
+		}
 	}
-	if cameraInterval == 0 {
-		cameraInterval = defaultCameraInterval
+	return sources, skipped
+}
+
+func newAPI511Source(spec SourceSpec) (*API511Source, []string) {
+	id := strings.TrimSpace(spec.ID)
+	if id == "" {
+		id = "511"
 	}
-	return NewIncidentsCollector(incidentInterval, stateStore, NewON511IncidentsSource()),
-		&CamerasCollector{interval: cameraInterval, stateStore: stateStore, wake: make(chan struct{}, 1)},
-		&RoadConditionsCollector{interval: incidentInterval, stateStore: stateStore, wake: make(chan struct{}, 1)}
+	province := strings.ToUpper(strings.TrimSpace(spec.Province))
+	eventsURL := strings.TrimSpace(spec.IncidentsURL)
+	camerasURL := strings.TrimSpace(spec.CamerasURL)
+	roadConditionsURL := strings.TrimSpace(spec.RoadConditionsURL)
+	publicURL := strings.TrimSpace(spec.PublicURL)
+	if province == "ON" {
+		if eventsURL == "" {
+			eventsURL = on511EventsURL
+		}
+		if camerasURL == "" {
+			camerasURL = on511CamerasURL
+		}
+		if roadConditionsURL == "" {
+			roadConditionsURL = on511RoadCondURL
+		}
+		if publicURL == "" {
+			publicURL = on511PublicURL
+		}
+	}
+	var warnings []string
+	if eventsURL == "" && camerasURL == "" && roadConditionsURL == "" {
+		warnings = append(warnings, fmt.Sprintf("%s: 511 source has no configured API URLs", id))
+		return nil, warnings
+	}
+	return &API511Source{
+		id:                id,
+		eventsURL:         eventsURL,
+		camerasURL:        camerasURL,
+		roadConditionsURL: roadConditionsURL,
+		publicURL:         publicURL,
+	}, warnings
+}
+
+func sourceID(spec SourceSpec) string {
+	if strings.TrimSpace(spec.ID) != "" {
+		return spec.ID
+	}
+	if strings.TrimSpace(spec.Type) != "" {
+		return spec.Type
+	}
+	return "traffic source"
+}
+
+func NewCamerasCollector(interval time.Duration, stateStore *store.StateStore, sources ...CameraSource) *CamerasCollector {
+	if interval == 0 {
+		interval = defaultCameraInterval
+	}
+	return &CamerasCollector{interval: interval, stateStore: stateStore, sources: sources, wake: make(chan struct{}, 1)}
+}
+
+func NewRoadConditionsCollector(interval time.Duration, stateStore *store.StateStore, sources ...RoadConditionSource) *RoadConditionsCollector {
+	if interval == 0 {
+		interval = defaultIncidentInterval
+	}
+	return &RoadConditionsCollector{interval: interval, stateStore: stateStore, sources: sources, wake: make(chan struct{}, 1)}
 }
 
 // ── Incidents ─────────────────────────────────────────────────────────────────
@@ -48,10 +147,29 @@ type IncidentSource interface {
 	Fetch(ctx context.Context) ([]domain.TrafficIncident, error)
 }
 
+type CameraSource interface {
+	ID() string
+	FetchCameras(ctx context.Context) ([]domain.TrafficCamera, error)
+}
+
+type RoadConditionSource interface {
+	ID() string
+	FetchRoadConditions(ctx context.Context) ([]domain.TrafficRoadCondition, error)
+}
+
+type promotedAlertSource interface {
+	PromotedMunicipalAlerts() []domain.MunicipalAlert
+}
+
+type MunicipalAlertSink interface {
+	SetSourceAlerts(sourceID string, alerts []domain.MunicipalAlert)
+}
+
 type IncidentsCollector struct {
 	interval   time.Duration
 	stateStore *store.StateStore
 	sources    []IncidentSource
+	alertSink  MunicipalAlertSink
 	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.TrafficIncidents
@@ -66,6 +184,10 @@ func NewIncidentsCollector(interval time.Duration, stateStore *store.StateStore,
 }
 
 func (c *IncidentsCollector) SetNetCheck(fn func() bool) { c.netCheck = fn }
+
+func (c *IncidentsCollector) SetMunicipalAlertSink(sink MunicipalAlertSink) {
+	c.alertSink = sink
+}
 
 func (c *IncidentsCollector) OnSubscription() {
 	select {
@@ -133,12 +255,22 @@ func (c *IncidentsCollector) fetch(ctx context.Context) error {
 		if err != nil {
 			log.Printf("[%s] fetch: %v", source.ID(), err)
 			failed = append(failed, fmt.Sprintf("%s: %v", source.ID(), err))
+			if c.alertSink != nil {
+				if _, ok := source.(promotedAlertSource); ok {
+					c.alertSink.SetSourceAlerts(source.ID(), nil)
+				}
+			}
 			c.stateStore.PublishSystem(store.SystemEvent{
 				CollectorID: source.ID(), Status: "error", Message: err.Error(),
 			})
 			continue
 		}
 		incidents = append(incidents, items...)
+		if c.alertSink != nil {
+			if alertSource, ok := source.(promotedAlertSource); ok {
+				c.alertSink.SetSourceAlerts(source.ID(), alertSource.PromotedMunicipalAlerts())
+			}
+		}
 		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: source.ID(), Status: "ok"})
 		log.Printf("[%s] fetched %d incidents", source.ID(), len(items))
 	}
@@ -190,11 +322,15 @@ func dedupeTrafficIncidents(incidents []domain.TrafficIncident) ([]domain.Traffi
 	return deduped, duplicates
 }
 
-type ON511IncidentsSource struct{}
+type API511Source struct {
+	id                string
+	eventsURL         string
+	camerasURL        string
+	roadConditionsURL string
+	publicURL         string
+}
 
-func NewON511IncidentsSource() *ON511IncidentsSource { return &ON511IncidentsSource{} }
-
-func (s *ON511IncidentsSource) ID() string { return "511on.incidents" }
+func (s *API511Source) ID() string { return s.id }
 
 // on511Event is the raw JSON shape returned by the Events endpoint.
 type on511Event struct {
@@ -211,8 +347,11 @@ type on511Event struct {
 	Severity          string  `json:"Severity"`
 }
 
-func (s *ON511IncidentsSource) Fetch(ctx context.Context) ([]domain.TrafficIncident, error) {
-	body, err := getJSON(ctx, eventsURL)
+func (s *API511Source) Fetch(ctx context.Context) ([]domain.TrafficIncident, error) {
+	if s.eventsURL == "" {
+		return nil, fmt.Errorf("%s incidents URL is not configured", s.ID())
+	}
+	body, err := getJSON(ctx, s.eventsURL)
 	if err != nil {
 		return nil, err
 	}
@@ -224,14 +363,14 @@ func (s *ON511IncidentsSource) Fetch(ctx context.Context) ([]domain.TrafficIncid
 	incidents := make([]domain.TrafficIncident, 0, len(raw))
 	for _, e := range raw {
 		inc := domain.TrafficIncident{
-			ID:          fmt.Sprintf("%d", e.ID),
+			ID:          fmt.Sprintf("%s:%d", s.ID(), e.ID),
 			Type:        mapEventType(e.EventType),
 			Severity:    mapSeverity(e.EventType, e.IsFullClosure),
 			Lat:         e.Latitude,
 			Lon:         e.Longitude,
 			Description: e.Description,
 			RoadName:    e.RoadwayName,
-			SourceURL:   publicURL,
+			SourceURL:   s.publicURL,
 		}
 		if e.StartDate > 0 {
 			t := time.Unix(e.StartDate, 0)
@@ -274,6 +413,7 @@ func mapSeverity(et string, fullClosure bool) string {
 type CamerasCollector struct {
 	interval   time.Duration
 	stateStore *store.StateStore
+	sources    []CameraSource
 	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.TrafficCameras
@@ -289,14 +429,14 @@ func (c *CamerasCollector) OnSubscription() {
 	}
 }
 
-func (c *CamerasCollector) ID() string                { return "511on.cameras" }
+func (c *CamerasCollector) ID() string                { return "traffic.cameras" }
 func (c *CamerasCollector) Domain() domain.DomainType { return domain.DomainTrafficCameras }
 
 func (c *CamerasCollector) Start(ctx context.Context) error {
 	go func() {
 		if c.netCheck == nil || c.netCheck() {
 			if err := c.fetch(ctx); err != nil {
-				log.Printf("[511on.cameras] initial fetch: %v", err)
+				log.Printf("[traffic.cameras] initial fetch: %v", err)
 				c.stateStore.PublishSystem(store.SystemEvent{
 					CollectorID: c.ID(), Status: "error", Message: err.Error(),
 				})
@@ -325,7 +465,7 @@ func (c *CamerasCollector) fetchIfReady(ctx context.Context) {
 		return
 	}
 	if err := c.fetch(ctx); err != nil {
-		log.Printf("[511on.cameras] fetch: %v", err)
+		log.Printf("[traffic.cameras] fetch: %v", err)
 		c.stateStore.PublishSystem(store.SystemEvent{
 			CollectorID: c.ID(), Status: "error", Message: err.Error(),
 		})
@@ -356,14 +496,17 @@ type on511Camera struct {
 	Views     []on511CameraView `json:"Views"`
 }
 
-func (c *CamerasCollector) fetch(ctx context.Context) error {
-	body, err := getJSON(ctx, camerasURL)
+func (s *API511Source) FetchCameras(ctx context.Context) ([]domain.TrafficCamera, error) {
+	if s.camerasURL == "" {
+		return nil, fmt.Errorf("%s cameras URL is not configured", s.ID())
+	}
+	body, err := getJSON(ctx, s.camerasURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var raw []on511Camera
 	if err := json.Unmarshal(body, &raw); err != nil {
-		return fmt.Errorf("unmarshal cameras: %w", err)
+		return nil, fmt.Errorf("unmarshal cameras: %w", err)
 	}
 
 	cameras := make([]domain.TrafficCamera, 0, len(raw))
@@ -373,13 +516,33 @@ func (c *CamerasCollector) fetch(ctx context.Context) error {
 			continue
 		}
 		cameras = append(cameras, domain.TrafficCamera{
-			ID:          fmt.Sprintf("%d", cam.ID),
+			ID:          fmt.Sprintf("%s:%d", s.ID(), cam.ID),
 			Name:        cam.Location,
 			Lat:         cam.Latitude,
 			Lon:         cam.Longitude,
 			SnapshotURL: snapshotURL,
 			UpdatedAt:   time.Now().UTC(),
 		})
+	}
+	return cameras, nil
+}
+
+func (c *CamerasCollector) fetch(ctx context.Context) error {
+	var cameras []domain.TrafficCamera
+	var failed []string
+	for _, source := range c.sources {
+		items, err := source.FetchCameras(ctx)
+		if err != nil {
+			log.Printf("[%s.cameras] fetch: %v", source.ID(), err)
+			failed = append(failed, fmt.Sprintf("%s: %v", source.ID(), err))
+			c.stateStore.PublishSystem(store.SystemEvent{
+				CollectorID: source.ID() + ".cameras", Status: "error", Message: err.Error(),
+			})
+			continue
+		}
+		cameras = append(cameras, items...)
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: source.ID() + ".cameras", Status: "ok"})
+		log.Printf("[%s.cameras] fetched %d cameras", source.ID(), len(items))
 	}
 
 	state := domain.TrafficCameras{
@@ -390,7 +553,10 @@ func (c *CamerasCollector) fetch(ctx context.Context) error {
 	c.state = state
 	c.mu.Unlock()
 	c.stateStore.Set(state)
-	log.Printf("[511on.cameras] fetched %d cameras", len(cameras))
+	log.Printf("[traffic.cameras] published %d cameras from %d source(s)", len(cameras), len(c.sources))
+	if len(failed) == len(c.sources) && len(c.sources) > 0 {
+		return fmt.Errorf("all traffic camera sources failed: %s", strings.Join(failed, "; "))
+	}
 	return nil
 }
 
@@ -408,6 +574,7 @@ func firstEnabledViewURL(views []on511CameraView) string {
 type RoadConditionsCollector struct {
 	interval   time.Duration
 	stateStore *store.StateStore
+	sources    []RoadConditionSource
 	netCheck   func() bool
 	mu         sync.RWMutex
 	state      domain.TrafficRoadConditions
@@ -423,7 +590,7 @@ func (c *RoadConditionsCollector) OnSubscription() {
 	}
 }
 
-func (c *RoadConditionsCollector) ID() string { return "511on.road_conditions" }
+func (c *RoadConditionsCollector) ID() string { return "traffic.road_conditions" }
 func (c *RoadConditionsCollector) Domain() domain.DomainType {
 	return domain.DomainTrafficRoadConditions
 }
@@ -432,7 +599,7 @@ func (c *RoadConditionsCollector) Start(ctx context.Context) error {
 	go func() {
 		if c.netCheck == nil || c.netCheck() {
 			if err := c.fetch(ctx); err != nil {
-				log.Printf("[511on.road_conditions] initial fetch: %v", err)
+				log.Printf("[traffic.road_conditions] initial fetch: %v", err)
 				c.stateStore.PublishSystem(store.SystemEvent{
 					CollectorID: c.ID(), Status: "error", Message: err.Error(),
 				})
@@ -461,7 +628,7 @@ func (c *RoadConditionsCollector) fetchIfReady(ctx context.Context) {
 		return
 	}
 	if err := c.fetch(ctx); err != nil {
-		log.Printf("[511on.road_conditions] fetch: %v", err)
+		log.Printf("[traffic.road_conditions] fetch: %v", err)
 		c.stateStore.PublishSystem(store.SystemEvent{
 			CollectorID: c.ID(), Status: "error", Message: err.Error(),
 		})
@@ -486,14 +653,17 @@ type on511RoadCondition struct {
 	LastUpdated         int64    `json:"LastUpdated"`
 }
 
-func (c *RoadConditionsCollector) fetch(ctx context.Context) error {
-	body, err := getJSON(ctx, roadCondURL)
+func (s *API511Source) FetchRoadConditions(ctx context.Context) ([]domain.TrafficRoadCondition, error) {
+	if s.roadConditionsURL == "" {
+		return nil, fmt.Errorf("%s road conditions URL is not configured", s.ID())
+	}
+	body, err := getJSON(ctx, s.roadConditionsURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var raw []on511RoadCondition
 	if err := json.Unmarshal(body, &raw); err != nil {
-		return fmt.Errorf("unmarshal road conditions: %w", err)
+		return nil, fmt.Errorf("unmarshal road conditions: %w", err)
 	}
 
 	conditions := make([]domain.TrafficRoadCondition, 0, len(raw))
@@ -511,6 +681,26 @@ func (c *RoadConditionsCollector) fetch(ctx context.Context) error {
 		}
 		conditions = append(conditions, cond)
 	}
+	return conditions, nil
+}
+
+func (c *RoadConditionsCollector) fetch(ctx context.Context) error {
+	var conditions []domain.TrafficRoadCondition
+	var failed []string
+	for _, source := range c.sources {
+		items, err := source.FetchRoadConditions(ctx)
+		if err != nil {
+			log.Printf("[%s.road_conditions] fetch: %v", source.ID(), err)
+			failed = append(failed, fmt.Sprintf("%s: %v", source.ID(), err))
+			c.stateStore.PublishSystem(store.SystemEvent{
+				CollectorID: source.ID() + ".road_conditions", Status: "error", Message: err.Error(),
+			})
+			continue
+		}
+		conditions = append(conditions, items...)
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: source.ID() + ".road_conditions", Status: "ok"})
+		log.Printf("[%s.road_conditions] fetched %d road condition segments", source.ID(), len(items))
+	}
 
 	state := domain.TrafficRoadConditions{
 		StateBase:  domain.StateBase{UpdatedAt: time.Now().UTC()},
@@ -520,7 +710,10 @@ func (c *RoadConditionsCollector) fetch(ctx context.Context) error {
 	c.state = state
 	c.mu.Unlock()
 	c.stateStore.Set(state)
-	log.Printf("[511on.road_conditions] fetched %d road condition segments", len(conditions))
+	log.Printf("[traffic.road_conditions] published %d road condition segments from %d source(s)", len(conditions), len(c.sources))
+	if len(failed) == len(c.sources) && len(c.sources) > 0 {
+		return fmt.Errorf("all traffic road condition sources failed: %s", strings.Join(failed, "; "))
+	}
 	return nil
 }
 
