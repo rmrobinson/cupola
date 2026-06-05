@@ -2,9 +2,11 @@ module github.com/rmrobinson/cupola
 
 go 1.26.1
 
-require gopkg.in/yaml.v3 v3.0.1
-
-require github.com/go-chi/chi/v5 v5.2.5
+require (
+	github.com/go-chi/chi/v5 v5.2.5
+	golang.org/x/net v0.52.0
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	cel.dev/expr v0.25.1 // indirect
@@ -82,7 +84,6 @@ require (
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	gocloud.dev v0.40.0 // indirect
 	golang.org/x/crypto v0.49.0 // indirect
-	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect

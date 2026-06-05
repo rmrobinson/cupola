@@ -174,6 +174,7 @@ const (
     DomainWeatherForecast     DomainType = "weather.forecast"
     DomainWeatherForecastHourly DomainType = "weather.forecast.hourly"
     DomainWeatherAlerts       DomainType = "weather.alerts"
+    DomainWeatherAirQuality   DomainType = "weather.air_quality"
     DomainSolarWeatherCurrent DomainType = "solar.weather.current"
     DomainSolarWeatherForecast DomainType = "solar.weather.forecast"
     DomainTransitArrivals     DomainType = "transit.arrivals"
@@ -301,6 +302,35 @@ type WeatherAlert struct {
 ```
 
 *Implementations:* `envcanada.alerts`, `noaa.alerts` (future)
+
+### `weather.air_quality`
+
+```go
+type WeatherAirQuality struct {
+    Location     string
+    Province     string
+    SourceURL    string
+    Observed     *AQHIValue
+    Forecasts    []AQHIForecastPeriod
+    IssuedAt     time.Time
+    CalculatedAt time.Time
+    UpdatedAt    time.Time
+}
+
+type AQHIValue struct {
+    Value *int
+    Risk  string
+}
+
+type AQHIForecastPeriod struct {
+    Label string
+    Max   *AQHIValue
+}
+```
+
+*Implementations:* `envcanada.air_quality`
+
+Environment Canada AQHI collection fetches the configured province summary page and parses observed conditions plus forecast maximums. AQHI locations are distinct from weather stations; explicit `air_quality_province` and `air_quality_location` config is preferred when automatic province-scoped matching is not confident.
 
 ### `solar.weather.current`
 
@@ -867,6 +897,7 @@ On startup the frontend fetches `GET /api/v1/domains`. Widgets whose domain is a
 | `weather-current` | `weather.current` | Units |
 | `weather-forecast` | `weather.forecast` | Days to show |
 | `weather-hourly-forecast` | `weather.forecast.hourly` | — |
+| `weather-air-quality` | `weather.air_quality` | — |
 | `alerts` | `weather.alerts`, `transit.alerts`, `municipal.alerts` | Source type filter (default: all) |
 | `transit` | `transit.arrivals` | Agency, route, stop ID, max trips |
 | `camera` | `home` or `traffic.cameras` | Camera ID, stream type, refresh interval |
@@ -962,6 +993,10 @@ collectors:
     poll_interval_forecast: 1h
     poll_interval_hourly_forecast: 20m
     poll_interval_alerts: 15m
+    air_quality_enabled: false
+    # air_quality_province: ON
+    # air_quality_location: Kitchener
+    poll_interval_air_quality: 30m
 
   solar_envcanada:
     enabled: true

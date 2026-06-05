@@ -19,8 +19,10 @@ var allProvinces = []string{
 	"AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT",
 }
 
-// ecStation is one entry from the embedded station JSON on each province page.
-type ecStation struct {
+var stationPageBaseURL = "https://weather.gc.ca"
+
+// ECStation is one entry from the embedded station JSON on each province page.
+type ECStation struct {
 	Name        string  `json:"display_name"`
 	Code        string  `json:"code"`
 	SiteCode    string  `json:"site_code"`
@@ -45,6 +47,11 @@ var stationCache struct {
 	lat   float64
 	lon   float64
 	name  string
+}
+
+var provinceStationCache struct {
+	mu       sync.Mutex
+	stations map[string][]ECStation
 }
 
 // getNearestStation returns the lat/lon of the EC reporting station closest to
@@ -79,8 +86,7 @@ func discoverStationByCode(override StationOverride) (lat, lon float64, err erro
 	if province == "" {
 		return 0, 0, fmt.Errorf("province is required when station_code is set")
 	}
-	client := &http.Client{Timeout: 20 * time.Second}
-	stations, err := fetchProvinceStations(client, province)
+	stations, err := provinceStations(province)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -97,21 +103,20 @@ func discoverStationByCode(override StationOverride) (lat, lon float64, err erro
 // the embedded station JSON, and returns the closest station to the user.
 func discoverNearestStation(userLat, userLon float64) (lat, lon float64, name string, err error) {
 	type result struct {
-		stations []ecStation
+		stations []ECStation
 		err      error
 	}
 	ch := make(chan result, len(allProvinces))
-	client := &http.Client{Timeout: 20 * time.Second}
 
 	for _, prov := range allProvinces {
 		prov := prov
 		go func() {
-			s, e := fetchProvinceStations(client, prov)
+			s, e := provinceStations(prov)
 			ch <- result{s, e}
 		}()
 	}
 
-	var all []ecStation
+	var all []ECStation
 	for range allProvinces {
 		r := <-ch
 		if r.err != nil {
@@ -140,7 +145,7 @@ func discoverNearestStation(userLat, userLon float64) (lat, lon float64, name st
 	return nearest.Lat, nearest.Lon, nearest.Name, nil
 }
 
-func (s ecStation) matchesCode(code string) bool {
+func (s ECStation) matchesCode(code string) bool {
 	code = strings.ToLower(strings.TrimSpace(code))
 	for _, candidate := range []string{s.Code, s.SiteCode, s.StationCode, s.ID} {
 		if strings.ToLower(strings.TrimSpace(candidate)) == code {
@@ -150,10 +155,68 @@ func (s ecStation) matchesCode(code string) bool {
 	return false
 }
 
+func provinceStations(province string) ([]ECStation, error) {
+	province = strings.ToUpper(strings.TrimSpace(province))
+	if province == "" {
+		return nil, fmt.Errorf("province is required")
+	}
+	provinceStationCache.mu.Lock()
+	if provinceStationCache.stations != nil {
+		if stations, ok := provinceStationCache.stations[province]; ok {
+			out := append([]ECStation(nil), stations...)
+			provinceStationCache.mu.Unlock()
+			return out, nil
+		}
+	}
+	provinceStationCache.mu.Unlock()
+
+	stations, err := fetchProvinceStations(&http.Client{Timeout: 20 * time.Second}, province)
+	if err != nil {
+		return nil, err
+	}
+
+	provinceStationCache.mu.Lock()
+	if provinceStationCache.stations == nil {
+		provinceStationCache.stations = make(map[string][]ECStation)
+	}
+	provinceStationCache.stations[province] = append([]ECStation(nil), stations...)
+	provinceStationCache.mu.Unlock()
+	return stations, nil
+}
+
+func allStations() ([]ECStation, error) {
+	type result struct {
+		stations []ECStation
+		err      error
+	}
+	ch := make(chan result, len(allProvinces))
+	for _, prov := range allProvinces {
+		prov := prov
+		go func() {
+			stations, err := provinceStations(prov)
+			ch <- result{stations: stations, err: err}
+		}()
+	}
+	var all []ECStation
+	var errs []string
+	for range allProvinces {
+		r := <-ch
+		if r.err != nil {
+			errs = append(errs, r.err.Error())
+			continue
+		}
+		all = append(all, r.stations...)
+	}
+	if len(all) == 0 {
+		return nil, fmt.Errorf("no stations found: %s", strings.Join(errs, "; "))
+	}
+	return all, nil
+}
+
 // fetchProvinceStations downloads one province page and extracts its embedded
 // station JSON array.
-func fetchProvinceStations(client *http.Client, province string) ([]ecStation, error) {
-	url := "https://weather.gc.ca/forecast/canada/index_e.html?id=" + province
+func fetchProvinceStations(client *http.Client, province string) ([]ECStation, error) {
+	url := stationPageBaseURL + "/forecast/canada/index_e.html?id=" + province
 	resp, err := client.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("get %s: %w", url, err)
@@ -175,7 +238,7 @@ func fetchProvinceStations(client *http.Client, province string) ([]ecStation, e
 		return nil, fmt.Errorf("no station JSON found on %s page", province)
 	}
 
-	var stations []ecStation
+	var stations []ECStation
 	// json.Decoder.Decode reads one complete JSON value and ignores trailing content.
 	if err := json.NewDecoder(bytes.NewReader(body[start:])).Decode(&stations); err != nil {
 		return nil, fmt.Errorf("decode stations for %s: %w", province, err)

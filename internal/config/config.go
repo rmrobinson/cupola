@@ -90,6 +90,10 @@ type EnvCanadaWeatherConfig struct {
 	PollIntervalForecast       Duration `yaml:"poll_interval_forecast"`
 	PollIntervalHourlyForecast Duration `yaml:"poll_interval_hourly_forecast"`
 	PollIntervalAlerts         Duration `yaml:"poll_interval_alerts"`
+	AirQualityEnabled          bool     `yaml:"air_quality_enabled"`
+	AirQualityProvince         string   `yaml:"air_quality_province"`
+	AirQualityLocation         string   `yaml:"air_quality_location"`
+	PollIntervalAirQuality     Duration `yaml:"poll_interval_air_quality"`
 }
 
 type EnvCanadaSolarConfig struct {

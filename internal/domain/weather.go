@@ -88,3 +88,26 @@ type WeatherAlert struct {
 	Summary   string        `json:"summary"`
 	SourceURL string        `json:"source_url"`
 }
+
+type WeatherAirQuality struct {
+	StateBase
+	Location     string               `json:"location"`
+	Province     string               `json:"province"`
+	SourceURL    string               `json:"source_url"`
+	Observed     *AQHIValue           `json:"observed,omitempty"`
+	Forecasts    []AQHIForecastPeriod `json:"forecasts"`
+	IssuedAt     time.Time            `json:"issued_at,omitempty"`
+	CalculatedAt time.Time            `json:"calculated_at,omitempty"`
+}
+
+func (WeatherAirQuality) DomainType() DomainType { return DomainWeatherAirQuality }
+
+type AQHIValue struct {
+	Value *int   `json:"value,omitempty"`
+	Risk  string `json:"risk,omitempty"`
+}
+
+type AQHIForecastPeriod struct {
+	Label string     `json:"label"`
+	Max   *AQHIValue `json:"max,omitempty"`
+}

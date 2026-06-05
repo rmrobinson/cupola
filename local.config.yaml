@@ -31,6 +31,7 @@ collectors:
     # province: ON
     poll_interval_forecast: 1h
     poll_interval_alerts: 15m
+    air_quality_enabled: true
 
   solar_envcanada:
     enabled: true

@@ -78,6 +78,7 @@ var widgetImportRegistry = map[string]widgetImportMeta{
 
 	"weather-current":         {Domains: []domain.DomainType{domain.DomainWeatherCurrent}},
 	"weather-forecast":        {Domains: []domain.DomainType{domain.DomainWeatherForecast}},
+	"weather-air-quality":     {Domains: []domain.DomainType{domain.DomainWeatherAirQuality}},
 	"weather-rainfall":        {Domains: []domain.DomainType{domain.DomainWeatherCurrent}},
 	"solar-activity":          {Domains: []domain.DomainType{domain.DomainSolarWeatherCurrent}},
 	"solar-forecast":          {Domains: []domain.DomainType{domain.DomainSolarWeatherForecast}},

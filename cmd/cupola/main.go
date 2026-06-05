@@ -90,12 +90,29 @@ func main() {
 		if alertInterval == 0 {
 			alertInterval = 15 * time.Minute
 		}
+		airQualityInterval := c.PollIntervalAirQuality.Duration
+		if airQualityInterval == 0 {
+			airQualityInterval = 30 * time.Minute
+		}
 		log.Printf("envcanada: registering weather collectors for %.3f,%.3f",
 			cfg.Location.Lat, cfg.Location.Lon)
 		station := envcanada.StationOverride{Code: c.StationCode, Province: c.Province}
 		registry.Register(envcanada.NewForecastCollector(cfg.Location.Lat, cfg.Location.Lon, fcInterval, stateStore, station))
 		registry.Register(envcanada.NewHourlyForecastCollector(cfg.Location.Lat, cfg.Location.Lon, hourlyInterval, stateStore, station))
 		registry.Register(envcanada.NewAlertsCollector(cfg.Location.Lat, cfg.Location.Lon, alertInterval, stateStore, station))
+		if c.AirQualityEnabled {
+			registry.Register(envcanada.NewAirQualityCollector(
+				cfg.Location.Lat,
+				cfg.Location.Lon,
+				airQualityInterval,
+				stateStore,
+				envcanada.AirQualityOptions{
+					Province: c.AirQualityProvince,
+					Location: c.AirQualityLocation,
+					Station:  station,
+				},
+			))
+		}
 	}
 
 	// Canada flag status: HTML scrape of canada.ca.
