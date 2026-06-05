@@ -97,6 +97,22 @@ func main() {
 		registry.Register(envcanada.NewHourlyForecastCollector(cfg.Location.Lat, cfg.Location.Lon, hourlyInterval, stateStore, station))
 		registry.Register(envcanada.NewAlertsCollector(cfg.Location.Lat, cfg.Location.Lon, alertInterval, stateStore, station))
 	}
+	if aq := resolveAirQualityConfig(cfg.Collectors); aq.enabled {
+		registry.Register(envcanada.NewAirQualityCollector(
+			cfg.Location.Lat,
+			cfg.Location.Lon,
+			aq.interval,
+			stateStore,
+			envcanada.AirQualityOptions{
+				Province: aq.province,
+				Location: aq.location,
+				Station: envcanada.StationOverride{
+					Code:     aq.stationCode,
+					Province: aq.stationProvince,
+				},
+			},
+		))
+	}
 
 	// Canada flag status: HTML scrape of canada.ca.
 	if c := cfg.Collectors.FlagCanada; c != nil && c.Enabled {
@@ -369,6 +385,33 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown: %v", err)
 	}
+}
+
+type resolvedAirQualityConfig struct {
+	enabled         bool
+	interval        time.Duration
+	province        string
+	location        string
+	stationCode     string
+	stationProvince string
+}
+
+func resolveAirQualityConfig(cfg config.CollectorsConfig) resolvedAirQualityConfig {
+	if c := cfg.AirQualityEnvCanada; c != nil && c.Enabled {
+		interval := c.PollInterval.Duration
+		if interval == 0 {
+			interval = 30 * time.Minute
+		}
+		return resolvedAirQualityConfig{
+			enabled:         true,
+			interval:        interval,
+			province:        c.Province,
+			location:        c.Location,
+			stationCode:     c.StationCode,
+			stationProvince: c.Province,
+		}
+	}
+	return resolvedAirQualityConfig{}
 }
 
 func defaultCORSOrigins(host string, port int) []string {

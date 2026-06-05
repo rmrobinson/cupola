@@ -32,17 +32,31 @@ collectors:
     poll_interval_forecast: 1h
     poll_interval_alerts: 15m
 
+  air_quality_envcanada:
+    enabled: true
+    poll_interval: 30m
+
   solar_envcanada:
     enabled: true
     poll_interval: 1h
     # region auto-selected from lat/lon; override with:
     # region: 4
 
-  traffic_511:
+  traffic:
     enabled: true
-    provinces: [ON]
     poll_interval_incidents: 15m
     poll_interval_cameras: 24h
+    sources:
+      - id: on511
+        type: 511
+        province: ON
+        public_url: "https://511on.ca"
+        incidents_url: "https://511on.ca/api/v2/get/event?format=json&lang=en"
+        cameras_url: "https://511on.ca/api/v2/get/Cameras?format=json&lang=en"
+        road_conditions_url: "https://511on.ca/api/v3/get/RoadConditions?format=json&lang=en"
+      - id: region_waterloo_roadclosures
+        type: region-waterloo-roadclosures
+        url: "https://gis.regionofwaterloo.ca/wamap/rest/services/RegionalClosures/MapServer"
 
   aircraft_dump1090:
     enabled: true
@@ -88,6 +102,11 @@ collectors:
       url: "https://www.kitchenerutilities.ca/en/outages-and-news.aspx"
       poll_interval: 10m
       domain: municipal.alerts
+    - id: kitchener_roadclosures
+      parser: kitchener.roadclosures
+      url: "https://app2.kitchener.ca/roadclosures/list.asp"
+      poll_interval: 15m
+      domain: municipal.events
 
   waste_collection:
     enabled: true

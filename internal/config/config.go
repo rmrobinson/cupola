@@ -62,19 +62,20 @@ type TilesConfig struct {
 }
 
 type CollectorsConfig struct {
-	WeatherEcowitt   *EcowittConfig          `yaml:"weather_ecowitt"`
-	WeatherEnvCanada *EnvCanadaWeatherConfig `yaml:"weather_envcanada"`
-	SolarEnvCanada   *EnvCanadaSolarConfig   `yaml:"solar_envcanada"`
-	Transit          *TransitConfig          `yaml:"transit"`
-	Traffic          *TrafficConfig          `yaml:"traffic"`
-	AircraftDump1090 *Dump1090Config         `yaml:"aircraft_dump1090"`
-	House            *HouseConfig            `yaml:"house"`
-	RSSFeeds         []RSSFeedConfig         `yaml:"rss_feeds"`
-	FlagCanada       *FlagCanadaConfig       `yaml:"flag_canada"`
-	Waterways        []WaterwayConfig        `yaml:"waterways"`
-	Municipal        []MunicipalConfig       `yaml:"municipal"`
-	IMAP             *IMAPConfig             `yaml:"imap"`
-	WasteCollection  *WasteCollectionConfig  `yaml:"waste_collection"`
+	WeatherEcowitt      *EcowittConfig             `yaml:"weather_ecowitt"`
+	WeatherEnvCanada    *EnvCanadaWeatherConfig    `yaml:"weather_envcanada"`
+	AirQualityEnvCanada *EnvCanadaAirQualityConfig `yaml:"air_quality_envcanada"`
+	SolarEnvCanada      *EnvCanadaSolarConfig      `yaml:"solar_envcanada"`
+	Transit             *TransitConfig             `yaml:"transit"`
+	Traffic             *TrafficConfig             `yaml:"traffic"`
+	AircraftDump1090    *Dump1090Config            `yaml:"aircraft_dump1090"`
+	House               *HouseConfig               `yaml:"house"`
+	RSSFeeds            []RSSFeedConfig            `yaml:"rss_feeds"`
+	FlagCanada          *FlagCanadaConfig          `yaml:"flag_canada"`
+	Waterways           []WaterwayConfig           `yaml:"waterways"`
+	Municipal           []MunicipalConfig          `yaml:"municipal"`
+	IMAP                *IMAPConfig                `yaml:"imap"`
+	WasteCollection     *WasteCollectionConfig     `yaml:"waste_collection"`
 }
 
 type EcowittConfig struct {
@@ -90,6 +91,14 @@ type EnvCanadaWeatherConfig struct {
 	PollIntervalForecast       Duration `yaml:"poll_interval_forecast"`
 	PollIntervalHourlyForecast Duration `yaml:"poll_interval_hourly_forecast"`
 	PollIntervalAlerts         Duration `yaml:"poll_interval_alerts"`
+}
+
+type EnvCanadaAirQualityConfig struct {
+	Enabled      bool     `yaml:"enabled"`
+	StationCode  string   `yaml:"station_code"` // optional: bypass auto-discovery
+	Province     string   `yaml:"province"`     // required when station_code is set
+	Location     string   `yaml:"location"`     // optional AQHI site override
+	PollInterval Duration `yaml:"poll_interval"`
 }
 
 type EnvCanadaSolarConfig struct {

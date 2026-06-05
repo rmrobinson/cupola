@@ -28,6 +28,7 @@ These collectors make outbound HTTPS (or HTTP) requests to external services. Th
 | `envcanada.forecast` | `internal/collector/envcanada` | `weather.gc.ca` forecast Atom feeds. |
 | `envcanada.hourly_forecast` | `internal/collector/envcanada` | `weather.gc.ca` hourly forecast HTML pages. No RSS endpoint has been found for hourly data, so the collector parses embedded SSR JSON from the public hourly page. |
 | `envcanada.alerts` | `internal/collector/envcanada` | `weather.gc.ca` alert Atom feeds. |
+| `envcanada.air_quality` | `internal/collector/envcanada` | `weather.gc.ca` AQHI provincial summary HTML pages. |
 | `envcanada.solar` | `internal/collector/envcanada` | `services.swpc.noaa.gov` NOAA planetary K-index for solar/aurora data. |
 | `flag` | `internal/collector/flag` | `canada.ca` — scrapes the Canadian Heritage half-masting notices page. |
 | `gtfs` | `internal/collector/gtfs` | Transit agency GTFS static ZIP feeds. URLs are configured per agency in SQLite through the GTFS Feeds admin/API. |

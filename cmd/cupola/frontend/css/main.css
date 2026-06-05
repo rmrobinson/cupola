@@ -1584,6 +1584,131 @@ button {
   }
 }
 
+/* ── Weather air quality widget ────────────────────────────────────────── */
+
+.widget-air-quality {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(3px, 2.4cqh, 7px);
+  overflow: hidden;
+}
+
+.aq-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.aq-location {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(0.72rem, min(4.8cqw, 9cqh), 1rem);
+  font-weight: 650;
+}
+
+.aq-province {
+  flex: 0 0 auto;
+  color: rgba(255,255,255,0.48);
+  font-size: clamp(0.55rem, min(3.1cqw, 6cqh), 0.74rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.aq-current {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(7px, 3cqw, 14px);
+  min-width: 0;
+}
+
+.aq-value {
+  font-size: clamp(2rem, min(23cqw, 39cqh), 4.6rem);
+  font-weight: 220;
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+
+.aq-risk {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(0.72rem, min(4.5cqw, 8.5cqh), 1.15rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.aq-bar {
+  flex: 0 0 auto;
+  height: 5px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.aq-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s, background 0.5s;
+}
+
+.aq-forecast {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1px, 1.3cqh, 4px);
+}
+
+.aq-period {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: clamp(4px, 2cqw, 8px);
+  padding: clamp(1px, 1.1cqh, 4px) 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: clamp(0.56rem, min(2.9cqw, 5.7cqh), 0.76rem);
+  line-height: 1.15;
+}
+
+.aq-period-label,
+.aq-period-risk {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aq-period-label {
+  font-weight: 650;
+}
+
+.aq-period-value {
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.aq-period-risk {
+  color: rgba(255,255,255,0.58);
+}
+
+.aq-issued {
+  margin-top: auto;
+  color: rgba(255,255,255,0.46);
+  font-size: clamp(0.5rem, min(2.7cqw, 5cqh), 0.68rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Weather forecast widget ───────────────────────────────────────────── */
 
 .widget-weather-forecast {
