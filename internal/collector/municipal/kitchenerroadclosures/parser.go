@@ -1,7 +1,12 @@
-package traffic511
+// Package kitchenerroadclosures parses the City of Kitchener road-closures
+// page into municipal.alerts.
+//
+// Register via import side-effect:
+//
+//	_ "github.com/rmrobinson/cupola/internal/collector/municipal/kitchenerroadclosures"
+package kitchenerroadclosures
 
 import (
-	"context"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -12,73 +17,48 @@ import (
 
 	"golang.org/x/net/html"
 
+	"github.com/rmrobinson/cupola/internal/collector/municipal"
 	"github.com/rmrobinson/cupola/internal/domain"
 )
 
-const (
-	kitchenerCityCentreLat = 43.4516
-	kitchenerCityCentreLon = -80.4925
-)
+const publicURL = "https://www.kitchener.ca/roadclosures"
 
-type KitchenerRoadClosuresSource struct {
-	listURL   string
-	publicURL string
-	lat       float64
-	lon       float64
+func init() {
+	municipal.RegisterAlertsParser("kitchener.roadclosures", func() municipal.AlertsParser {
+		return &Parser{}
+	})
 }
 
-func NewKitchenerRoadClosuresSource() *KitchenerRoadClosuresSource {
-	return &KitchenerRoadClosuresSource{
-		listURL:   kitchenerRoadClosuresListURL,
-		publicURL: kitchenerRoadClosuresURL,
-		lat:       kitchenerCityCentreLat,
-		lon:       kitchenerCityCentreLon,
-	}
+// Parser implements municipal.AlertsParser for Kitchener road closures.
+type Parser struct {
+	Now func() time.Time
 }
 
-func (s *KitchenerRoadClosuresSource) ID() string { return "kitchener.roadclosures" }
-
-func (s *KitchenerRoadClosuresSource) Fetch(ctx context.Context) ([]domain.TrafficIncident, error) {
-	incidents, err := fetchKitchenerRoadClosures(ctx, s.listURL)
+func (p *Parser) Parse(rawURL string) ([]domain.MunicipalAlert, error) {
+	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("kitchener.roadclosures: create request %s: %w", rawURL, err)
 	}
-	for i := range incidents {
-		incidents[i].Lat = s.lat
-		incidents[i].Lon = s.lon
-		incidents[i].SourceURL = s.publicURL
-		incidents[i].ApproximateLocation = true
-		if incidents[i].LocationLabel == "" {
-			incidents[i].LocationLabel = "Kitchener city centre"
-		}
-	}
-	return incidents, nil
-}
-
-func fetchKitchenerRoadClosures(ctx context.Context, url string) ([]domain.TrafficIncident, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("create request %s: %w", url, err)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("get %s: %w", url, err)
+		return nil, fmt.Errorf("kitchener.roadclosures: get %s: %w", rawURL, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		io.Copy(io.Discard, io.LimitReader(resp.Body, 512)) //nolint:errcheck
-		return nil, fmt.Errorf("get %s: status %d", url, resp.StatusCode)
+		return nil, fmt.Errorf("kitchener.roadclosures: get %s: status %d", rawURL, resp.StatusCode)
 	}
-	return parseKitchenerRoadClosures(resp.Body)
+	return p.parse(resp.Body)
 }
 
-func parseKitchenerRoadClosures(r io.Reader) ([]domain.TrafficIncident, error) {
+func (p *Parser) parse(r io.Reader) ([]domain.MunicipalAlert, error) {
 	doc, err := html.Parse(r)
 	if err != nil {
-		return nil, fmt.Errorf("parse html: %w", err)
+		return nil, fmt.Errorf("kitchener.roadclosures: parse HTML: %w", err)
 	}
 
-	var incidents []domain.TrafficIncident
+	url := publicURL
+	var alerts []domain.MunicipalAlert
 	for _, table := range htmlElements(doc, "table") {
 		section := roadClosureSectionTitle(table)
 		for _, row := range htmlElements(table, "tr") {
@@ -96,16 +76,11 @@ func parseKitchenerRoadClosures(r io.Reader) ([]domain.TrafficIncident, error) {
 			if reason == "" && details == "" && fields["date"] == "" {
 				continue
 			}
-			if street == "" || !includeKitchenerClosure(section, reason, details) {
+			if street == "" || !includeClosure(section, reason, details) {
 				continue
 			}
 
-			startsAt, endsAt := parseKitchenerDateRange(fields["date"])
-			severity := "moderate"
-			if strings.Contains(strings.ToLower(section), "emergency") {
-				severity = "major"
-			}
-
+			startsAt, endsAt := parseDateRange(fields["date"])
 			description := reason
 			if details != "" {
 				if description != "" {
@@ -117,28 +92,77 @@ func parseKitchenerRoadClosures(r io.Reader) ([]domain.TrafficIncident, error) {
 				description = appendSentence(description, "From "+fromTo)
 			}
 
-			incidents = append(incidents, domain.TrafficIncident{
-				ID:                  "kitchener-" + stableClosureID(section, street, fromTo, fields["date"], reason),
-				Type:                "closure",
-				Severity:            severity,
-				Description:         description,
-				RoadName:            street,
-				StartsAt:            startsAt,
-				EndsAt:              endsAt,
-				SourceURL:           kitchenerRoadClosuresURL,
-				Lat:                 kitchenerCityCentreLat,
-				Lon:                 kitchenerCityCentreLon,
-				ApproximateLocation: true,
-				LocationLabel:       "Kitchener city centre",
+			var area *string
+			if fromTo != "" {
+				a := street + ": " + fromTo
+				area = &a
+			} else {
+				a := street
+				area = &a
+			}
+
+			alerts = append(alerts, domain.MunicipalAlert{
+				ID:          "kitchener.roadclosures:" + stableClosureID(section, street, fromTo, fields["date"], reason),
+				Title:       street + " road closure",
+				Description: description,
+				AlertType:   "road-closure",
+				Severity:    closureSeverity(section, reason, details),
+				Area:        area,
+				StartsAt:    startsAt,
+				EndsAt:      endsAt,
+				URL:         &url,
+				PublishedAt: publishedAtFromStartsAt(startsAt),
 			})
 		}
 	}
-	return incidents, nil
+
+	alerts, _ = dedupeMunicipalAlertsByID(alerts)
+	return alerts, nil
 }
 
-func includeKitchenerClosure(section, reason, details string) bool {
+func includeClosure(section, reason, details string) bool {
 	text := strings.ToLower(section + " " + reason + " " + details)
 	return strings.Contains(text, "emergency") || strings.Contains(text, "special event")
+}
+
+func publishedAtFromStartsAt(startsAt *time.Time) time.Time {
+	if startsAt == nil {
+		return time.Time{}
+	}
+	return startsAt.UTC()
+}
+
+func closureSeverity(section, reason, details string) domain.AlertSeverity {
+	text := strings.ToLower(section + " " + reason + " " + details)
+	if strings.Contains(text, "emergency") {
+		return domain.SeverityWarning
+	}
+	return domain.SeverityInfo
+}
+
+func dedupeMunicipalAlertsByID(alerts []domain.MunicipalAlert) ([]domain.MunicipalAlert, int) {
+	if len(alerts) < 2 {
+		return alerts, 0
+	}
+	seen := make(map[string]struct{}, len(alerts))
+	deduped := make([]domain.MunicipalAlert, 0, len(alerts))
+	var duplicates int
+	for _, alert := range alerts {
+		if alert.ID == "" {
+			deduped = append(deduped, alert)
+			continue
+		}
+		if _, ok := seen[alert.ID]; ok {
+			duplicates++
+			continue
+		}
+		seen[alert.ID] = struct{}{}
+		deduped = append(deduped, alert)
+	}
+	if duplicates == 0 {
+		return alerts, 0
+	}
+	return deduped, duplicates
 }
 
 func roadClosureSectionTitle(table *html.Node) string {
@@ -190,20 +214,20 @@ func splitClosureDetailLabel(line string) (key string, value string, ok bool) {
 	return strings.ToLower(m[1]), strings.TrimSpace(m[2]), true
 }
 
-func parseKitchenerDateRange(raw string) (*time.Time, *time.Time) {
+func parseDateRange(raw string) (*time.Time, *time.Time) {
 	if raw == "" {
 		return nil, nil
 	}
 	parts := strings.SplitN(raw, " to ", 2)
-	start := parseKitchenerDate(parts[0])
+	start := parseDate(parts[0])
 	var end *time.Time
 	if len(parts) == 2 {
-		end = parseKitchenerDate(parts[1])
+		end = parseDate(parts[1])
 	}
 	return start, end
 }
 
-func parseKitchenerDate(raw string) *time.Time {
+func parseDate(raw string) *time.Time {
 	t, err := time.Parse("2006-Jan-02", strings.TrimSpace(raw))
 	if err != nil {
 		return nil

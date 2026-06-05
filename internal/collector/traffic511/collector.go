@@ -16,12 +16,10 @@ import (
 )
 
 const (
-	eventsURL                    = "https://511on.ca/api/v2/get/event?format=json&lang=en"
-	camerasURL                   = "https://511on.ca/api/v2/get/Cameras?format=json&lang=en"
-	roadCondURL                  = "https://511on.ca/api/v3/get/RoadConditions?format=json&lang=en"
-	publicURL                    = "https://511on.ca"
-	kitchenerRoadClosuresURL     = "https://www.kitchener.ca/roadclosures"
-	kitchenerRoadClosuresListURL = "https://app2.kitchener.ca/roadclosures/list.asp"
+	eventsURL   = "https://511on.ca/api/v2/get/event?format=json&lang=en"
+	camerasURL  = "https://511on.ca/api/v2/get/Cameras?format=json&lang=en"
+	roadCondURL = "https://511on.ca/api/v3/get/RoadConditions?format=json&lang=en"
+	publicURL   = "https://511on.ca"
 
 	defaultIncidentInterval = 15 * time.Minute
 	defaultCameraInterval   = 24 * time.Hour
@@ -38,7 +36,7 @@ func NewCollectors(incidentInterval, cameraInterval time.Duration, stateStore *s
 	if cameraInterval == 0 {
 		cameraInterval = defaultCameraInterval
 	}
-	return NewIncidentsCollector(incidentInterval, stateStore, NewON511IncidentsSource(), NewKitchenerRoadClosuresSource()),
+	return NewIncidentsCollector(incidentInterval, stateStore, NewON511IncidentsSource()),
 		&CamerasCollector{interval: cameraInterval, stateStore: stateStore, wake: make(chan struct{}, 1)},
 		&RoadConditionsCollector{interval: incidentInterval, stateStore: stateStore, wake: make(chan struct{}, 1)}
 }

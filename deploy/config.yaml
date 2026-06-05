@@ -83,6 +83,11 @@ collectors:
       url: "https://www.grandriver.ca/news/categories/flood-messages/"
       poll_interval: 15m
       domain: municipal.alerts
+    - id: kitchener_roadclosures
+      parser: kitchener.roadclosures
+      url: "https://app2.kitchener.ca/roadclosures/list.asp"
+      poll_interval: 15m
+      domain: municipal.alerts
     - id: enova_power
       parser: enova.power
       url: "https://oms.enovapower.com/Outages/"
