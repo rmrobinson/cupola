@@ -48,5 +48,6 @@ func resetStationTestState() {
 	stationCache.lat = 0
 	stationCache.lon = 0
 	stationCache.name = ""
+	stationCache.prov = ""
 	stationCache.mu.Unlock()
 }

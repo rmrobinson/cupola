@@ -1,10 +1,15 @@
 package envcanada
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rmrobinson/cupola/internal/domain"
+	"github.com/rmrobinson/cupola/internal/store"
 )
 
 func TestParseAirQualitySummaryHTML(t *testing.T) {
@@ -68,6 +73,43 @@ func TestParseAirQualitySummaryHTMLMissingValues(t *testing.T) {
 	}
 }
 
+func TestParseAirQualityIssuedAtUsesSiteLocation(t *testing.T) {
+	loc, err := time.LoadLocation("America/Toronto")
+	if err != nil {
+		t.Fatalf("LoadLocation: %v", err)
+	}
+	summary, err := parseAirQualitySummaryHTMLInLocation([]byte(airQualitySummaryFixture), "ON", airQualityBaseURL, loc)
+	if err != nil {
+		t.Fatalf("parseAirQualitySummaryHTMLInLocation: %v", err)
+	}
+	want := time.Date(2026, 6, 4, 17, 0, 0, 0, loc)
+	if !summary.IssuedAt.Equal(want) {
+		t.Fatalf("IssuedAt = %s, want %s", summary.IssuedAt, want)
+	}
+}
+
+func TestParseAirQualitySummaryHTMLIgnoresNestedTableCells(t *testing.T) {
+	body := strings.Replace(airQualitySummaryFixture,
+		"4<br>Moderate Risk</td>",
+		"4<br>Moderate Risk<table><tr><td>99<br>Very High Risk</td></tr></table></td>",
+		1,
+	)
+	summary, err := parseAirQualitySummaryHTML([]byte(body), "ON", airQualityBaseURL)
+	if err != nil {
+		t.Fatalf("parseAirQualitySummaryHTML: %v", err)
+	}
+	row, ok := findAirQualitySite(summary.Sites, "Kitchener")
+	if !ok {
+		t.Fatalf("Kitchener row not found")
+	}
+	assertAQHIValue(t, "tonight", row.Forecasts[0].Max, 4, "Moderate Risk")
+}
+
+func TestParseAQHIValueVeryHighPlus(t *testing.T) {
+	got := parseAQHIValue("10+ Very High Risk")
+	assertAQHIValue(t, "10+", got, 10, "Very High Risk")
+}
+
 func TestDiscoverAirQualitySite(t *testing.T) {
 	summary, err := parseAirQualitySummaryHTML([]byte(airQualitySummaryFixture), "ON", airQualityBaseURL)
 	if err != nil {
@@ -89,6 +131,46 @@ func TestDiscoverAirQualitySite(t *testing.T) {
 	}
 }
 
+func TestResolveSiteUsesConfiguredStationCodeCoordinates(t *testing.T) {
+	resetStationTestState()
+	oldAQBase := airQualityBaseURL
+	defer func() {
+		airQualityBaseURL = oldAQBase
+		resetStationTestState()
+	}()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/airquality/pages/provincial_summary/on_e.html":
+			_, _ = fmt.Fprint(w, airQualitySummaryFixture)
+		case "/forecast/canada/index_e.html":
+			_, _ = fmt.Fprint(w, `<html><script>[`+
+				`{"display_name":"Hamilton Downtown","code":"hamilton","lat":43.2557,"lon":-79.8711,"province":"ON"},`+
+				`{"display_name":"Kitchener Waterloo","code":"s0000585","lat":43.45,"lon":-80.49,"province":"ON"}`+
+				`]</script></html>`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	airQualityBaseURL = srv.URL
+	stationPageBaseURL = srv.URL
+
+	collector := NewAirQualityCollector(43.2557, -79.8711, time.Hour, store.NewStateStore(), AirQualityOptions{
+		Station: StationOverride{Code: "s0000585", Province: "ON"},
+	})
+	site, err := collector.resolveSite()
+	if err != nil {
+		t.Fatalf("resolveSite: %v", err)
+	}
+	if site.Location != "Kitchener" {
+		t.Fatalf("site.Location = %q, want Kitchener", site.Location)
+	}
+	if site.Lat != 43.45 || site.Lon != -80.49 {
+		t.Fatalf("site coordinates = %.4f, %.4f; want configured station coordinates", site.Lat, site.Lon)
+	}
+}
+
 func TestDiscoverAirQualitySiteLowConfidence(t *testing.T) {
 	rows := []airQualityRow{{Location: "Kitchener"}}
 	stations := []ECStation{{Name: "Ottawa", Lat: 45.42, Lon: -75.69, Province: "ON"}}
@@ -96,7 +178,7 @@ func TestDiscoverAirQualitySiteLowConfidence(t *testing.T) {
 	if err == nil {
 		t.Fatalf("discoverAirQualitySite returned nil error")
 	}
-	if !strings.Contains(err.Error(), "air_quality_location") {
+	if !strings.Contains(err.Error(), "air_quality_envcanada.location") {
 		t.Fatalf("error = %q", err.Error())
 	}
 }

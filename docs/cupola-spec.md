@@ -313,7 +313,6 @@ type WeatherAirQuality struct {
     Observed     *AQHIValue
     Forecasts    []AQHIForecastPeriod
     IssuedAt     time.Time
-    CalculatedAt time.Time
     UpdatedAt    time.Time
 }
 
@@ -330,7 +329,7 @@ type AQHIForecastPeriod struct {
 
 *Implementations:* `envcanada.air_quality`
 
-Environment Canada AQHI collection fetches the configured province summary page and parses observed conditions plus forecast maximums. AQHI locations are distinct from weather stations; explicit `air_quality_province` and `air_quality_location` config is preferred when automatic province-scoped matching is not confident.
+Environment Canada AQHI collection fetches the configured province summary page and parses observed conditions plus forecast maximums. AQHI locations are distinct from weather stations; explicit `air_quality_envcanada.location` config is preferred when automatic province-scoped matching is not confident.
 
 ### `solar.weather.current`
 
@@ -993,10 +992,13 @@ collectors:
     poll_interval_forecast: 1h
     poll_interval_hourly_forecast: 20m
     poll_interval_alerts: 15m
-    air_quality_enabled: false
-    # air_quality_province: ON
-    # air_quality_location: Kitchener
-    poll_interval_air_quality: 30m
+
+  air_quality_envcanada:
+    enabled: false
+    # station_code: s0000585
+    # province: ON
+    # location: Kitchener
+    poll_interval: 30m
 
   solar_envcanada:
     enabled: true

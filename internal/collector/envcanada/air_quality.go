@@ -20,7 +20,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-const airQualityBaseURL = "https://weather.gc.ca"
+var airQualityBaseURL = "https://weather.gc.ca"
 
 type AirQualityOptions struct {
 	Province string
@@ -79,6 +79,9 @@ func (c *AirQualityCollector) Start(ctx context.Context) error {
 		}
 		if site != nil {
 			if err := c.fetch(*site); err != nil {
+				// TODO: publish a system health error for initial fetch failures,
+				// matching the periodic fetch path once startup health semantics
+				// are cleaned up across collectors.
 				log.Printf("[envcanada.air_quality] initial fetch: %v", err)
 			}
 		}
@@ -135,7 +138,7 @@ func (c *AirQualityCollector) fetchIfReady(site *airQualitySite) *airQualitySite
 }
 
 func (c *AirQualityCollector) resolveSite() (*airQualitySite, error) {
-	province, err := c.resolveProvince()
+	province, selectionLat, selectionLon, err := c.resolveSiteContext()
 	if err != nil {
 		return nil, err
 	}
@@ -151,46 +154,55 @@ func (c *AirQualityCollector) resolveSite() (*airQualitySite, error) {
 				location, province, availableAirQualitySites(summary.Sites))
 		}
 		log.Printf("[envcanada.air_quality] configured AQHI site: %s, %s", row.Location, province)
-		return &airQualitySite{Province: province, Location: row.Location}, nil
+		siteLat, siteLon := selectionLat, selectionLon
+		if stations, err := provinceStations(province); err == nil {
+			if station, score := bestStationMatch(row.Location, stations); score >= 0.45 {
+				siteLat, siteLon = station.Lat, station.Lon
+			}
+		}
+		return buildAirQualitySite(province, row.Location, siteLat, siteLon), nil
 	}
 	stations, err := provinceStations(province)
 	if err != nil {
 		return nil, err
 	}
-	site, matched, err := discoverAirQualitySite(summary.Sites, stations, c.userLat, c.userLon)
+	site, matched, err := discoverAirQualitySite(summary.Sites, stations, selectionLat, selectionLon)
 	if err != nil {
 		return nil, err
 	}
 	log.Printf("[envcanada.air_quality] selected AQHI site: %s, %s (matched station %s)",
 		site.Location, province, matched.Name)
-	return &airQualitySite{Province: province, Location: site.Location}, nil
+	return buildAirQualitySite(province, site.Location, matched.Lat, matched.Lon), nil
 }
 
-func (c *AirQualityCollector) resolveProvince() (string, error) {
+func (c *AirQualityCollector) resolveSiteContext() (province string, lat, lon float64, err error) {
+	lat, lon = c.userLat, c.userLon
+	if strings.TrimSpace(c.options.Station.Code) != "" {
+		station, err := resolveStationDetails(c.userLat, c.userLon, c.options.Station)
+		if err != nil {
+			return "", 0, 0, err
+		}
+		lat, lon = station.Lat, station.Lon
+		if province := normalizeProvince(c.options.Province); province != "" {
+			return province, lat, lon, nil
+		}
+		return normalizeProvince(station.Province), lat, lon, nil
+	}
 	if province := normalizeProvince(c.options.Province); province != "" {
-		return province, nil
+		return province, lat, lon, nil
 	}
 	if province := normalizeProvince(c.options.Station.Province); province != "" {
-		return province, nil
+		return province, lat, lon, nil
 	}
-	lat, lon, name, err := discoverNearestStation(c.userLat, c.userLon)
+	station, err := getNearestStationDetails(c.userLat, c.userLon)
 	if err != nil {
-		return "", err
+		return "", 0, 0, err
 	}
-	stations, err := allStations()
-	if err != nil {
-		return "", err
-	}
-	for _, s := range stations {
-		if s.Lat == lat && s.Lon == lon && s.Name == name {
-			return normalizeProvince(s.Province), nil
-		}
-	}
-	return "", fmt.Errorf("could not determine province for nearest station %q", name)
+	return normalizeProvince(station.Province), lat, lon, nil
 }
 
 func (c *AirQualityCollector) fetch(site airQualitySite) error {
-	summary, err := fetchAirQualitySummary(site.Province)
+	summary, err := fetchAirQualitySummaryInLocation(site.Province, site.Timezone)
 	if err != nil {
 		return err
 	}
@@ -223,6 +235,9 @@ func (c *AirQualityCollector) fetch(site airQualitySite) error {
 type airQualitySite struct {
 	Province string
 	Location string
+	Lat      float64
+	Lon      float64
+	Timezone *time.Location
 }
 
 type airQualitySummary struct {
@@ -239,6 +254,10 @@ type airQualityRow struct {
 }
 
 func fetchAirQualitySummary(province string) (*airQualitySummary, error) {
+	return fetchAirQualitySummaryInLocation(province, nil)
+}
+
+func fetchAirQualitySummaryInLocation(province string, loc *time.Location) (*airQualitySummary, error) {
 	province = normalizeProvince(province)
 	u := airQualitySummaryURL(province)
 	client := &http.Client{Timeout: 20 * time.Second}
@@ -254,7 +273,7 @@ func fetchAirQualitySummary(province string) (*airQualitySummary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", u, err)
 	}
-	return parseAirQualitySummaryHTML(body, province, airQualityBaseURL)
+	return parseAirQualitySummaryHTMLInLocation(body, province, airQualityBaseURL, loc)
 }
 
 func airQualitySummaryURL(province string) string {
@@ -262,6 +281,10 @@ func airQualitySummaryURL(province string) string {
 }
 
 func parseAirQualitySummaryHTML(body []byte, province, baseURL string) (*airQualitySummary, error) {
+	return parseAirQualitySummaryHTMLInLocation(body, province, baseURL, nil)
+}
+
+func parseAirQualitySummaryHTMLInLocation(body []byte, province, baseURL string, loc *time.Location) (*airQualitySummary, error) {
 	root, err := html.Parse(strings.NewReader(string(body)))
 	if err != nil {
 		return nil, fmt.Errorf("parse AQHI HTML: %w", err)
@@ -276,8 +299,8 @@ func parseAirQualitySummaryHTML(body []byte, province, baseURL string) (*airQual
 	}
 
 	var rows []airQualityRow
-	for _, tr := range childElements(table, "tr") {
-		cells := childElements(tr, "td")
+	for _, tr := range descendantElements(table, "tr") {
+		cells := directChildElements(tr, "td")
 		if len(cells) < 2 {
 			continue
 		}
@@ -308,7 +331,7 @@ func parseAirQualitySummaryHTML(body []byte, province, baseURL string) (*airQual
 	return &airQualitySummary{
 		Province: normalizeProvince(province),
 		Sites:    rows,
-		IssuedAt: parseAirQualityIssuedAt(root),
+		IssuedAt: parseAirQualityIssuedAt(root, loc),
 	}, nil
 }
 
@@ -333,8 +356,8 @@ func findAirQualitySummaryTable(root *html.Node) *html.Node {
 
 func forecastHeaders(table *html.Node) []string {
 	var labels []string
-	for _, tr := range childElements(table, "tr") {
-		ths := childElements(tr, "th")
+	for _, tr := range descendantElements(table, "tr") {
+		ths := directChildElements(tr, "th")
 		if len(ths) == 0 {
 			continue
 		}
@@ -356,7 +379,7 @@ func forecastHeaders(table *html.Node) []string {
 	return labels
 }
 
-func childElements(root *html.Node, name string) []*html.Node {
+func descendantElements(root *html.Node, name string) []*html.Node {
 	var out []*html.Node
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
@@ -370,6 +393,16 @@ func childElements(root *html.Node, name string) []*html.Node {
 	}
 	for c := root.FirstChild; c != nil; c = c.NextSibling {
 		walk(c)
+	}
+	return out
+}
+
+func directChildElements(root *html.Node, name string) []*html.Node {
+	var out []*html.Node
+	for c := root.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode && c.Data == name {
+			out = append(out, c)
+		}
 	}
 	return out
 }
@@ -439,7 +472,7 @@ func parseAQHIValue(text string) *domain.AQHIValue {
 	return &value
 }
 
-func parseAirQualityIssuedAt(root *html.Node) time.Time {
+func parseAirQualityIssuedAt(root *html.Node, loc *time.Location) time.Time {
 	var candidates []string
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
@@ -463,17 +496,27 @@ func parseAirQualityIssuedAt(root *html.Node) time.Time {
 	}
 	walk(root)
 	for _, c := range candidates {
-		if ts := parseIssuedTime(c); !ts.IsZero() {
+		if ts := parseIssuedTime(c, loc); !ts.IsZero() {
 			return ts
 		}
 	}
 	return time.Time{}
 }
 
-func parseIssuedTime(s string) time.Time {
+func parseIssuedTime(s string, loc *time.Location) time.Time {
 	s = cleanText(strings.TrimPrefix(s, "1."))
 	s = strings.TrimPrefix(s, "Forecast issued at:")
 	s = strings.TrimSpace(s)
+	if loc != nil {
+		for _, layout := range []string{
+			"3:04 PM MST Monday 2 January 2006",
+			"3:04 PM Monday 2 January 2006",
+		} {
+			if t, err := time.ParseInLocation(layout, s, loc); err == nil {
+				return t
+			}
+		}
+	}
 	layouts := []string{
 		"3:04 PM MST Monday 2 January 2006",
 		"3:04 PM Monday 2 January 2006",
@@ -484,6 +527,66 @@ func parseIssuedTime(s string) time.Time {
 		}
 	}
 	return time.Time{}
+}
+
+func buildAirQualitySite(province, location string, lat, lon float64) *airQualitySite {
+	return &airQualitySite{
+		Province: normalizeProvince(province),
+		Location: location,
+		Lat:      lat,
+		Lon:      lon,
+		Timezone: airQualitySiteTimezone(province, lat, lon),
+	}
+}
+
+func airQualitySiteTimezone(province string, lat, lon float64) *time.Location {
+	name := airQualitySiteTimezoneName(province, lat, lon)
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		return time.UTC
+	}
+	return loc
+}
+
+func airQualitySiteTimezoneName(province string, lat, lon float64) string {
+	switch normalizeProvince(province) {
+	case "BC":
+		if lon > -120 {
+			return "America/Edmonton"
+		}
+		return "America/Vancouver"
+	case "AB", "NT":
+		return "America/Edmonton"
+	case "SK":
+		return "America/Regina"
+	case "MB":
+		return "America/Winnipeg"
+	case "ON":
+		if lon < -90 {
+			return "America/Winnipeg"
+		}
+		return "America/Toronto"
+	case "QC":
+		return "America/Toronto"
+	case "NB", "NS", "PE":
+		return "America/Halifax"
+	case "NL":
+		return "America/St_Johns"
+	case "YT":
+		return "America/Whitehorse"
+	case "NU":
+		if lon < -102 {
+			return "America/Rankin_Inlet"
+		}
+		if lon < -85 {
+			return "America/Winnipeg"
+		}
+		return "America/Iqaluit"
+	default:
+		_ = lat
+		_ = lon
+		return "America/Toronto"
+	}
 }
 
 func findAirQualitySite(rows []airQualityRow, location string) (airQualityRow, bool) {
@@ -523,7 +626,7 @@ func discoverAirQualitySite(rows []airQualityRow, stations []ECStation, userLat,
 		})
 	}
 	if len(candidates) == 0 {
-		return airQualityRow{}, ECStation{}, fmt.Errorf("could not confidently match AQHI sites to stations; configure air_quality_location explicitly. Available: %s", availableAirQualitySites(rows))
+		return airQualityRow{}, ECStation{}, fmt.Errorf("could not confidently match AQHI sites to stations; configure air_quality_envcanada.location explicitly. Available: %s", availableAirQualitySites(rows))
 	}
 	sort.Slice(candidates, func(i, j int) bool {
 		if candidates[i].dist == candidates[j].dist {

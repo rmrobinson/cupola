@@ -47,6 +47,7 @@ var stationCache struct {
 	lat   float64
 	lon   float64
 	name  string
+	prov  string
 }
 
 var provinceStationCache struct {
@@ -59,49 +60,89 @@ var provinceStationCache struct {
 // lifetime after a successful discovery. Failed discovery is intentionally not
 // cached so collectors can recover when internet connectivity returns.
 func getNearestStation(userLat, userLon float64) (lat, lon float64, err error) {
+	station, err := getNearestStationDetails(userLat, userLon)
+	if err != nil {
+		return 0, 0, err
+	}
+	return station.Lat, station.Lon, nil
+}
+
+func getNearestStationDetails(userLat, userLon float64) (ECStation, error) {
 	stationCache.mu.Lock()
 	defer stationCache.mu.Unlock()
 	if stationCache.ready {
-		return stationCache.lat, stationCache.lon, nil
+		return ECStation{
+			Name:     stationCache.name,
+			Lat:      stationCache.lat,
+			Lon:      stationCache.lon,
+			Province: stationCache.prov,
+		}, nil
 	}
-	lat, lon, name, err := discoverNearestStation(userLat, userLon)
+	station, err := discoverNearestStationDetails(userLat, userLon)
 	if err != nil {
-		return 0, 0, err
+		return ECStation{}, err
 	}
-	stationCache.lat, stationCache.lon, stationCache.name = lat, lon, name
+	stationCache.lat = station.Lat
+	stationCache.lon = station.Lon
+	stationCache.name = station.Name
+	stationCache.prov = station.Province
 	stationCache.ready = true
-	return lat, lon, nil
+	return station, nil
 }
 
 func resolveStation(userLat, userLon float64, override StationOverride) (lat, lon float64, err error) {
-	if strings.TrimSpace(override.Code) == "" {
-		return getNearestStation(userLat, userLon)
+	station, err := resolveStationDetails(userLat, userLon, override)
+	if err != nil {
+		return 0, 0, err
 	}
-	return discoverStationByCode(override)
+	return station.Lat, station.Lon, nil
+}
+
+func resolveStationDetails(userLat, userLon float64, override StationOverride) (ECStation, error) {
+	if strings.TrimSpace(override.Code) == "" {
+		return getNearestStationDetails(userLat, userLon)
+	}
+	return discoverStationByCodeDetails(override)
 }
 
 func discoverStationByCode(override StationOverride) (lat, lon float64, err error) {
+	station, err := discoverStationByCodeDetails(override)
+	if err != nil {
+		return 0, 0, err
+	}
+	return station.Lat, station.Lon, nil
+}
+
+func discoverStationByCodeDetails(override StationOverride) (ECStation, error) {
 	code := strings.TrimSpace(override.Code)
 	province := strings.ToUpper(strings.TrimSpace(override.Province))
 	if province == "" {
-		return 0, 0, fmt.Errorf("province is required when station_code is set")
+		return ECStation{}, fmt.Errorf("province is required when station_code is set")
 	}
 	stations, err := provinceStations(province)
 	if err != nil {
-		return 0, 0, err
+		return ECStation{}, err
 	}
 	for _, s := range stations {
 		if s.matchesCode(code) {
 			log.Printf("[envcanada] configured station: %s (%.3f, %.3f)", s.Name, s.Lat, s.Lon)
-			return s.Lat, s.Lon, nil
+			return s, nil
 		}
 	}
-	return 0, 0, fmt.Errorf("station_code %q not found in province %s", code, province)
+	return ECStation{}, fmt.Errorf("station_code %q not found in province %s", code, province)
 }
 
 // discoverNearestStation fetches all province pages concurrently, aggregates
 // the embedded station JSON, and returns the closest station to the user.
 func discoverNearestStation(userLat, userLon float64) (lat, lon float64, name string, err error) {
+	station, err := discoverNearestStationDetails(userLat, userLon)
+	if err != nil {
+		return 0, 0, "", err
+	}
+	return station.Lat, station.Lon, station.Name, nil
+}
+
+func discoverNearestStationDetails(userLat, userLon float64) (ECStation, error) {
 	type result struct {
 		stations []ECStation
 		err      error
@@ -127,7 +168,7 @@ func discoverNearestStation(userLat, userLon float64) (lat, lon float64, name st
 	}
 
 	if len(all) == 0 {
-		return 0, 0, "", fmt.Errorf("no stations found across all provinces")
+		return ECStation{}, fmt.Errorf("no stations found across all provinces")
 	}
 
 	// Haversine nearest-neighbour search.
@@ -142,7 +183,7 @@ func discoverNearestStation(userLat, userLon float64) (lat, lon float64, name st
 
 	log.Printf("[envcanada] nearest station: %s (%.3f, %.3f) — %.1f km away",
 		nearest.Name, nearest.Lat, nearest.Lon, best)
-	return nearest.Lat, nearest.Lon, nearest.Name, nil
+	return nearest, nil
 }
 
 func (s ECStation) matchesCode(code string) bool {

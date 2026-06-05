@@ -97,7 +97,6 @@ type WeatherAirQuality struct {
 	Observed     *AQHIValue           `json:"observed,omitempty"`
 	Forecasts    []AQHIForecastPeriod `json:"forecasts"`
 	IssuedAt     time.Time            `json:"issued_at,omitempty"`
-	CalculatedAt time.Time            `json:"calculated_at,omitempty"`
 }
 
 func (WeatherAirQuality) DomainType() DomainType { return DomainWeatherAirQuality }

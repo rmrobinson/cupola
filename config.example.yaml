@@ -41,11 +41,15 @@ collectors:
     poll_interval_forecast: 1h
     poll_interval_hourly_forecast: 20m
     poll_interval_alerts: 15m
-    air_quality_enabled: false
-    # Optional AQHI override; omit location for nearest-site discovery.
-    # air_quality_province: ON
-    # air_quality_location: Kitchener
-    poll_interval_air_quality: 30m
+
+  air_quality_envcanada:
+    enabled: false
+    # Station auto-discovered from lat/lon; override if discovery fails:
+    # station_code: s0000585
+    # province: ON
+    # Optional AQHI site override; omit location for nearest-site discovery.
+    # location: Kitchener
+    poll_interval: 30m
 
   solar_envcanada:
     enabled: true
