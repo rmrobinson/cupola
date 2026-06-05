@@ -66,7 +66,7 @@ type CollectorsConfig struct {
 	WeatherEnvCanada *EnvCanadaWeatherConfig `yaml:"weather_envcanada"`
 	SolarEnvCanada   *EnvCanadaSolarConfig   `yaml:"solar_envcanada"`
 	Transit          *TransitConfig          `yaml:"transit"`
-	Traffic511       *Traffic511Config       `yaml:"traffic_511"`
+	Traffic          *TrafficConfig          `yaml:"traffic"`
 	AircraftDump1090 *Dump1090Config         `yaml:"aircraft_dump1090"`
 	House            *HouseConfig            `yaml:"house"`
 	RSSFeeds         []RSSFeedConfig         `yaml:"rss_feeds"`
@@ -103,11 +103,23 @@ type TransitConfig struct {
 	StaticRefreshInterval Duration `yaml:"static_refresh_interval"`
 }
 
-type Traffic511Config struct {
-	Enabled               bool     `yaml:"enabled"`
-	Provinces             []string `yaml:"provinces"`
-	PollIntervalIncidents Duration `yaml:"poll_interval_incidents"`
-	PollIntervalCameras   Duration `yaml:"poll_interval_cameras"`
+type TrafficConfig struct {
+	Enabled               bool                  `yaml:"enabled"`
+	PollIntervalIncidents Duration              `yaml:"poll_interval_incidents"`
+	PollIntervalCameras   Duration              `yaml:"poll_interval_cameras"`
+	Sources               []TrafficSourceConfig `yaml:"sources"`
+}
+
+type TrafficSourceConfig struct {
+	ID                string `yaml:"id"`
+	Type              string `yaml:"type"`
+	Enabled           *bool  `yaml:"enabled"`
+	Province          string `yaml:"province"`
+	URL               string `yaml:"url"`
+	IncidentsURL      string `yaml:"incidents_url"`
+	CamerasURL        string `yaml:"cameras_url"`
+	RoadConditionsURL string `yaml:"road_conditions_url"`
+	PublicURL         string `yaml:"public_url"`
 }
 
 type Dump1090Config struct {

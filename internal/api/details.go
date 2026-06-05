@@ -121,6 +121,37 @@ func (h *Handler) detailFor(dt domain.DomainType, id string) (domain.Detail, boo
 			}, true
 		}
 
+	case domain.DomainMunicipalEvents:
+		s, ok := state.(domain.MunicipalEvents)
+		if !ok {
+			return domain.Detail{}, false
+		}
+		for _, ev := range s.Events {
+			if ev.ID != id {
+				continue
+			}
+			fields := []domain.DetailField{
+				{Key: "source_id", Value: ev.SourceID},
+				{Key: "event_type", Value: ev.EventType},
+				fieldTime("starts_at", ev.StartsAt),
+				fieldTime("ends_at", ev.EndsAt),
+				fieldTime("published_at", &ev.PublishedAt),
+			}
+			sourceURL := ""
+			if ev.URL != nil {
+				sourceURL = safeSourceURL(*ev.URL)
+			}
+			return domain.Detail{
+				Domain:      string(dt),
+				ID:          ev.ID,
+				Title:       ev.Title,
+				Subtitle:    ev.EventType,
+				Description: ev.Description,
+				Fields:      compactFields(fields),
+				SourceURL:   sourceURL,
+			}, true
+		}
+
 	case domain.DomainFlagStatus:
 		s, ok := state.(domain.FlagStatus)
 		if !ok || id != "current" {

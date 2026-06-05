@@ -105,7 +105,7 @@ Subsequent startups use the cached file and do not fetch from the network. To re
 | `envcanada.solar` | `solar.weather.current`, `solar.weather.forecast` | Space Weather Canada RSS (region auto-selected by lat/lon) | Poll | 1 hr |
 | `gtfsrt.<agency>` | `transit.arrivals`, `transit.vehicles`, `transit.alerts` | GTFS-RT | Poll | 30 s |
 | `gtfs.<agency>` | *(static schedule, feeds gtfsrt)* | GTFS static feed | Refresh | 24 hr |
-| `511.<province>` | `traffic.incidents`, `traffic.cameras` | 511 API — ON, AB, or BC | Poll | 2 min |
+| `traffic` | `traffic.incidents`, `traffic.cameras`, `traffic.road_conditions` | Configured traffic sources such as 511 APIs and regional closure services | Poll | 15 min incidents / 24 hr cameras |
 | `dump1090` | `aircraft` | dump1090 local HTTP JSON | Poll | 5 s |
 | `house` | `home` | rmrobinson/house API | Poll / webhook | 30 s |
 | `ephem` | `astro` | Computed locally (no network) | On schedule | Per event |
@@ -126,7 +126,7 @@ The municipal collector is a reusable framework. Each source is configured with 
 
 Initial parser implementations:
 - `kitchener.snow` — parses https://www.kitchener.ca/news/snow-events/ → `municipal.alerts`; IMAP phase 2
-- `kitchener.roadclosures` — parses https://app2.kitchener.ca/roadclosures/list.asp → `municipal.alerts`
+- `kitchener.roadclosures` — parses https://app2.kitchener.ca/roadclosures/list.asp → `municipal.events`
 - `grca.flood` — parses https://www.grandriver.ca/news/categories/flood-messages/ → `municipal.alerts`; IMAP phase 2
 - `enova.power` — parses https://oms.enovapower.com/Outages/ → `municipal.alerts`
 - `kitchener.utilities` — parses https://www.kitchenerutilities.ca/en/outages-and-news.aspx → `municipal.alerts`
@@ -426,6 +426,7 @@ type TrafficIncident struct {
     Lon         float64
     Description string
     RoadName    string
+    Lines       [][][]float64 // optional GeoJSON-order [lon, lat] line geometry
     StartsAt    *time.Time
     EndsAt      *time.Time
 }
@@ -640,7 +641,7 @@ type MunicipalEvent struct {
 }
 ```
 
-*Initial parsers:* none currently.
+*Initial parsers:* `kitchener.roadclosures` (HTTP scrape)
 
 ### `municipal.alerts`
 
@@ -667,7 +668,7 @@ type MunicipalAlert struct {
 }
 ```
 
-*Initial parsers:* `kitchener.snow` (HTTP scrape → IMAP phase 2), `kitchener.roadclosures` (HTTP scrape), `grca.flood` (HTTP scrape → IMAP phase 2), `enova.power` (HTTP scrape), `kitchener.utilities` (HTTP scrape)
+*Initial parsers:* `kitchener.snow` (HTTP scrape → IMAP phase 2), `grca.flood` (HTTP scrape → IMAP phase 2), `enova.power` (HTTP scrape), `kitchener.utilities` (HTTP scrape)
 
 ---
 
@@ -972,9 +973,21 @@ collectors:
     rt_poll_interval: 30s
     static_refresh_interval: 24h
 
-  traffic_511:
+  traffic:
     enabled: true
-    provinces: [ON]
+    poll_interval_incidents: 15m
+    poll_interval_cameras: 24h
+    sources:
+      - id: on511
+        type: 511
+        province: ON
+        public_url: "https://511on.ca"
+        incidents_url: "https://511on.ca/api/v2/get/event?format=json&lang=en"
+        cameras_url: "https://511on.ca/api/v2/get/Cameras?format=json&lang=en"
+        road_conditions_url: "https://511on.ca/api/v3/get/RoadConditions?format=json&lang=en"
+      - id: region_waterloo_roadclosures
+        type: region-waterloo-roadclosures
+        url: "https://gis.regionofwaterloo.ca/wamap/rest/services/RegionalClosures/MapServer"
 
   aircraft_dump1090:
     enabled: true
@@ -1012,7 +1025,7 @@ collectors:
       parser: kitchener.roadclosures
       url: "https://app2.kitchener.ca/roadclosures/list.asp"
       poll_interval: 15m
-      domain: municipal.alerts
+      domain: municipal.events
     - id: grca_flood
       parser: grca.flood
       url: "https://www.grandriver.ca/news/categories/flood-messages/"
@@ -1072,7 +1085,7 @@ cupola/
 │   │   ├── solar/
 │   │   ├── gtfs/
 │   │   ├── gtfsrt/
-│   │   ├── traffic511/
+│   │   ├── traffic/
 │   │   ├── dump1090/
 │   │   ├── house/
 │   │   ├── astro/

@@ -47,11 +47,21 @@ collectors:
     rt_poll_interval: 30s
     static_refresh_interval: 24h
 
-  traffic_511:
+  traffic:
     enabled: true
-    provinces: [ON]
     poll_interval_incidents: 15m
     poll_interval_cameras: 24h
+    sources:
+      - id: on511
+        type: 511
+        province: ON
+        public_url: "https://511on.ca"
+        incidents_url: "https://511on.ca/api/v2/get/event?format=json&lang=en"
+        cameras_url: "https://511on.ca/api/v2/get/Cameras?format=json&lang=en"
+        road_conditions_url: "https://511on.ca/api/v3/get/RoadConditions?format=json&lang=en"
+      - id: region_waterloo_roadclosures
+        type: region-waterloo-roadclosures
+        url: "https://gis.regionofwaterloo.ca/wamap/rest/services/RegionalClosures/MapServer"
 
   aircraft_dump1090:
     enabled: false
@@ -87,7 +97,7 @@ collectors:
       parser: kitchener.roadclosures
       url: "https://app2.kitchener.ca/roadclosures/list.asp"
       poll_interval: 15m
-      domain: municipal.alerts
+      domain: municipal.events
     - id: enova_power
       parser: enova.power
       url: "https://oms.enovapower.com/Outages/"

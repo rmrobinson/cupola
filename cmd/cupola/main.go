@@ -30,7 +30,7 @@ import (
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/kitchenerutilities"
 	notescollector "github.com/rmrobinson/cupola/internal/collector/notes"
 	rsscollector "github.com/rmrobinson/cupola/internal/collector/rss"
-	"github.com/rmrobinson/cupola/internal/collector/traffic511"
+	trafficcollector "github.com/rmrobinson/cupola/internal/collector/traffic"
 	wastecollector "github.com/rmrobinson/cupola/internal/collector/wastecollection"
 	waterwaycollector "github.com/rmrobinson/cupola/internal/collector/waterway"
 	_ "github.com/rmrobinson/cupola/internal/collector/waterway/grca"
@@ -146,13 +146,49 @@ func main() {
 		registry.Register(dump1090.New(a.URL, interval, cfg.Location.Lat, cfg.Location.Lon, radiusKM, stateStore))
 	}
 
-	// ON511 traffic: incidents, cameras, and road conditions.
-	if t := cfg.Collectors.Traffic511; t != nil && t.Enabled {
-		inc, cam, road := traffic511.NewCollectors(t.PollIntervalIncidents.Duration, t.PollIntervalCameras.Duration, stateStore)
-		registry.Register(inc)
-		registry.Register(cam)
-		registry.Register(road)
-		log.Printf("traffic511: registered incidents, cameras, and road conditions collectors")
+	// Traffic: one incidents collector aggregating configured traffic sources.
+	// 511-specific cameras and road conditions are registered only when a 511 source is enabled.
+	var trafficIncidentsCollector *trafficcollector.IncidentsCollector
+	if t := cfg.Collectors.Traffic; t != nil && t.Enabled {
+		sourceSpecs := make([]trafficcollector.SourceSpec, 0, len(t.Sources))
+		for _, src := range t.Sources {
+			if src.Enabled != nil && !*src.Enabled {
+				continue
+			}
+			sourceSpecs = append(sourceSpecs, trafficcollector.SourceSpec{
+				ID:                src.ID,
+				Type:              src.Type,
+				Province:          src.Province,
+				URL:               src.URL,
+				IncidentsURL:      src.IncidentsURL,
+				CamerasURL:        src.CamerasURL,
+				RoadConditionsURL: src.RoadConditionsURL,
+				PublicURL:         src.PublicURL,
+			})
+		}
+		if len(sourceSpecs) == 0 {
+			log.Printf("traffic: no enabled incident sources; skipping traffic collectors")
+		} else {
+			sources, skipped := trafficcollector.NewSources(sourceSpecs)
+			for _, msg := range skipped {
+				log.Printf("traffic: skipping %s", msg)
+			}
+			if len(sources.Incidents) == 0 {
+				log.Printf("traffic: no enabled incident sources; skipping traffic incident collector")
+			} else {
+				inc := trafficcollector.NewIncidentsCollector(t.PollIntervalIncidents.Duration, stateStore, sources.Incidents...)
+				trafficIncidentsCollector = inc
+				registry.Register(inc)
+			}
+			if len(sources.Cameras) > 0 {
+				registry.Register(trafficcollector.NewCamerasCollector(t.PollIntervalCameras.Duration, stateStore, sources.Cameras...))
+			}
+			if len(sources.RoadConditions) > 0 {
+				registry.Register(trafficcollector.NewRoadConditionsCollector(t.PollIntervalIncidents.Duration, stateStore, sources.RoadConditions...))
+			}
+			log.Printf("traffic: registered %d incident source(s), %d camera source(s), %d road-condition source(s)",
+				len(sources.Incidents), len(sources.Cameras), len(sources.RoadConditions))
+		}
 	}
 
 	webFS, err := fs.Sub(frontendFS, "frontend")
@@ -215,6 +251,15 @@ func main() {
 			munAlertsCollector = municipalcollector.NewAlertsCollector(alertsCfgs, stateStore)
 			registry.Register(munAlertsCollector)
 		}
+	}
+
+	if trafficIncidentsCollector != nil {
+		if munAlertsCollector == nil {
+			log.Printf("municipal.alerts: creating collector for traffic alert promotion")
+			munAlertsCollector = municipalcollector.NewAlertsCollector(nil, stateStore)
+			registry.Register(munAlertsCollector)
+		}
+		trafficIncidentsCollector.SetMunicipalAlertSink(munAlertsCollector)
 	}
 
 	// Waterway collector: GRCA gauge + reservoir data, with optional alert promotion.

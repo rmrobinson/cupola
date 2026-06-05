@@ -34,7 +34,7 @@ These collectors make outbound HTTPS (or HTTP) requests to external services. Th
 | `gtfsrt` | `internal/collector/gtfsrt` | Transit agency GTFS-RT protobuf feeds (trip updates, vehicle positions, alerts). URLs are configured per agency in SQLite through the GTFS Feeds admin/API. |
 | `municipal` | `internal/collector/municipal` | Agency-specific URLs determined by the registered parser. Configured in `config.yaml`. |
 | `rss` | `internal/collector/rss` | Any number of RSS/Atom feed URLs. Fully configurable in `config.yaml`. |
-| `traffic511` | `internal/collector/traffic511` | `511on.ca` — incidents, cameras, and road conditions APIs. URLs are hardcoded to the Ontario 511 service. |
+| `traffic` | `internal/collector/traffic` | Configured traffic data sources. Current sources include `511on.ca` incidents/cameras/road conditions APIs and the Region of Waterloo `RegionalClosures` ArcGIS service. |
 | `waterway` | `internal/collector/waterway` | Gauge data provider URLs determined by the registered source implementation. Configured in `config.yaml`. |
 
 ## Connectivity checker
@@ -48,5 +48,5 @@ The probe URL and interval are configurable via `connectivity.check_url` and `co
 - The `imap` dispatcher (Phase 23/24) is not yet implemented. When it is, it will require outbound access to an IMAP server, which may be local or internet-hosted depending on the mail provider. It will also be gated by the connectivity checker.
 - Collectors not listed in `config.yaml` are not loaded at startup and impose no network requirements.
 - For collectors with configurable URLs (`gtfs`, `gtfsrt`, `municipal`, `rss`, `waterway`), network requirements depend entirely on where those URLs resolve.
-- City of Kitchener road closures are configured as a `municipal.alerts` source using the `kitchener.roadclosures` parser; like other municipal HTTP sources, they are gated by the municipal alerts collector's internet check.
+- City of Kitchener road closures are configured as a `municipal.events` source using the `kitchener.roadclosures` parser; like other municipal HTTP sources, they are gated by the municipal events collector's internet check.
 - Weather widgets that render provider icons require the icon origin to be allowed by `server.csp_img_src`. Environment Canada hourly icons use `https://weather.gc.ca`; future providers should either emit CSP-allowed `icon_url` values or omit `icon_url`.

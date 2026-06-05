@@ -1,4 +1,4 @@
-package traffic511
+package traffic
 
 import (
 	"testing"
@@ -58,5 +58,45 @@ func TestDedupeTrafficIncidentsReturnsOriginalWhenNoDuplicates(t *testing.T) {
 	}
 	if len(got) != 2 || got[0].ID != "a" || got[1].ID != "b" {
 		t.Fatalf("unexpected incidents: %+v", got)
+	}
+}
+
+func TestNewSourcesBuildsConfigured511Provider(t *testing.T) {
+	sources, skipped := NewSources([]SourceSpec{{
+		ID:                "ab511",
+		Type:              "511",
+		Province:          "AB",
+		PublicURL:         "https://511.alberta.ca",
+		IncidentsURL:      "https://example.test/ab/events",
+		CamerasURL:        "https://example.test/ab/cameras",
+		RoadConditionsURL: "https://example.test/ab/roads",
+	}})
+
+	if len(skipped) != 0 {
+		t.Fatalf("unexpected skipped sources: %v", skipped)
+	}
+	if len(sources.Incidents) != 1 || len(sources.Cameras) != 1 || len(sources.RoadConditions) != 1 {
+		t.Fatalf("unexpected source counts: incidents=%d cameras=%d road=%d",
+			len(sources.Incidents), len(sources.Cameras), len(sources.RoadConditions))
+	}
+	if sources.Incidents[0].ID() != "ab511" ||
+		sources.Cameras[0].ID() != "ab511" ||
+		sources.RoadConditions[0].ID() != "ab511" {
+		t.Fatalf("configured 511 source ID not preserved")
+	}
+}
+
+func TestNewSourcesSkips511ProviderWithoutURLs(t *testing.T) {
+	sources, skipped := NewSources([]SourceSpec{{
+		ID:       "ab511",
+		Type:     "511",
+		Province: "AB",
+	}})
+
+	if len(sources.Incidents) != 0 || len(sources.Cameras) != 0 || len(sources.RoadConditions) != 0 {
+		t.Fatalf("expected no sources, got %+v", sources)
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("expected one skipped source, got %v", skipped)
 	}
 }

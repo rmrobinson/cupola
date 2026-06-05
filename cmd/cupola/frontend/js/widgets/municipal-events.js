@@ -5,6 +5,10 @@
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  function escAttr(s) {
+    return esc(s).replace(/"/g, '&quot;');
+  }
+
   function fmtDate(iso) {
     if (!iso) return '';
     return new Date(iso).toLocaleString(undefined, {
@@ -42,21 +46,19 @@
       const timeRange = startsStr ? `<div class="muni-event-time">${esc(startsStr)}${esc(endsStr)}</div>` : '';
       const source = ev.source_id ? `<span class="muni-event-source">${esc(ev.source_id)}</span>` : '';
       const type = ev.event_type ? `<span class="muni-event-type">${esc(ev.event_type.replace(/-/g, ' '))}</span>` : '';
-      const link = ev.url
-        ? `<a class="alert-link" href="${esc(ev.url)}" target="_blank" rel="noopener">Details ↗</a>`
-        : '';
       const desc = ev.description
         ? `<div class="muni-event-desc">${esc(ev.description)}</div>`
         : '';
       return `
-        <div class="muni-event-card">
+        <div class="muni-event-card detail-clickable"
+             data-detail-domain="municipal.events" data-detail-id="${escAttr(ev.id)}"
+             role="button" tabindex="0">
           <div class="muni-event-card-top">
             ${type}${source}
           </div>
           <div class="muni-event-title">${esc(ev.title)}</div>
           ${timeRange}
           ${desc}
-          ${link}
         </div>
       `;
     }).join('');

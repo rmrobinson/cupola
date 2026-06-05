@@ -52,6 +52,7 @@
   const DOMAIN_LABELS = {
     'flag.status': 'Flag status',
     'municipal.alerts': 'Municipal alert',
+    'municipal.events': 'Municipal event',
     'traffic.incidents': 'Traffic incident',
     'transit.alerts': 'Transit alert',
     'waterway.conditions': 'Waterway',
