@@ -48,7 +48,7 @@ var aggregateCodeOrder = map[string]int{
 	"JAPANESE_CYPRESS": 330,
 }
 
-type Request struct {
+type request struct {
 	Latitude     float64
 	Longitude    float64
 	Days         int
@@ -56,7 +56,7 @@ type Request struct {
 }
 
 type forecastClient interface {
-	Lookup(context.Context, Request) (*pollen.LookupForecastResponse, error)
+	Lookup(context.Context, request) (*pollen.LookupForecastResponse, error)
 }
 
 type sdkClient struct {
@@ -74,7 +74,7 @@ func newSDKClient(ctx context.Context, apiKey string) (forecastClient, error) {
 	return sdkClient{service: svc}, nil
 }
 
-func (c sdkClient) Lookup(ctx context.Context, req Request) (*pollen.LookupForecastResponse, error) {
+func (c sdkClient) Lookup(ctx context.Context, req request) (*pollen.LookupForecastResponse, error) {
 	call := c.service.Forecast.Lookup().
 		LocationLatitude(req.Latitude).
 		LocationLongitude(req.Longitude).
@@ -229,7 +229,7 @@ func (c *Collector) Fetch(ctx context.Context) error {
 	if c.client == nil {
 		return errors.New("google pollen client is required")
 	}
-	resp, err := c.client.Lookup(ctx, Request{
+	resp, err := c.client.Lookup(ctx, request{
 		Latitude:     c.opts.Latitude,
 		Longitude:    c.opts.Longitude,
 		Days:         c.opts.Days,
@@ -242,7 +242,7 @@ func (c *Collector) Fetch(ctx context.Context) error {
 	if err != nil {
 		loc = time.UTC
 	}
-	state := MapResponse(resp, c.now().UTC(), loc)
+	state := mapResponse(resp, c.now().UTC(), loc)
 	c.mu.Lock()
 	c.state = state
 	c.mu.Unlock()
@@ -251,7 +251,7 @@ func (c *Collector) Fetch(ctx context.Context) error {
 	return nil
 }
 
-func MapResponse(resp *pollen.LookupForecastResponse, now time.Time, loc *time.Location) domain.WeatherPollen {
+func mapResponse(resp *pollen.LookupForecastResponse, now time.Time, loc *time.Location) domain.WeatherPollen {
 	if loc == nil {
 		loc = time.UTC
 	}

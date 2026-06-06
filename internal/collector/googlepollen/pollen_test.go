@@ -17,13 +17,13 @@ import (
 )
 
 type fakeClient struct {
-	req   Request
+	req   request
 	resp  *pollen.LookupForecastResponse
 	err   error
 	calls int
 }
 
-func (f *fakeClient) Lookup(_ context.Context, req Request) (*pollen.LookupForecastResponse, error) {
+func (f *fakeClient) Lookup(_ context.Context, req request) (*pollen.LookupForecastResponse, error) {
 	f.req = req
 	f.calls++
 	return f.resp, f.err
@@ -42,7 +42,7 @@ func TestResolveOptionsDefaultsAndCapsDays(t *testing.T) {
 	}
 }
 
-func TestNewWithClientDefaultsNegativeInterval(t *testing.T) {
+func TestCollectorDefaultsNegativeInterval(t *testing.T) {
 	col := newWithClient(&fakeClient{}, Options{Latitude: 1, Longitude: 2, Timezone: "UTC", Interval: -time.Minute, Days: 1}, store.NewStateStore())
 	if col.opts.Interval != 12*time.Hour {
 		t.Fatalf("interval = %s, want 12h", col.opts.Interval)
@@ -77,7 +77,7 @@ func TestSDKAdapterBuildsLookupRequest(t *testing.T) {
 		t.Fatalf("NewService() error = %v", err)
 	}
 	client := sdkClient{service: svc}
-	resp, err := client.Lookup(context.Background(), Request{Latitude: 43.45, Longitude: -80.49, Days: 4, LanguageCode: "en-CA"})
+	resp, err := client.Lookup(context.Background(), request{Latitude: 43.45, Longitude: -80.49, Days: 4, LanguageCode: "en-CA"})
 	if err != nil {
 		t.Fatalf("Lookup() error = %v", err)
 	}
@@ -114,7 +114,7 @@ func TestMapResponseSelectsCurrentByLocalDateAndAggregates(t *testing.T) {
 			dayInfo(2026, 6, 7, []*pollen.PollenTypeInfo{typeInfo("GRASS", "Grass", true, 1, "Very low", "", 0, 1, 0)}, nil),
 		},
 	}
-	state := MapResponse(resp, time.Date(2026, 6, 6, 15, 0, 0, 0, time.UTC), loc)
+	state := mapResponse(resp, time.Date(2026, 6, 6, 15, 0, 0, 0, time.UTC), loc)
 	if state.RegionCode != "CA" || state.Source != sourceName {
 		t.Fatalf("unexpected state metadata: %+v", state)
 	}
@@ -151,7 +151,7 @@ func TestMapResponseAggregateTieBreakUsesStableCodeOrder(t *testing.T) {
 				nil),
 		},
 	}
-	state := MapResponse(resp, time.Date(2026, 6, 6, 15, 0, 0, 0, time.UTC), loc)
+	state := mapResponse(resp, time.Date(2026, 6, 6, 15, 0, 0, 0, time.UTC), loc)
 	if state.Current == nil || state.Current.Aggregate == nil {
 		t.Fatalf("current aggregate missing: %+v", state.Current)
 	}
@@ -172,7 +172,7 @@ func TestMapResponsePlantAggregateTieBreakUsesStableCodeOrder(t *testing.T) {
 				}),
 		},
 	}
-	state := MapResponse(resp, time.Date(2026, 6, 6, 15, 0, 0, 0, time.UTC), loc)
+	state := mapResponse(resp, time.Date(2026, 6, 6, 15, 0, 0, 0, time.UTC), loc)
 	if state.Current == nil || state.Current.Aggregate == nil {
 		t.Fatalf("current aggregate missing: %+v", state.Current)
 	}
@@ -183,7 +183,7 @@ func TestMapResponsePlantAggregateTieBreakUsesStableCodeOrder(t *testing.T) {
 
 func TestMapResponseTomorrowFirstHasNoCurrent(t *testing.T) {
 	loc, _ := time.LoadLocation("America/Toronto")
-	state := MapResponse(&pollen.LookupForecastResponse{
+	state := mapResponse(&pollen.LookupForecastResponse{
 		DailyInfo: []*pollen.DayInfo{dayInfo(2026, 6, 7, []*pollen.PollenTypeInfo{typeInfo("GRASS", "Grass", true, 2, "Low", "", 0, 1, 0)}, nil)},
 	}, time.Date(2026, 6, 6, 15, 0, 0, 0, time.UTC), loc)
 	if state.Current != nil {
