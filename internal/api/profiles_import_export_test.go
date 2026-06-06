@@ -104,6 +104,43 @@ func TestValidateProfileImportClassifiesUniversalAndMissingDomainWidgets(t *test
 	}
 }
 
+func TestValidateProfileImportClassifiesAggregateWeatherWidgetPartialDomains(t *testing.T) {
+	reg := collector.NewRegistry()
+	reg.Register(testCollector{id: "weather", domain: domain.DomainWeatherCurrent})
+	h := &Handler{registry: reg}
+
+	export := dashboardExport{
+		Kind:    dashboardExportKind,
+		Version: dashboardExportVersion,
+		Profile: store.Profile{
+			Name:   "Imported",
+			Layout: "landscape",
+			Widgets: []store.WidgetConfig{
+				{ID: "current", Type: "weather-current-aggregate", Pos: store.WidgetPos{W: 6, H: 4}},
+				{ID: "forecast", Type: "weather-forecast-aggregate", Pos: store.WidgetPos{W: 8, H: 7}},
+			},
+		},
+	}
+	body, _ := json.Marshal(importValidationRequest{Export: export})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/profiles/import/validate", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	h.Router().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	var resp importValidationResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode validation: %v", err)
+	}
+	if resp.Widgets[0].Status != "config_warning" {
+		t.Fatalf("current aggregate status = %q, want config_warning", resp.Widgets[0].Status)
+	}
+	if resp.Widgets[1].Status != "missing_domain" {
+		t.Fatalf("forecast aggregate status = %q, want missing_domain", resp.Widgets[1].Status)
+	}
+}
+
 func TestImportProfileSkipsUnavailableAndUnselectedWidgets(t *testing.T) {
 	db, err := store.NewSQLiteStore(t.TempDir())
 	if err != nil {
