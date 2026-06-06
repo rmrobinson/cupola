@@ -76,6 +76,16 @@ const Grid = (() => {
     scheduleSave();
   }
 
+  async function refreshState() {
+    const grid = document.getElementById('widget-grid');
+    if (!grid) return;
+    const refreshes = [...grid.querySelectorAll('.widget-cell')]
+      .map(cell => cell._refreshState)
+      .filter(Boolean)
+      .map(fn => fn());
+    await Promise.allSettled(refreshes);
+  }
+
   // ── Cell creation ─────────────────────────────────────────────────────
 
   async function createCell(wc, displayPos = null) {
@@ -165,22 +175,36 @@ const Grid = (() => {
       });
     }
 
-    // Fetch initial state for all domains.
     const stateMap = {};
-    for (const d of domainList) {
-      try {
-        const r = await fetch(`/api/v1/state/${d}`);
-        if (r.ok) stateMap[d] = await r.json();
-      } catch {}
-    }
-    currentState = isMulti ? stateMap : (stateMap[domainList[0]] || null);
+    let rendered = false;
 
-    // Create subscriptions for all domains.
-    domainList.forEach(d => {
-      const subId = isMulti ? `${wc.id}:${d}` : wc.id;
-      const params = def.subscriptionParams ? def.subscriptionParams(wc.config) : null;
-      Subscriptions.create(subId, d, params);
-    });
+    async function refreshWidgetState() {
+      await Promise.all(domainList.map(async d => {
+        try {
+          const r = await fetch(`/api/v1/state/${d}`);
+          if (r.ok) stateMap[d] = await r.json();
+        } catch {}
+      }));
+      currentState = isMulti ? stateMap : (stateMap[domainList[0]] || null);
+      renderCurrentState();
+    }
+
+    function renderCurrentState() {
+      const hasState = isMulti ? Object.keys(stateMap).length > 0 : !!currentState;
+      if (!hasState) {
+        renderUnavailable(content, domainList[0]);
+        rendered = false;
+        return;
+      }
+      if (rendered) {
+        def.onUpdate(content, currentState, wc.config);
+      } else {
+        def.render(content, currentState, wc.config);
+        rendered = true;
+      }
+    }
+
+    cell._refreshState = refreshWidgetState;
 
     // Stamp widget identity and an inline-save hook onto the content element.
     // Widgets read these to access their own ID and trigger a profile save
@@ -190,12 +214,15 @@ const Grid = (() => {
     content.dataset.widgetId = wc.id;
     content._saveConfig = scheduleSave;
 
-    const hasState = isMulti ? Object.keys(stateMap).length > 0 : !!currentState;
-    if (hasState) {
-      def.render(content, currentState, wc.config);
-    } else {
-      renderUnavailable(content, domainList[0]);
-    }
+    // Fetch initial state for all domains.
+    await refreshWidgetState();
+
+    // Create subscriptions for all domains.
+    domainList.forEach(d => {
+      const subId = isMulti ? `${wc.id}:${d}` : wc.id;
+      const params = def.subscriptionParams ? def.subscriptionParams(wc.config) : null;
+      Subscriptions.create(subId, d, params);
+    });
 
     // Set up stream handlers for all domains.
     const streamHandlers = [];
@@ -620,7 +647,8 @@ const Grid = (() => {
     }
     (cell._streamHandlers || []).forEach(({ domain, handler }) => Stream.off(domain, handler));
     cell._streamHandlers = [];
+    cell._refreshState = null;
   }
 
-  return { init, addWidget, removeWidget, destroy };
+  return { init, addWidget, removeWidget, destroy, refreshState };
 })();

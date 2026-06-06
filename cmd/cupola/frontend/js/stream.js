@@ -6,28 +6,40 @@
  *   Stream.connect();  // called by main.js on DOMContentLoaded
  */
 const Stream = (() => {
-  // Stable session ID for subscription lifecycle management (Phase 5).
-  const SESSION_ID = (typeof crypto !== 'undefined' && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+  // Rotate session IDs on reconnect so stale stream cleanup cannot remove
+  // subscriptions registered by the fresh connection.
+  function newSessionID() {
+    return (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
         const r = Math.random() * 16 | 0;
         return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
       });
+  }
 
   const listeners = {};           // domain → [fn, ...]
   const failing = new Set();      // collector IDs currently in error state
   const cautioning = new Set();   // collector IDs in caution state (e.g. connectivity)
   const connectHandlers = [];     // called each time a connection opens
+  let sessionID = newSessionID();
   let es = null;
   let _lastDataAt = null;         // timestamp of last received SSE message
   let _everConnected = false;     // true after first successful open
   let _offline = false;           // true while SSE is down after first connect
   let _offlineTimer = null;
+  let _reconnectTimer = null;
 
   function connect() {
+    if (_reconnectTimer) {
+      clearTimeout(_reconnectTimer);
+      _reconnectTimer = null;
+    }
     if (es) es.close();
-    es = new EventSource(`/api/v1/stream?session_id=${SESSION_ID}`);
+    sessionID = newSessionID();
+    es = new EventSource(`/api/v1/stream?session_id=${sessionID}`);
+    const activeES = es;
     es.onopen = () => {
+      if (es !== activeES) return;
       _everConnected = true;
       if (_offline) {
         _offline = false;
@@ -36,16 +48,24 @@ const Stream = (() => {
       }
       connectHandlers.forEach(fn => fn());
     };
-    es.onmessage = onMessage;
+    es.onmessage = e => {
+      if (es !== activeES) return;
+      onMessage(e);
+    };
     es.onerror = () => {
+      if (es !== activeES) return;
       es.close();
       if (_everConnected && !_offline) {
         _offline = true;
         _syncBanner();
         _offlineTimer = setInterval(_syncBanner, 30_000);
       }
-      setTimeout(connect, 3000);
+      _reconnectTimer = setTimeout(connect, 3000);
     };
+  }
+
+  function reconnectNow() {
+    connect();
   }
 
   function onConnect(fn) {
@@ -111,5 +131,12 @@ const Stream = (() => {
     listeners[domain] = listeners[domain].filter(f => f !== fn);
   }
 
-  return { connect, on, off, onConnect, SESSION_ID };
+  return {
+    connect,
+    reconnectNow,
+    on,
+    off,
+    onConnect,
+    get SESSION_ID() { return sessionID; },
+  };
 })();
