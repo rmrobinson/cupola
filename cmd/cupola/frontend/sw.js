@@ -49,6 +49,8 @@ const PRECACHE = [
   '/js/widgets/weather-forecast-aggregate.js',
   '/js/widgets/weather-hourly-forecast.js',
   '/js/widgets/weather-air-quality.js',
+  '/js/widgets/weather-pollen-current.js',
+  '/js/widgets/weather-pollen-forecast.js',
   '/js/widgets/weather-rainfall.js',
   '/js/vendor/leaflet.js',
   '/js/vendor/leaflet.css',

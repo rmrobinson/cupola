@@ -52,3 +52,40 @@ func TestResolveAirQualityConfigDisabledWhenDedicatedConfigMissing(t *testing.T)
 		t.Fatalf("enabled = true, want false")
 	}
 }
+
+func TestResolvePollenConfigDefaultsAndCapsDays(t *testing.T) {
+	got := resolvePollenConfig(config.CollectorsConfig{
+		PollenGoogle: &config.GooglePollenConfig{
+			Enabled:      true,
+			APIKey:       " test-key ",
+			Days:         9,
+			LanguageCode: " en-CA ",
+		},
+	}, 43.45, -80.49, "America/Toronto")
+
+	if !got.enabled {
+		t.Fatalf("enabled = false, want true")
+	}
+	if got.apiKey != "test-key" {
+		t.Fatalf("apiKey = %q, want test-key", got.apiKey)
+	}
+	if got.opts.Interval != 12*time.Hour {
+		t.Fatalf("interval = %s, want 12h", got.opts.Interval)
+	}
+	if got.opts.Days != 5 {
+		t.Fatalf("days = %d, want 5", got.opts.Days)
+	}
+	if got.opts.LanguageCode != "en-CA" {
+		t.Fatalf("language = %q, want en-CA", got.opts.LanguageCode)
+	}
+}
+
+func TestResolvePollenConfigDisabledWithoutAPIKey(t *testing.T) {
+	got := resolvePollenConfig(config.CollectorsConfig{
+		PollenGoogle: &config.GooglePollenConfig{Enabled: true},
+	}, 43.45, -80.49, "America/Toronto")
+
+	if got.enabled {
+		t.Fatalf("enabled = true, want false")
+	}
+}

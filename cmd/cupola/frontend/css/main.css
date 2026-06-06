@@ -1924,7 +1924,7 @@ button {
 .widget-weather-forecast-aggregate {
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: clamp(6px, 2cqh, 10px);
@@ -1945,9 +1945,9 @@ button {
 
 .wfa-period {
   display: grid;
-  grid-template-columns: minmax(4.5rem, 6rem) minmax(0, 1fr) auto auto minmax(4.6rem, auto);
+  grid-template-columns: minmax(4.2rem, 5.6rem) minmax(0, 1fr) auto auto auto auto;
   align-items: center;
-  gap: clamp(4px, 1.6cqw, 7px);
+  gap: clamp(2px, 0.8cqw, 4px);
   padding: clamp(2px, 1.2cqh, 4px) 0;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   font-size: clamp(0.56rem, min(2.8cqw, 5.6cqh), 0.75rem);
@@ -1979,6 +1979,7 @@ button {
 .wfa-temp,
 .wfa-pop,
 .wfa-inline-aqhi,
+.wfa-inline-pollen,
 .wfa-solar-time,
 .wfa-solar-aurora {
   white-space: nowrap;
@@ -1987,12 +1988,22 @@ button {
 .wfa-high { color: #f7b733; }
 .wfa-low  { color: #74b9ff; margin-left: 4px; }
 .wfa-pop  { color: rgba(255,255,255,0.55); }
-.wfa-inline-aqhi {
-  font-weight: 700;
+.wfa-inline-aqhi,
+.wfa-inline-pollen {
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
-.wfa-inline-aqhi.is-empty { visibility: hidden; }
+
+.wfa-inline-aqhi {
+  min-width: 3.2rem;
+}
+
+.wfa-inline-pollen {
+  min-width: 3rem;
+}
+.wfa-inline-aqhi.is-empty,
+.wfa-inline-pollen.is-empty { visibility: hidden; }
 
 .wfa-strip {
   flex: 0 0 auto;
@@ -2072,12 +2083,165 @@ button {
   }
 
   .wfa-period {
-    grid-template-columns: minmax(3.8rem, 4.7rem) minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(3.6rem, 4.4rem) minmax(0, 1fr) auto auto auto;
   }
 
   .wfa-pop {
     display: none;
   }
+}
+
+/* ── Pollen widgets ────────────────────────────────────────────────────── */
+
+.widget-weather-pollen-current,
+.widget-weather-pollen-forecast {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 2cqh, 10px);
+}
+
+.widget-weather-pollen-forecast {
+  overflow: hidden;
+}
+
+.pollen-head,
+.pollen-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  color: rgba(255,255,255,0.78);
+  font-size: clamp(0.68rem, min(3cqw, 6cqh), 0.86rem);
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.pollen-current-metric {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(8px, 3cqw, 12px);
+  min-width: 0;
+}
+
+.pollen-upi {
+  font-size: clamp(2.3rem, min(16cqw, 22cqh), 4.7rem);
+  font-weight: 230;
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+
+.pollen-upi-label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  color: rgba(255,255,255,0.72);
+  font-size: clamp(0.68rem, min(3cqw, 6cqh), 0.9rem);
+  font-weight: 650;
+  line-height: 1.12;
+}
+
+.pollen-upi-label span,
+.pollen-head span,
+.pollen-day-head span,
+.pollen-day-label,
+.pollen-row-name,
+.pollen-row-cat,
+.pollen-mini-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pollen-section-title {
+  color: rgba(255,255,255,0.48);
+  font-size: clamp(0.5rem, min(2.4cqw, 5cqh), 0.68rem);
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.pollen-types,
+.pollen-plants {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 2px;
+}
+
+.pollen-plants {
+  overflow: hidden;
+}
+
+.pollen-row,
+.pollen-mini-row {
+  display: grid;
+  min-width: 0;
+  align-items: baseline;
+  gap: 5px;
+  border-bottom: 1px solid rgba(255,255,255,0.055);
+  color: rgba(255,255,255,0.68);
+  font-size: clamp(0.54rem, min(2.5cqw, 5.2cqh), 0.72rem);
+  line-height: 1.12;
+}
+
+.pollen-row {
+  grid-template-columns: minmax(0, 1fr) minmax(3.4rem, auto) 1.4rem minmax(3.8rem, auto);
+  padding: 2px 0;
+}
+
+.pollen-mini-row {
+  grid-template-columns: minmax(0, 1fr) 1.4rem minmax(3.6rem, auto);
+  padding: 1px 0;
+}
+
+.pollen-row.in-season .pollen-row-name,
+.pollen-mini-row.in-season span:first-child {
+  color: rgba(255,255,255,0.9);
+  font-weight: 650;
+}
+
+.pollen-row-season {
+  color: rgba(255,255,255,0.42);
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+
+.pollen-row-value,
+.pollen-mini-row span:nth-child(2) {
+  font-weight: 750;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pollen-forecast-day {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.pollen-day-label {
+  color: rgba(255,255,255,0.56);
+  font-size: clamp(0.56rem, min(2.5cqw, 5.2cqh), 0.72rem);
+  line-height: 1.12;
+}
+
+.pollen-day-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: clamp(8px, 3cqw, 14px);
+  min-width: 0;
 }
 
 /* ── Weather hourly forecast widget ────────────────────────────────────── */

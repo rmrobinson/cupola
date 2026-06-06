@@ -91,12 +91,12 @@ type WeatherAlert struct {
 
 type WeatherAirQuality struct {
 	StateBase
-	Location     string               `json:"location"`
-	Province     string               `json:"province"`
-	SourceURL    string               `json:"source_url"`
-	Observed     *AQHIValue           `json:"observed,omitempty"`
-	Forecasts    []AQHIForecastPeriod `json:"forecasts"`
-	IssuedAt     time.Time            `json:"issued_at,omitempty"`
+	Location  string               `json:"location"`
+	Province  string               `json:"province"`
+	SourceURL string               `json:"source_url"`
+	Observed  *AQHIValue           `json:"observed,omitempty"`
+	Forecasts []AQHIForecastPeriod `json:"forecasts"`
+	IssuedAt  time.Time            `json:"issued_at,omitempty"`
 }
 
 func (WeatherAirQuality) DomainType() DomainType { return DomainWeatherAirQuality }
@@ -109,4 +109,45 @@ type AQHIValue struct {
 type AQHIForecastPeriod struct {
 	Label string     `json:"label"`
 	Max   *AQHIValue `json:"max,omitempty"`
+}
+
+type WeatherPollen struct {
+	StateBase
+	RegionCode string      `json:"region_code,omitempty"`
+	Source     string      `json:"source"`
+	Current    *PollenDay  `json:"current,omitempty"`
+	Days       []PollenDay `json:"days"`
+}
+
+func (WeatherPollen) DomainType() DomainType { return DomainWeatherPollen }
+
+type PollenDay struct {
+	Date                  string           `json:"date"`
+	Aggregate             *PollenAggregate `json:"aggregate,omitempty"`
+	Types                 []PollenRow      `json:"types"`
+	Plants                []PollenRow      `json:"plants"`
+	HealthRecommendations []string         `json:"health_recommendations,omitempty"`
+}
+
+type PollenAggregate struct {
+	Value       int    `json:"value"`
+	Label       string `json:"label"`
+	Code        string `json:"code"`
+	Category    string `json:"category,omitempty"`
+	Description string `json:"description,omitempty"`
+	Color       string `json:"color,omitempty"`
+}
+
+type PollenRow struct {
+	Code        string       `json:"code"`
+	DisplayName string       `json:"display_name"`
+	InSeason    bool         `json:"in_season"`
+	UPI         *PollenIndex `json:"upi,omitempty"`
+}
+
+type PollenIndex struct {
+	Value       int    `json:"value"`
+	Category    string `json:"category,omitempty"`
+	Description string `json:"description,omitempty"`
+	Color       string `json:"color,omitempty"`
 }

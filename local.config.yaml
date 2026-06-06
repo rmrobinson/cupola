@@ -113,6 +113,13 @@ collectors:
     data_path: "data/kitchener_waste_collection_zone_b1_thursdays_2026.json"
     week_start: sunday
 
+  pollen_google:
+    enabled: true
+    api_key: "${GOOGLE_POLLEN_API_KEY}"
+    poll_interval: 12h
+    days: 5
+    # language_code: en
+
   imap:
     enabled: false   # enable in phase 2 (IMAP dispatcher)
     host: "imap.example.com"

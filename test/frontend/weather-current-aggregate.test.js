@@ -53,11 +53,11 @@ function solarState(overrides = {}) {
   };
 }
 
-test('weather current aggregate registers for current weather, AQHI, and solar domains', () => {
+test('weather current aggregate registers for current weather, AQHI, solar, and pollen domains', () => {
   const widget = loadWidget();
 
   assert.equal(widget.type, 'weather-current-aggregate');
-  assert.deepEqual(Array.from(widget.domains), ['weather.current', 'weather.air_quality', 'solar.weather.current']);
+  assert.deepEqual(Array.from(widget.domains), ['weather.current', 'weather.air_quality', 'solar.weather.current', 'weather.pollen']);
   assert.equal(widget.defaultSize.w, 6);
   assert.equal(widget.defaultSize.h, 4);
 });
@@ -70,6 +70,11 @@ test('weather current aggregate renders all three sources', () => {
     'weather.current': weatherState(),
     'weather.air_quality': aqhiState(),
     'solar.weather.current': solarState(),
+    'weather.pollen': {
+      current: {
+        aggregate: { value: 5, label: 'Grass', category: 'Very high', color: '#e53935' },
+      },
+    },
   });
 
   assert.match(container.innerHTML, /widget-weather-current-aggregate/);
@@ -86,8 +91,13 @@ test('weather current aggregate renders all three sources', () => {
   assert.match(container.innerHTML, /3\.7/);
   assert.match(container.innerHTML, /Solar weather/);
   assert.match(container.innerHTML, /Unsettled/);
+  assert.match(container.innerHTML, /Pollen/);
+  assert.match(container.innerHTML, /style="color:#f7b733">UV 5<\/span>\s*<span style="color:#f7b733">Moderate<\/span>/);
+  assert.match(container.innerHTML, /style="color:#f7b733">Moderate Risk<\/span>/);
+  assert.match(container.innerHTML, /style="color:#e53935">Very high<\/span>/);
+  assert.match(container.innerHTML, /style="color:#a8ff78">Unsettled<\/span>/);
   assert.match(container.innerHTML, /Currently 21&deg;C[\s\S]*Humidity 64%[\s\S]*Wind 18 km\/h SW[\s\S]*Gust 34 km\/h[\s\S]*Pressure 1014 hPa/);
-  assert.match(container.innerHTML, /Air quality[\s\S]*Kitchener ON[\s\S]*Solar weather/);
+  assert.match(container.innerHTML, /Air quality[\s\S]*Kitchener ON[\s\S]*Pollen[\s\S]*Solar weather/);
 });
 
 test('weather current aggregate renders with only weather', () => {
@@ -125,6 +135,33 @@ test('weather current aggregate renders with only solar', () => {
   assert.match(container.innerHTML, /Solar weather/);
   assert.match(container.innerHTML, /Quiet/);
   assert.match(container.innerHTML, /Aurora unlikely/);
+});
+
+test('weather current aggregate renders pollen only when current pollen exists', () => {
+  const widget = loadWidget();
+  const container = {};
+
+  widget.render(container, {
+    'weather.pollen': {
+      current: {
+        aggregate: { value: 5, label: 'Grass', category: 'Very high', color: '#e53935' },
+      },
+    },
+  });
+
+  assert.match(container.innerHTML, /Pollen/);
+  assert.match(container.innerHTML, />5<\/span>/);
+  assert.match(container.innerHTML, /Very high/);
+  assert.match(container.innerHTML, /Grass/);
+
+  widget.render(container, {
+    'weather.pollen': {
+      days: [{ aggregate: { value: 5, label: 'Grass' } }],
+    },
+  });
+
+  assert.match(container.innerHTML, /Source unavailable/);
+  assert.doesNotMatch(container.innerHTML, /Pollen/);
 });
 
 test('weather current aggregate renders empty state when all sources are missing', () => {

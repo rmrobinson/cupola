@@ -141,6 +141,42 @@ func TestValidateProfileImportClassifiesAggregateWeatherWidgetPartialDomains(t *
 	}
 }
 
+func TestValidateProfileImportClassifiesPollenWidgets(t *testing.T) {
+	reg := collector.NewRegistry()
+	reg.Register(testCollector{id: "pollen", domain: domain.DomainWeatherPollen})
+	h := &Handler{registry: reg}
+
+	export := dashboardExport{
+		Kind:    dashboardExportKind,
+		Version: dashboardExportVersion,
+		Profile: store.Profile{
+			Name:   "Imported",
+			Layout: "landscape",
+			Widgets: []store.WidgetConfig{
+				{ID: "pollen-current", Type: "weather-pollen-current", Pos: store.WidgetPos{W: 4, H: 4}},
+				{ID: "pollen-forecast", Type: "weather-pollen-forecast", Pos: store.WidgetPos{W: 6, H: 6}},
+			},
+		},
+	}
+	body, _ := json.Marshal(importValidationRequest{Export: export})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/profiles/import/validate", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	h.Router().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	var resp importValidationResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode validation: %v", err)
+	}
+	for _, widget := range resp.Widgets {
+		if widget.Status != "ok" {
+			t.Fatalf("%s status = %q, want ok", widget.Type, widget.Status)
+		}
+	}
+}
+
 func TestImportProfileSkipsUnavailableAndUnselectedWidgets(t *testing.T) {
 	db, err := store.NewSQLiteStore(t.TempDir())
 	if err != nil {
