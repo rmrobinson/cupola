@@ -15,6 +15,8 @@ The frontend has no bundler or build step. Vendor libraries in `cmd/cupola/front
 ## Backend Conventions
 
 - Collectors implement `internal/collector.Collector` and publish normalized domain state through `store.StateStore`.
+- Collector packages should expose only runtime construction APIs, usually `New(...)`, plus intentional option/config types. Keep provider SDK clients, adapters, request helpers, and test/dependency-injection constructors private to the collector package.
+- Do not export functions that accept or return unexported types or interfaces. Same-package tests may use private `newWith...` helpers for fake-client injection instead of widening the public collector API.
 - Only one collector may own each `domain.DomainType`; duplicate registration is fatal.
 - Any collector that depends on internet reachability must implement `SetNetCheck(func() bool)` and skip internet fetches while the checker reports down. `cmd/cupola/main.go` wires this automatically for collectors that expose the method. Local LAN collectors do not need to be gated by the internet checker.
 - SQLite stores profiles, notes, GTFS schedule/cache data, and transit agency config. Do not use it as general sensor, alert, or time-series storage.

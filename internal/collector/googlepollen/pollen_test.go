@@ -43,7 +43,7 @@ func TestResolveOptionsDefaultsAndCapsDays(t *testing.T) {
 }
 
 func TestNewWithClientDefaultsNegativeInterval(t *testing.T) {
-	col := NewWithClient(&fakeClient{}, Options{Latitude: 1, Longitude: 2, Timezone: "UTC", Interval: -time.Minute, Days: 1}, store.NewStateStore())
+	col := newWithClient(&fakeClient{}, Options{Latitude: 1, Longitude: 2, Timezone: "UTC", Interval: -time.Minute, Days: 1}, store.NewStateStore())
 	if col.opts.Interval != 12*time.Hour {
 		t.Fatalf("interval = %s, want 12h", col.opts.Interval)
 	}
@@ -197,7 +197,7 @@ func TestMapResponseTomorrowFirstHasNoCurrent(t *testing.T) {
 func TestCollectorFetchPublishesAndUsesRequest(t *testing.T) {
 	fake := &fakeClient{resp: &pollen.LookupForecastResponse{DailyInfo: []*pollen.DayInfo{dayInfo(2026, 6, 6, nil, nil)}}}
 	st := store.NewStateStore()
-	col := NewWithClient(fake, ResolveOptions(43.45, -80.49, "America/Toronto", time.Hour, 3, "en"), st)
+	col := newWithClient(fake, ResolveOptions(43.45, -80.49, "America/Toronto", time.Hour, 3, "en"), st)
 	col.now = func() time.Time { return time.Date(2026, 6, 6, 12, 0, 0, 0, time.UTC) }
 	if err := col.Fetch(context.Background()); err != nil {
 		t.Fatalf("Fetch() error = %v", err)
@@ -212,7 +212,7 @@ func TestCollectorFetchPublishesAndUsesRequest(t *testing.T) {
 
 func TestCollectorSkipsFetchWhenNetworkDown(t *testing.T) {
 	fake := &fakeClient{resp: &pollen.LookupForecastResponse{}}
-	col := NewWithClient(fake, ResolveOptions(1, 2, "UTC", time.Hour, 1, ""), store.NewStateStore())
+	col := newWithClient(fake, ResolveOptions(1, 2, "UTC", time.Hour, 1, ""), store.NewStateStore())
 	col.SetNetCheck(func() bool { return false })
 	col.fetchIfReady(context.Background())
 	if fake.calls != 0 {
@@ -222,7 +222,7 @@ func TestCollectorSkipsFetchWhenNetworkDown(t *testing.T) {
 
 func TestCollectorThrottlesSubscriptionWakeFetches(t *testing.T) {
 	fake := &fakeClient{resp: &pollen.LookupForecastResponse{}}
-	col := NewWithClient(fake, ResolveOptions(1, 2, "UTC", 12*time.Hour, 1, ""), store.NewStateStore())
+	col := newWithClient(fake, ResolveOptions(1, 2, "UTC", 12*time.Hour, 1, ""), store.NewStateStore())
 	now := time.Date(2026, 6, 6, 14, 0, 0, 0, time.UTC)
 	col.now = func() time.Time { return now }
 
@@ -249,7 +249,7 @@ func TestCollectorThrottlesSubscriptionWakeFetches(t *testing.T) {
 
 func TestCollectorDoesNotThrottleAfterFailure(t *testing.T) {
 	fake := &fakeClient{err: errors.New("boom")}
-	col := NewWithClient(fake, ResolveOptions(1, 2, "UTC", 12*time.Hour, 1, ""), store.NewStateStore())
+	col := newWithClient(fake, ResolveOptions(1, 2, "UTC", 12*time.Hour, 1, ""), store.NewStateStore())
 	now := time.Date(2026, 6, 6, 14, 0, 0, 0, time.UTC)
 	col.now = func() time.Time { return now }
 
@@ -271,7 +271,7 @@ func TestCollectorDoesNotThrottleAfterFailure(t *testing.T) {
 }
 
 func TestCollectorStartRequiresClient(t *testing.T) {
-	col := NewWithClient(nil, ResolveOptions(1, 2, "UTC", time.Hour, 1, ""), store.NewStateStore())
+	col := newWithClient(nil, ResolveOptions(1, 2, "UTC", time.Hour, 1, ""), store.NewStateStore())
 	if err := col.Start(context.Background()); err == nil {
 		t.Fatal("Start() error = nil, want error")
 	}

@@ -63,7 +63,7 @@ type sdkClient struct {
 	service *pollen.Service
 }
 
-func NewSDKClient(ctx context.Context, apiKey string) (forecastClient, error) {
+func newSDKClient(ctx context.Context, apiKey string) (forecastClient, error) {
 	if strings.TrimSpace(apiKey) == "" {
 		return nil, errors.New("google pollen api key is required")
 	}
@@ -113,14 +113,14 @@ type Collector struct {
 }
 
 func New(ctx context.Context, apiKey string, opts Options, stateStore *store.StateStore) (*Collector, error) {
-	client, err := NewSDKClient(ctx, apiKey)
+	client, err := newSDKClient(ctx, apiKey)
 	if err != nil {
 		return nil, err
 	}
-	return NewWithClient(client, opts, stateStore), nil
+	return newWithClient(client, opts, stateStore), nil
 }
 
-func NewWithClient(client forecastClient, opts Options, stateStore *store.StateStore) *Collector {
+func newWithClient(client forecastClient, opts Options, stateStore *store.StateStore) *Collector {
 	if opts.Interval <= 0 {
 		opts.Interval = defaultPoll
 	}
