@@ -71,7 +71,7 @@
           <div class="wca-bar-block">
             <div class="wca-metric-head">
               <span style="color:${uv.color}">UV ${data.uv.toFixed(0)}</span>
-              <span>${uv.label}</span>
+              <span style="color:${uv.color}">${uv.label}</span>
             </div>
             <div class="wca-bar"><div class="wca-bar-fill" style="width:${Math.min(100, uv.pct).toFixed(0)}%;background:${uv.color}"></div></div>
           </div>
@@ -92,7 +92,7 @@
         <div class="wca-side-title">Air quality</div>
         <div class="wca-side-main">
           <span class="wca-side-value" style="color:${color}">${aqhiValue(observed)}</span>
-          <span class="wca-side-label">${esc(risk || 'AQHI')}</span>
+          <span class="wca-side-label" style="color:${color}">${esc(risk || 'AQHI')}</span>
         </div>
         <div class="wca-side-bar"><div class="wca-side-bar-fill" style="width:${Math.min(100, Math.max(0, ((value || 0) / 10) * 100)).toFixed(0)}%;background:${color}"></div></div>
         ${place ? `<div class="wca-side-note">${esc(place)}</div>` : ''}
@@ -110,10 +110,28 @@
         <div class="wca-side-title">Solar weather</div>
         <div class="wca-side-main">
           <span class="wca-side-value" style="color:${color}">${kp.toFixed(1)}</span>
-          <span class="wca-side-label">${esc(desc)}</span>
+          <span class="wca-side-label" style="color:${color}">${esc(desc)}</span>
         </div>
         <div class="wca-side-bar"><div class="wca-side-bar-fill" style="width:${Math.min(100, (kp / 9) * 100).toFixed(0)}%;background:${color}"></div></div>
         <div class="wca-side-note">${data.aurora_viewable ? 'Aurora possible' : 'Aurora unlikely'}${data.flare_class ? ` · Flare ${esc(data.flare_class)}` : ''}</div>
+      </section>
+    `;
+  }
+
+  function renderPollen(data) {
+    const day = data && data.current;
+    if (!day || !day.aggregate) return '';
+    const agg = day.aggregate;
+    const color = agg.color || '#f7b733';
+    return `
+      <section class="wca-side-section wca-pollen">
+        <div class="wca-side-title">Pollen</div>
+        <div class="wca-side-main">
+          <span class="wca-side-value" style="color:${esc(color)}">${agg.value}</span>
+          <span class="wca-side-label" style="color:${esc(color)}">${esc(agg.category || agg.label || 'UPI')}</span>
+        </div>
+        <div class="wca-side-bar"><div class="wca-side-bar-fill" style="width:${Math.min(100, Math.max(0, (agg.value / 5) * 100)).toFixed(0)}%;background:${esc(color)}"></div></div>
+        <div class="wca-side-note">${esc(agg.label || '')}</div>
       </section>
     `;
   }
@@ -122,8 +140,9 @@
     const weather = stateMap && stateMap['weather.current'];
     const aqhi = stateMap && stateMap['weather.air_quality'];
     const solar = stateMap && stateMap['solar.weather.current'];
+    const pollen = stateMap && stateMap['weather.pollen'];
 
-    if (!weather && !aqhi && !solar) {
+    if (!weather && !aqhi && !solar && !(pollen && pollen.current)) {
       container.innerHTML = `<div class="widget-unavailable"><span class="widget-unavailable-label">Source unavailable</span><span style="font-size:10px;opacity:.5">weather aggregate</span></div>`;
       return;
     }
@@ -133,6 +152,7 @@
         ${renderWeather(weather)}
         <div class="wca-side">
           ${renderAQHI(aqhi)}
+          ${renderPollen(pollen)}
           ${renderSolar(solar)}
         </div>
       </div>
@@ -141,7 +161,7 @@
 
   window.CupolaWidgets.push({
     type: 'weather-current-aggregate',
-    domains: ['weather.current', 'weather.air_quality', 'solar.weather.current'],
+    domains: ['weather.current', 'weather.air_quality', 'solar.weather.current', 'weather.pollen'],
     defaultSize: { w: 6, h: 4 },
     subscriptionParams: () => null,
     render(container, stateMap, _config) { render(container, stateMap); },

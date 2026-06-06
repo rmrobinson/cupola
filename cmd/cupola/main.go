@@ -21,6 +21,7 @@ import (
 	ecowittcollector "github.com/rmrobinson/cupola/internal/collector/ecowitt"
 	"github.com/rmrobinson/cupola/internal/collector/envcanada"
 	flagcollector "github.com/rmrobinson/cupola/internal/collector/flag"
+	"github.com/rmrobinson/cupola/internal/collector/googlepollen"
 	"github.com/rmrobinson/cupola/internal/collector/gtfsrt"
 	municipalcollector "github.com/rmrobinson/cupola/internal/collector/municipal"
 	_ "github.com/rmrobinson/cupola/internal/collector/municipal/enovapower"
@@ -112,6 +113,22 @@ func main() {
 				},
 			},
 		))
+	}
+	if c := cfg.Collectors.PollenGoogle; c != nil && c.Enabled && strings.TrimSpace(c.APIKey) == "" {
+		log.Printf("google.pollen: enabled but api_key is empty after environment expansion; collector not registered")
+	}
+	if pc := resolvePollenConfig(cfg.Collectors, cfg.Location.Lat, cfg.Location.Lon, cfg.Location.Timezone); pc.enabled {
+		if googlepollen.ExceedsFreeTier(pc.opts.Interval) {
+			log.Printf("google.pollen: configured poll interval %s estimates %d requests/month, above the 5000 request/month free tier",
+				pc.opts.Interval, googlepollen.EstimatedMonthlyRequests(pc.opts.Interval))
+		}
+		log.Printf("google.pollen: registering collector for %.3f,%.3f (days=%d interval=%s)",
+			pc.opts.Latitude, pc.opts.Longitude, pc.opts.Days, pc.opts.Interval)
+		pollenCol, err := googlepollen.New(context.Background(), pc.apiKey, pc.opts, stateStore)
+		if err != nil {
+			log.Fatalf("google.pollen: create collector: %v", err)
+		}
+		registry.Register(pollenCol)
 	}
 
 	// Canada flag status: HTML scrape of canada.ca.
@@ -396,6 +413,12 @@ type resolvedAirQualityConfig struct {
 	stationProvince string
 }
 
+type resolvedPollenConfig struct {
+	enabled bool
+	apiKey  string
+	opts    googlepollen.Options
+}
+
 func resolveAirQualityConfig(cfg config.CollectorsConfig) resolvedAirQualityConfig {
 	if c := cfg.AirQualityEnvCanada; c != nil && c.Enabled {
 		interval := c.PollInterval.Duration
@@ -412,6 +435,25 @@ func resolveAirQualityConfig(cfg config.CollectorsConfig) resolvedAirQualityConf
 		}
 	}
 	return resolvedAirQualityConfig{}
+}
+
+func resolvePollenConfig(cfg config.CollectorsConfig, lat, lon float64, timezone string) resolvedPollenConfig {
+	c := cfg.PollenGoogle
+	if c == nil || !c.Enabled || strings.TrimSpace(c.APIKey) == "" {
+		return resolvedPollenConfig{}
+	}
+	return resolvedPollenConfig{
+		enabled: true,
+		apiKey:  strings.TrimSpace(c.APIKey),
+		opts: googlepollen.ResolveOptions(
+			lat,
+			lon,
+			timezone,
+			c.PollInterval.Duration,
+			c.Days,
+			c.LanguageCode,
+		),
+	}
 }
 
 func defaultCORSOrigins(host string, port int) []string {

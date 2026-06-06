@@ -24,6 +24,43 @@
     return String(label || '').trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
+  function dateKey(iso) {
+    if (!iso) return '';
+    const raw = String(iso);
+    const m = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${mo}-${day}`;
+  }
+
+  function localDateFromKey(key) {
+    const m = String(key || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
+
+  function pollenDateFromLabel(label, pollenDays) {
+    const days = Array.isArray(pollenDays) ? pollenDays : [];
+    if (!days.length) return '';
+    const normalized = labelKey(label).replace(/\s+night$/, '');
+    if (normalized === 'today' || normalized === 'tonight') return dateKey(days[0].date);
+    if (normalized === 'tomorrow') return days[1] ? dateKey(days[1].date) : '';
+
+    const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const target = weekdays.indexOf(normalized);
+    if (target < 0) return '';
+    for (const day of days) {
+      const key = dateKey(day.date);
+      const d = localDateFromKey(key);
+      if (d && d.getDay() === target) return key;
+    }
+    return '';
+  }
+
   function aqhiMetric(period) {
     const max = period?.max || null;
     const color = aqhiColor(max && max.value, max && max.risk);
@@ -31,6 +68,40 @@
       color,
       value: aqhiValue(max),
       risk: max && max.risk || '',
+    };
+  }
+
+  function pollenTypeLabel(code, label) {
+    const c = String(code || '').toUpperCase();
+    if (c === 'GRASS' || c === 'TREE' || c === 'WEED') return label || c.charAt(0) + c.slice(1).toLowerCase();
+    if (c === 'GRAMINALES') return 'Grass';
+    if (c === 'RAGWEED' || c === 'MUGWORT') return 'Weed';
+    if ([
+      'ALDER',
+      'ASH',
+      'BIRCH',
+      'COTTONWOOD',
+      'ELM',
+      'MAPLE',
+      'OLIVE',
+      'JUNIPER',
+      'OAK',
+      'PINE',
+      'CYPRESS_PINE',
+      'HAZEL',
+      'JAPANESE_CEDAR',
+      'JAPANESE_CYPRESS',
+    ].includes(c)) return 'Tree';
+    return label || 'Pollen';
+  }
+
+  function pollenMetric(day) {
+    const agg = day?.aggregate || null;
+    const label = agg ? pollenTypeLabel(agg.code, agg.label) : 'Pollen';
+    return {
+      color: agg?.color || '#f7b733',
+      value: agg ? String(agg.value) : '—',
+      label,
     };
   }
 
@@ -49,11 +120,10 @@
     return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   }
 
-  function renderWeather(data, aqhiData, config) {
+  function renderWeather(data, aqhiData, pollenData, config) {
     const periods = data?.periods || [];
     const limit = config?.days_to_show ? config.days_to_show * 2 : 10;
     const shown = periods.slice(0, limit);
-    if (!shown.length) return { html: '', matchedAQHI: new Set() };
 
     const aqhiByLabel = new Map();
     for (const p of aqhiData?.forecasts || []) {
@@ -61,7 +131,33 @@
       if (key) aqhiByLabel.set(key, p);
     }
 
+    const pollenByDate = new Map();
+    for (const day of pollenData?.days || []) {
+      const key = dateKey(day.date);
+      if (key) pollenByDate.set(key, day);
+    }
+
     const matchedAQHI = new Set();
+    const matchedPollen = new Set();
+
+    if (!shown.length && pollenByDate.size) {
+      const pollenRows = Array.from(pollenByDate.values()).slice(0, 5).map(day => {
+        const metric = pollenMetric(day);
+        return `
+          <div class="wfa-period has-pollen">
+            <span class="wfa-label">${esc(day.date)}</span>
+            <span class="wfa-condition">${esc(metric.label)}</span>
+            <span class="wfa-temp"></span>
+            <span class="wfa-pop"></span>
+            <span class="wfa-inline-aqhi is-empty"></span>
+            <span class="wfa-inline-pollen" style="color:${esc(metric.color)}">${esc(metric.label)} ${metric.value}</span>
+          </div>
+        `;
+      }).join('');
+      return { html: `<section class="wfa-weather">${pollenRows}</section>`, matchedAQHI, matchedPollen };
+    }
+
+    if (!shown.length) return { html: '', matchedAQHI, matchedPollen };
 
     const html = `
       <section class="wfa-weather">
@@ -70,8 +166,12 @@
           const aqhi = aqhiByLabel.get(key);
           if (aqhi) matchedAQHI.add(key);
           const metric = aqhiMetric(aqhi);
+          const pDate = pollenDateFromLabel(p.label, pollenData?.days) || dateKey(p.starts_at || p.date);
+          const pollen = pollenByDate.get(pDate);
+          if (pollen) matchedPollen.add(pDate);
+          const pMetric = pollenMetric(pollen);
           return `
-            <div class="wfa-period ${aqhi ? 'has-aqhi' : ''}">
+            <div class="wfa-period ${aqhi ? 'has-aqhi' : ''} ${pollen ? 'has-pollen' : ''}">
               <span class="wfa-label">${esc(p.label)}</span>
               <span class="wfa-condition">${esc(p.condition || p.summary || '')}</span>
               <span class="wfa-temp">
@@ -80,6 +180,7 @@
               </span>
               <span class="wfa-pop">${p.precip_chance}%</span>
               ${aqhi ? `<span class="wfa-inline-aqhi" style="color:${metric.color}">AQHI ${metric.value}</span>` : '<span class="wfa-inline-aqhi is-empty"></span>'}
+              ${pollen ? `<span class="wfa-inline-pollen" style="color:${esc(pMetric.color)}">${esc(pMetric.label)} ${pMetric.value}</span>` : '<span class="wfa-inline-pollen is-empty"></span>'}
             </div>
           `;
         }).join('')}
@@ -143,6 +244,7 @@
     const weather = renderWeather(
       stateMap && stateMap['weather.forecast'],
       stateMap && stateMap['weather.air_quality'],
+      stateMap && stateMap['weather.pollen'],
       config || {}
     );
     const weatherHTML = weather.html;
@@ -165,7 +267,7 @@
 
   window.CupolaWidgets.push({
     type: 'weather-forecast-aggregate',
-    domains: ['weather.forecast', 'weather.air_quality', 'solar.weather.forecast'],
+    domains: ['weather.forecast', 'weather.air_quality', 'solar.weather.forecast', 'weather.pollen'],
     defaultSize: { w: 8, h: 7 },
     subscriptionParams: () => null,
     render(container, stateMap, config) { render(container, stateMap, config); },

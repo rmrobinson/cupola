@@ -21,8 +21,8 @@ function loadWidget() {
 function forecastState(overrides = {}) {
   return {
     periods: [
-      { label: 'Today', condition: 'Sunny', high: 25, low: 14, precip_chance: 10 },
-      { label: 'Tonight', condition: 'Clear', low: 12, precip_chance: 0 },
+      { label: 'Today', starts_at: '2026-06-06T12:00:00Z', condition: 'Sunny', high: 25, low: 14, precip_chance: 10 },
+      { label: 'Tonight', starts_at: '2026-06-07T00:00:00Z', condition: 'Clear', low: 12, precip_chance: 0 },
     ],
     ...overrides,
   };
@@ -63,7 +63,7 @@ test('weather forecast aggregate registers for forecast weather, AQHI, and solar
   const widget = loadWidget();
 
   assert.equal(widget.type, 'weather-forecast-aggregate');
-  assert.deepEqual(Array.from(widget.domains), ['weather.forecast', 'weather.air_quality', 'solar.weather.forecast']);
+  assert.deepEqual(Array.from(widget.domains), ['weather.forecast', 'weather.air_quality', 'solar.weather.forecast', 'weather.pollen']);
   assert.equal(widget.defaultSize.w, 8);
   assert.equal(widget.defaultSize.h, 7);
 });
@@ -160,6 +160,59 @@ test('weather forecast aggregate renders useful output with only AQHI and solar'
   assert.match(container.innerHTML, /Waterloo/);
   assert.match(container.innerHTML, /Low Risk/);
   assert.match(container.innerHTML, /Solar forecast/);
+});
+
+test('weather forecast aggregate renders pollen metrics when present', () => {
+  const widget = loadWidget();
+  const container = {};
+
+  widget.render(container, {
+    'weather.forecast': forecastState({
+      periods: [
+        { label: 'Sunday', starts_at: '2026-06-06T12:00:00Z', condition: 'Sunny', high: 25, precip_chance: 10 },
+        { label: 'Monday', starts_at: '2026-06-07T12:00:00Z', condition: 'Rain', high: 18, precip_chance: 80 },
+      ],
+    }),
+    'weather.air_quality': aqhiState({
+      forecasts: [
+        { label: 'Sunday', max: { value: 3, risk: 'Low Risk' } },
+        { label: 'Monday', max: { value: 5, risk: 'Moderate Risk' } },
+      ],
+    }),
+    'weather.pollen': {
+      days: [
+        { date: '2026-06-07', aggregate: { value: 5, label: 'Grass', code: 'GRASS', category: 'Very high', color: '#e53935' } },
+        { date: '2026-06-08', aggregate: { value: 2, label: 'Cypress pine', code: 'CYPRESS_PINE', category: 'Low', color: '#57d9a3' } },
+      ],
+    },
+  });
+
+  assert.doesNotMatch(container.innerHTML, /Pollen forecast/);
+  assert.match(container.innerHTML, /Sunday[\s\S]*Sunny[\s\S]*AQHI 3[\s\S]*Grass 5/);
+  assert.match(container.innerHTML, /Monday[\s\S]*Rain[\s\S]*AQHI 5[\s\S]*Tree 2/);
+  assert.doesNotMatch(container.innerHTML, /Cypress pine 2/);
+});
+
+test('weather forecast aggregate matches pollen by forecast label before timestamp date', () => {
+  const widget = loadWidget();
+  const container = {};
+
+  widget.render(container, {
+    'weather.forecast': forecastState({
+      periods: [
+        { label: 'Saturday night', starts_at: '2026-06-07T03:00:00Z', condition: 'Clear', low: 12, precip_chance: 0 },
+      ],
+    }),
+    'weather.pollen': {
+      days: [
+        { date: '2026-06-06', aggregate: { value: 1, label: 'Grass', code: 'GRASS', category: 'Very low', color: '#57d9a3' } },
+        { date: '2026-06-07', aggregate: { value: 5, label: 'Tree', code: 'TREE', category: 'Very high', color: '#e53935' } },
+      ],
+    },
+  });
+
+  assert.match(container.innerHTML, /Saturday night[\s\S]*Clear[\s\S]*Grass 1/);
+  assert.doesNotMatch(container.innerHTML, /Tree 5/);
 });
 
 test('weather forecast aggregate renders empty state when all sources are missing', () => {

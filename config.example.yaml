@@ -51,6 +51,13 @@ collectors:
     # location: Kitchener
     poll_interval: 30m
 
+  pollen_google:
+    enabled: false
+    api_key: "${GOOGLE_POLLEN_API_KEY}"
+    poll_interval: 12h
+    days: 5
+    # language_code: en
+
   solar_envcanada:
     enabled: true
     poll_interval: 1h

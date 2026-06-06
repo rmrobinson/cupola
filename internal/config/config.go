@@ -65,6 +65,7 @@ type CollectorsConfig struct {
 	WeatherEcowitt      *EcowittConfig             `yaml:"weather_ecowitt"`
 	WeatherEnvCanada    *EnvCanadaWeatherConfig    `yaml:"weather_envcanada"`
 	AirQualityEnvCanada *EnvCanadaAirQualityConfig `yaml:"air_quality_envcanada"`
+	PollenGoogle        *GooglePollenConfig        `yaml:"pollen_google"`
 	SolarEnvCanada      *EnvCanadaSolarConfig      `yaml:"solar_envcanada"`
 	Transit             *TransitConfig             `yaml:"transit"`
 	Traffic             *TrafficConfig             `yaml:"traffic"`
@@ -99,6 +100,14 @@ type EnvCanadaAirQualityConfig struct {
 	Province     string   `yaml:"province"`     // required when station_code is set
 	Location     string   `yaml:"location"`     // optional AQHI site override
 	PollInterval Duration `yaml:"poll_interval"`
+}
+
+type GooglePollenConfig struct {
+	Enabled      bool     `yaml:"enabled"`
+	APIKey       string   `yaml:"api_key"`
+	PollInterval Duration `yaml:"poll_interval"`
+	Days         int      `yaml:"days"`
+	LanguageCode string   `yaml:"language_code"`
 }
 
 type EnvCanadaSolarConfig struct {

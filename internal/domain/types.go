@@ -11,6 +11,7 @@ const (
 	DomainWeatherForecastHourly DomainType = "weather.forecast.hourly"
 	DomainWeatherAlerts         DomainType = "weather.alerts"
 	DomainWeatherAirQuality     DomainType = "weather.air_quality"
+	DomainWeatherPollen         DomainType = "weather.pollen"
 	DomainSolarWeatherCurrent   DomainType = "solar.weather.current"
 	DomainSolarWeatherForecast  DomainType = "solar.weather.forecast"
 	DomainTransitArrivals       DomainType = "transit.arrivals"
