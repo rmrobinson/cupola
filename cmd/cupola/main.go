@@ -69,6 +69,10 @@ func main() {
 
 	registry := collector.NewRegistry()
 	stateStore := store.NewStateStore()
+	currentWeather := resolveCurrentWeatherConfig(cfg.Collectors)
+	if currentWeather.conflict {
+		log.Printf("weather.current: both Ecowitt and Environment Canada current conditions are enabled; using Ecowitt and skipping envcanada.current")
+	}
 
 	notesCol := notescollector.New(sqliteStore, stateStore)
 	registry.Register(notesCol)
@@ -91,9 +95,16 @@ func main() {
 		if alertInterval == 0 {
 			alertInterval = 15 * time.Minute
 		}
+		currentInterval := c.PollIntervalCurrentConditions.Duration
+		if currentInterval == 0 {
+			currentInterval = 10 * time.Minute
+		}
 		log.Printf("envcanada: registering weather collectors for %.3f,%.3f",
 			cfg.Location.Lat, cfg.Location.Lon)
 		station := envcanada.StationOverride{Code: c.StationCode, Province: c.Province}
+		if currentWeather.source == currentWeatherSourceEnvCanada {
+			registry.Register(envcanada.NewCurrentConditionsCollector(cfg.Location.Lat, cfg.Location.Lon, currentInterval, stateStore, station))
+		}
 		registry.Register(envcanada.NewForecastCollector(cfg.Location.Lat, cfg.Location.Lon, fcInterval, stateStore, station))
 		registry.Register(envcanada.NewHourlyForecastCollector(cfg.Location.Lat, cfg.Location.Lon, hourlyInterval, stateStore, station))
 		registry.Register(envcanada.NewAlertsCollector(cfg.Location.Lat, cfg.Location.Lon, alertInterval, stateStore, station))
@@ -141,12 +152,8 @@ func main() {
 	}
 
 	// Ecowitt GW2000 local weather station.
-	if c := cfg.Collectors.WeatherEcowitt; c != nil && c.Enabled && c.URL != "" {
-		interval := c.PollInterval.Duration
-		if interval == 0 {
-			interval = time.Minute
-		}
-		registry.Register(ecowittcollector.New(c.URL, interval, stateStore))
+	if currentWeather.source == currentWeatherSourceEcowitt {
+		registry.Register(ecowittcollector.New(currentWeather.ecowittURL, currentWeather.interval, stateStore))
 	}
 
 	// Space Weather Canada solar activity (current + forecast).
@@ -413,10 +420,63 @@ type resolvedAirQualityConfig struct {
 	stationProvince string
 }
 
+type currentWeatherSource string
+
+const (
+	currentWeatherSourceNone      currentWeatherSource = ""
+	currentWeatherSourceEcowitt   currentWeatherSource = "ecowitt.current"
+	currentWeatherSourceEnvCanada currentWeatherSource = "envcanada.current"
+)
+
+type resolvedCurrentWeatherConfig struct {
+	source     currentWeatherSource
+	interval   time.Duration
+	ecowittURL string
+	conflict   bool
+}
+
 type resolvedPollenConfig struct {
 	enabled bool
 	apiKey  string
 	opts    googlepollen.Options
+}
+
+func resolveCurrentWeatherConfig(cfg config.CollectorsConfig) resolvedCurrentWeatherConfig {
+	ecowittEnabled := false
+	ecowittURL := ""
+	ecowittInterval := time.Minute
+	if c := cfg.WeatherEcowitt; c != nil && c.Enabled && strings.TrimSpace(c.URL) != "" {
+		ecowittEnabled = true
+		ecowittURL = c.URL
+		if c.PollInterval.Duration != 0 {
+			ecowittInterval = c.PollInterval.Duration
+		}
+	}
+
+	envCanadaEnabled := false
+	envCanadaInterval := 10 * time.Minute
+	if c := cfg.WeatherEnvCanada; c != nil && c.Enabled && c.CurrentConditionsEnabled {
+		envCanadaEnabled = true
+		if c.PollIntervalCurrentConditions.Duration != 0 {
+			envCanadaInterval = c.PollIntervalCurrentConditions.Duration
+		}
+	}
+
+	if ecowittEnabled {
+		return resolvedCurrentWeatherConfig{
+			source:     currentWeatherSourceEcowitt,
+			interval:   ecowittInterval,
+			ecowittURL: ecowittURL,
+			conflict:   envCanadaEnabled,
+		}
+	}
+	if envCanadaEnabled {
+		return resolvedCurrentWeatherConfig{
+			source:   currentWeatherSourceEnvCanada,
+			interval: envCanadaInterval,
+		}
+	}
+	return resolvedCurrentWeatherConfig{source: currentWeatherSourceNone}
 }
 
 func resolveAirQualityConfig(cfg config.CollectorsConfig) resolvedAirQualityConfig {

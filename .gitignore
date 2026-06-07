@@ -3,3 +3,4 @@
 cmd/cupola/frontend/js/vendor/
 data/
 *.log
+*local.config.yaml

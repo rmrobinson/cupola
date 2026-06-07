@@ -53,6 +53,63 @@ func TestResolveAirQualityConfigDisabledWhenDedicatedConfigMissing(t *testing.T)
 	}
 }
 
+func TestResolveCurrentWeatherConfigUsesEcowittOnly(t *testing.T) {
+	got := resolveCurrentWeatherConfig(config.CollectorsConfig{
+		WeatherEcowitt: &config.EcowittConfig{
+			Enabled:      true,
+			URL:          "http://weather.local",
+			PollInterval: config.Duration{Duration: 90 * time.Second},
+		},
+	})
+
+	if got.source != currentWeatherSourceEcowitt {
+		t.Fatalf("source = %q, want %q", got.source, currentWeatherSourceEcowitt)
+	}
+	if got.ecowittURL != "http://weather.local" || got.interval != 90*time.Second || got.conflict {
+		t.Fatalf("unexpected resolved config: %+v", got)
+	}
+}
+
+func TestResolveCurrentWeatherConfigUsesEnvCanadaOnly(t *testing.T) {
+	got := resolveCurrentWeatherConfig(config.CollectorsConfig{
+		WeatherEnvCanada: &config.EnvCanadaWeatherConfig{
+			Enabled:                       true,
+			CurrentConditionsEnabled:      true,
+			PollIntervalCurrentConditions: config.Duration{Duration: 12 * time.Minute},
+		},
+	})
+
+	if got.source != currentWeatherSourceEnvCanada {
+		t.Fatalf("source = %q, want %q", got.source, currentWeatherSourceEnvCanada)
+	}
+	if got.interval != 12*time.Minute || got.conflict {
+		t.Fatalf("unexpected resolved config: %+v", got)
+	}
+}
+
+func TestResolveCurrentWeatherConfigPrefersEcowittWhenBothEnabled(t *testing.T) {
+	got := resolveCurrentWeatherConfig(config.CollectorsConfig{
+		WeatherEcowitt: &config.EcowittConfig{
+			Enabled: true,
+			URL:     "http://weather.local",
+		},
+		WeatherEnvCanada: &config.EnvCanadaWeatherConfig{
+			Enabled:                  true,
+			CurrentConditionsEnabled: true,
+		},
+	})
+
+	if got.source != currentWeatherSourceEcowitt {
+		t.Fatalf("source = %q, want %q", got.source, currentWeatherSourceEcowitt)
+	}
+	if !got.conflict {
+		t.Fatalf("conflict = false, want true")
+	}
+	if got.interval != time.Minute {
+		t.Fatalf("interval = %s, want 1m", got.interval)
+	}
+}
+
 func TestResolvePollenConfigDefaultsAndCapsDays(t *testing.T) {
 	got := resolvePollenConfig(config.CollectorsConfig{
 		PollenGoogle: &config.GooglePollenConfig{

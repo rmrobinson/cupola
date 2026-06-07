@@ -86,12 +86,14 @@ type EcowittConfig struct {
 }
 
 type EnvCanadaWeatherConfig struct {
-	Enabled                    bool     `yaml:"enabled"`
-	StationCode                string   `yaml:"station_code"` // optional: bypass auto-discovery
-	Province                   string   `yaml:"province"`     // required when station_code is set
-	PollIntervalForecast       Duration `yaml:"poll_interval_forecast"`
-	PollIntervalHourlyForecast Duration `yaml:"poll_interval_hourly_forecast"`
-	PollIntervalAlerts         Duration `yaml:"poll_interval_alerts"`
+	Enabled                       bool     `yaml:"enabled"`
+	CurrentConditionsEnabled      bool     `yaml:"current_conditions_enabled"`
+	StationCode                   string   `yaml:"station_code"` // optional: bypass auto-discovery
+	Province                      string   `yaml:"province"`     // required when station_code is set
+	PollIntervalCurrentConditions Duration `yaml:"poll_interval_current_conditions"`
+	PollIntervalForecast          Duration `yaml:"poll_interval_forecast"`
+	PollIntervalHourlyForecast    Duration `yaml:"poll_interval_hourly_forecast"`
+	PollIntervalAlerts            Duration `yaml:"poll_interval_alerts"`
 }
 
 type EnvCanadaAirQualityConfig struct {
