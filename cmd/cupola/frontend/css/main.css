@@ -546,6 +546,10 @@ button {
   gap: 8px;
 }
 
+.canvas.layout-locked #btn-add-widget {
+  opacity: 0.45;
+}
+
 /* ── Widget cell / chrome ──────────────────────────────────────────────── */
 
 .widget-cell {
@@ -577,6 +581,11 @@ button {
 
 .widget-chrome:active { cursor: grabbing; }
 
+.canvas.layout-locked .widget-chrome {
+  cursor: default;
+  touch-action: auto;
+}
+
 .drag-handle {
   cursor: grab;
   opacity: 0.4;
@@ -597,6 +606,12 @@ button {
 }
 
 .drag-handle:active { cursor: grabbing; }
+
+.canvas.layout-locked .drag-handle,
+.canvas.layout-locked .btn-widget-config,
+.canvas.layout-locked .btn-widget-remove {
+  display: none;
+}
 
 .widget-type-label {
   flex: 1;
@@ -746,6 +761,10 @@ button {
   height: 10px;
   background: rgba(255,255,255,0.2);
   border-radius: 2px;
+}
+
+.canvas.layout-locked .widget-resize-handle {
+  display: none;
 }
 
 .widget-resizing .widget-resize-handle::after {
