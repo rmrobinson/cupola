@@ -1,8 +1,9 @@
-const CACHE_VERSION = 'runtime-v2';
+const CACHE_VERSION = 'runtime-v3';
 const STATIC_CACHE = `cupola-static-${CACHE_VERSION}`;
 
 const PRECACHE = [
   '/',
+  '/dashboard.html',
   '/admin',
   '/admin.html',
   '/manifest.json',
@@ -20,6 +21,7 @@ const PRECACHE = [
   '/js/dashboard-api.js',
   '/js/details.js',
   '/js/admin.js',
+  '/js/landing.js',
   '/js/subscriptions.js',
   '/js/overlays.js',
   '/js/profile.js',
@@ -105,7 +107,7 @@ async function networkFirstStatic(request) {
     if (response.ok) cache.put(request, response.clone());
     return response;
   } catch {
-    return (await cache.match(request))
+    return (await cache.match(request, { ignoreSearch: true }))
       ?? new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
   }
 }
