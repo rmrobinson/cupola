@@ -105,7 +105,7 @@ const Grid = (() => {
     chrome.className = 'widget-chrome';
     chrome.innerHTML = `
       <span class="drag-handle" title="Drag to move">&#8942;&#8942;</span>
-      <span class="widget-type-label">${esc(humanLabel(wc.type))}</span>
+      <span class="widget-type-label">${esc(widgetLabel(def, wc.type))}</span>
       <button class="btn-widget-config${(def?.configSchema?.length || def?.buildConfig) ? '' : ' hidden'}" title="Configure">&#9881;</button>
       <button class="btn-widget-remove" title="Remove">&times;</button>
     `;
@@ -626,6 +626,10 @@ const Grid = (() => {
 
   function humanLabel(type) {
     return type.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function widgetLabel(def, type) {
+    return def?.label || humanLabel(type);
   }
 
   function esc(s) {

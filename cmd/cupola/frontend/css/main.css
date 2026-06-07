@@ -2073,6 +2073,36 @@ button {
     grid-template-rows: minmax(0, 1fr) auto;
   }
 
+  .widget-weather-current-aggregate.has-weather .wca-current {
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(7rem, 1fr);
+    align-items: start;
+    column-gap: clamp(10px, 4cqw, 18px);
+    row-gap: clamp(2px, 1.4cqh, 5px);
+  }
+
+  .widget-weather-current-aggregate.has-weather .wca-temp {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .widget-weather-current-aggregate.has-weather .wca-condition {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .widget-weather-current-aggregate.has-weather .wca-details {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    text-align: right;
+  }
+
+  .widget-weather-current-aggregate.has-weather .wca-bar-block {
+    grid-column: 1 / -1;
+    margin-top: 0;
+  }
+
   .widget-weather-current-aggregate.has-weather .wca-side {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
