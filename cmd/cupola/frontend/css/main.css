@@ -527,17 +527,48 @@ button {
 }
 
 .canvas-brand {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   min-width: 0;
+  padding: 0;
+  touch-action: manipulation;
+}
+
+.canvas-brand:hover .canvas-brand-icon,
+.canvas-brand:focus-visible .canvas-brand-icon {
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.6), 0 6px 18px rgba(0,0,0,0.24);
 }
 
 .canvas-brand-icon {
+  flex: 0 0 auto;
   display: block;
   width: 34px;
   height: 34px;
   border-radius: 8px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.24);
+}
+
+.canvas-dashboard-name {
+  margin-left: 10px;
+  max-width: min(32vw, 260px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255,255,255,0.76);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 767px) {
+  .canvas-dashboard-name {
+    display: none;
+  }
 }
 
 .canvas-toolbar-actions {

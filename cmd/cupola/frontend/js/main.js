@@ -180,6 +180,8 @@ async function launchCanvas(profile) {
   const canvas = document.getElementById('canvas');
   document.getElementById('landing').classList.add('hidden');
   canvas.classList.remove('hidden');
+  const dashboardName = document.getElementById('canvas-dashboard-name');
+  if (dashboardName) dashboardName.textContent = profile.name || profile.id || 'Dashboard';
 
   Grid.init(profile, saveProfile);
   window.CupolaActiveProfile = profile;
@@ -190,6 +192,12 @@ async function launchCanvas(profile) {
     lockBtn.addEventListener('click', () => setLayoutLocked(!Grid.isLocked()));
   }
   setLayoutLocked(isPWAApp());
+
+  const dashboardListBtn = document.getElementById('btn-dashboard-list');
+  if (dashboardListBtn && !dashboardListBtn.dataset.bound) {
+    dashboardListBtn.dataset.bound = '1';
+    dashboardListBtn.addEventListener('click', showDashboardList);
+  }
 
   const addBtn = document.getElementById('btn-add-widget');
   if (addBtn && !addBtn.dataset.bound) {
@@ -220,6 +228,15 @@ async function launchCanvas(profile) {
       window.location.href = '/admin';
     });
   }
+}
+
+function showDashboardList() {
+  Grid.destroy();
+  window.CupolaActiveProfile = null;
+  setLayoutLocked(false);
+  document.getElementById('canvas')?.classList.add('hidden');
+  WidgetPicker.hide();
+  Profile.showLanding(profile => launchCanvas(profile));
 }
 
 function setLayoutLocked(locked) {
