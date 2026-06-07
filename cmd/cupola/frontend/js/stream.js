@@ -68,6 +68,12 @@ const Stream = (() => {
     connect();
   }
 
+  function shouldReconnectOnResume() {
+    if (!es || _offline) return true;
+    if (typeof EventSource !== 'undefined' && es.readyState === EventSource.CLOSED) return true;
+    return false;
+  }
+
   function onConnect(fn) {
     connectHandlers.push(fn);
   }
@@ -134,6 +140,7 @@ const Stream = (() => {
   return {
     connect,
     reconnectNow,
+    shouldReconnectOnResume,
     on,
     off,
     onConnect,

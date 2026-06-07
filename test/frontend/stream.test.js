@@ -9,14 +9,20 @@ function loadStream() {
   const ids = ['seed-session', 'stream-1', 'stream-2', 'stream-3'];
 
   class FakeEventSource {
+    static CONNECTING = 0;
+    static OPEN = 1;
+    static CLOSED = 2;
+
     constructor(url) {
       this.url = url;
       this.closed = false;
+      this.readyState = FakeEventSource.OPEN;
       instances.push(this);
     }
 
     close() {
       this.closed = true;
+      this.readyState = FakeEventSource.CLOSED;
     }
   }
 
@@ -65,4 +71,16 @@ test('stale stream open callbacks are ignored after reconnect', () => {
 
   instances[1].onopen();
   assert.equal(opens, 1);
+});
+
+test('resume reconnect is skipped while the active stream is open', () => {
+  const { Stream, instances } = loadStream();
+
+  assert.equal(Stream.shouldReconnectOnResume(), true);
+
+  Stream.connect();
+  assert.equal(Stream.shouldReconnectOnResume(), false);
+
+  instances[0].readyState = instances[0].constructor.CLOSED;
+  assert.equal(Stream.shouldReconnectOnResume(), true);
 });

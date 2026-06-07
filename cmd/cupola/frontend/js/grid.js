@@ -79,10 +79,11 @@ const Grid = (() => {
   async function refreshState() {
     const grid = document.getElementById('widget-grid');
     if (!grid) return;
+    const stateCache = new Map();
     const refreshes = [...grid.querySelectorAll('.widget-cell')]
       .map(cell => cell._refreshState)
       .filter(Boolean)
-      .map(fn => fn());
+      .map(fn => fn(stateCache));
     await Promise.allSettled(refreshes);
   }
 
@@ -178,12 +179,15 @@ const Grid = (() => {
     const stateMap = {};
     let rendered = false;
 
-    async function refreshWidgetState() {
+    async function refreshWidgetState(stateCache = new Map()) {
       await Promise.all(domainList.map(async d => {
-        try {
-          const r = await fetch(`/api/v1/state/${d}`);
-          if (r.ok) stateMap[d] = await r.json();
-        } catch {}
+        if (!stateCache.has(d)) {
+          stateCache.set(d, fetch(`/api/v1/state/${d}`)
+            .then(r => r.ok ? r.json() : undefined)
+            .catch(() => undefined));
+        }
+        const state = await stateCache.get(d);
+        if (state !== undefined) stateMap[d] = state;
       }));
       currentState = isMulti ? stateMap : (stateMap[domainList[0]] || null);
       renderCurrentState();
@@ -235,7 +239,11 @@ const Grid = (() => {
           }
         : (data) => {
             currentState = data || null;
-            if (!data) { renderUnavailable(content, d); return; }
+            if (!data) {
+              renderUnavailable(content, d);
+              rendered = false;
+              return;
+            }
             def.onUpdate(content, data, wc.config);
           };
       streamHandlers.push({ domain: d, handler });

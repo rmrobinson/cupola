@@ -154,13 +154,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function installForegroundRefresh() {
   let lastRefreshAt = Date.now();
-  const refresh = () => {
+  const refresh = (evt) => {
     if (document.visibilityState && document.visibilityState !== 'visible') return;
     const now = Date.now();
     if (now - lastRefreshAt < 750) return;
     lastRefreshAt = now;
-    Stream.reconnectNow();
+
     if (window.CupolaActiveProfile) Grid.refreshState();
+
+    const restoredFromPageCache = evt?.type === 'pageshow' && evt.persisted;
+    if (restoredFromPageCache || Stream.shouldReconnectOnResume()) {
+      Stream.reconnectNow();
+    }
   };
 
   window.addEventListener('pageshow', refresh);
