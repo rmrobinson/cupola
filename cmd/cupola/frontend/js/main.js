@@ -1,13 +1,13 @@
 /**
- * main.js — orchestrator (loaded last).
+ * main.js — dashboard page orchestrator (loaded last).
  *
- * Initialises: SSE → Horizon → Profile landing or kiosk auto-load → Grid
+ * Initialises: SSE → Horizon → dashboard profile load → Grid
  * Exposes: Widgets registry (consumed by grid.js)
  */
 
 // ── Config ────────────────────────────────────────────────────────────────────
 // Fetch home lat/lon at script-load time so the promise is already in flight
-// before DOMContentLoaded. launchCanvas awaits it, guaranteeing distance-sort
+// before DOMContentLoaded. launchDashboard awaits it, guaranteeing distance-sort
 // widgets have coordinates on their first render.
 window.CupolaConfig = {};
 const _configReady = fetch('/api/v1/config')
@@ -116,6 +116,8 @@ const Horizon = (() => {
 
 // ── Profile save helper ───────────────────────────────────────────────────────
 
+const LAST_DASHBOARD_KEY = 'cupola:last-dashboard-id';
+
 function saveProfile(profile) {
   return DashboardAPI.saveProfile(profile).catch(err => {
     AppUI.reportError('Dashboard save failed', err);
@@ -127,7 +129,15 @@ function saveProfile(profile) {
 document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
   const isKiosk = params.get('kiosk') === '1';
-  const kioskProfileId = params.get('profile');
+  const profileId = params.get('id') || params.get('profile');
+
+  if (!profileId) {
+    window.location.replace('/');
+    return;
+  }
+  if (isKiosk) {
+    document.getElementById('canvas')?.classList.add('kiosk');
+  }
 
   Stream.connect();
   installForegroundRefresh();
@@ -137,19 +147,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Wire horizon to astro domain
   Stream.on('astro', data => Horizon.setAstro(data));
 
-  if (isKiosk && kioskProfileId) {
-    // Kiosk mode: auto-load the named profile, suppress chrome
-    document.getElementById('canvas').classList.add('kiosk');
-    DashboardAPI.getProfile(kioskProfileId)
-      .then(profile => {
-        launchCanvas(profile);
-      })
-      .catch(err => {
-        console.error('[cupola] kiosk profile not found:', kioskProfileId, err);
-      });
-  } else {
-    Profile.showLanding(profile => launchCanvas(profile));
-  }
+  DashboardAPI.getProfile(profileId)
+    .then(profile => launchDashboard(profile, { isKiosk }))
+    .catch(err => {
+      if (window.localStorage?.getItem(LAST_DASHBOARD_KEY) === profileId) {
+        window.localStorage.removeItem(LAST_DASHBOARD_KEY);
+      }
+      AppUI.reportError('Dashboard load failed', err);
+      window.setTimeout(() => { window.location.href = '/?list=1'; }, 1200);
+    });
 });
 
 function installForegroundRefresh() {
@@ -174,12 +180,15 @@ function installForegroundRefresh() {
   document.addEventListener('visibilitychange', refresh);
 }
 
-async function launchCanvas(profile) {
+async function launchDashboard(profile, opts = {}) {
   await _configReady;
 
-  const canvas = document.getElementById('canvas');
-  document.getElementById('landing').classList.add('hidden');
-  canvas.classList.remove('hidden');
+  if (!opts.isKiosk && profile?.id) {
+    window.localStorage?.setItem(LAST_DASHBOARD_KEY, profile.id);
+  }
+
+  const dashboardName = document.getElementById('canvas-dashboard-name');
+  if (dashboardName) dashboardName.textContent = profile.name || profile.id || 'Dashboard';
 
   Grid.init(profile, saveProfile);
   window.CupolaActiveProfile = profile;
@@ -190,6 +199,14 @@ async function launchCanvas(profile) {
     lockBtn.addEventListener('click', () => setLayoutLocked(!Grid.isLocked()));
   }
   setLayoutLocked(isPWAApp());
+
+  const dashboardListBtn = document.getElementById('btn-dashboard-list');
+  if (dashboardListBtn && !dashboardListBtn.dataset.bound) {
+    dashboardListBtn.dataset.bound = '1';
+    dashboardListBtn.addEventListener('click', () => {
+      window.location.href = '/?list=1';
+    });
+  }
 
   const addBtn = document.getElementById('btn-add-widget');
   if (addBtn && !addBtn.dataset.bound) {

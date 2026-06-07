@@ -2,18 +2,10 @@
   window.CupolaWidgets = window.CupolaWidgets || [];
 
   function moonSVG(phase) {
-    // Draw the moon using two overlapping circles.
-    // Lit side is always on the right for waxing, left for waning.
+    phase = ((Number(phase) || 0) % 1 + 1) % 1;
     const illum = (1 - Math.cos(2 * Math.PI * phase)) / 2;
-    const waxing = phase < 0.5;
     const r = 36;
     const cx = 50, cy = 50;
-
-    // The illuminated fraction determines how much of the shadow circle overlaps.
-    // shadow ellipse x-radius: at 0 illum → r (full shadow), at 1 → 0 (no shadow)
-    const shadowRX = r * Math.abs(1 - 2 * illum);
-    const shadowDir = waxing ? -1 : 1; // shadow side
-    const shadowCX = cx + shadowDir * r * (1 - 2 * illum);
 
     const moonColor = 'rgba(255,230,100,0.88)';
     const shadowColor = '#0a0a1e';
@@ -32,16 +24,52 @@
       </svg>`;
     }
 
-    const uniqueId = 'mp' + Math.floor(phase * 1000);
+    const top = `${cx} ${cy - r}`;
+    const bottom = `${cx} ${cy + r}`;
+    const fmt = n => Number(n.toFixed(3));
+    const crescentPath = (side, amount) => {
+      const t = Math.max(0, Math.min(1, amount));
+      const outerSweep = side === 'right' ? 1 : 0;
+      const innerSweep = side === 'right' ? 0 : 1;
+      if (t >= 0.995) {
+        return `M ${top} A ${r} ${r} 0 0 ${outerSweep} ${bottom} L ${top} Z`;
+      }
+      const rx = fmt(r * (1 - t));
+      return `M ${top} A ${r} ${r} 0 0 ${outerSweep} ${bottom} A ${rx} ${r} 0 0 ${innerSweep} ${top} Z`;
+    };
+
+    const uniqueId = 'mp' + Math.floor(phase * 10000);
+    const clip = `<defs><clipPath id="${uniqueId}"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath></defs>`;
+    const border = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${borderColor}" stroke-width="1"/>`;
+    if (phase < 0.25) {
+      return `<svg viewBox="0 0 100 100" class="moon-visual">
+        ${clip}
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${shadowColor}"/>
+        <path d="${crescentPath('right', phase / 0.25)}" fill="${moonColor}" clip-path="url(#${uniqueId})"/>
+        ${border}
+      </svg>`;
+    }
+    if (phase < 0.5) {
+      return `<svg viewBox="0 0 100 100" class="moon-visual">
+        ${clip}
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${moonColor}"/>
+        <path d="${crescentPath('left', 1 - ((phase - 0.25) / 0.25))}" fill="${shadowColor}" clip-path="url(#${uniqueId})"/>
+        ${border}
+      </svg>`;
+    }
+    if (phase < 0.75) {
+      return `<svg viewBox="0 0 100 100" class="moon-visual">
+        ${clip}
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${moonColor}"/>
+        <path d="${crescentPath('right', (phase - 0.5) / 0.25)}" fill="${shadowColor}" clip-path="url(#${uniqueId})"/>
+        ${border}
+      </svg>`;
+    }
     return `<svg viewBox="0 0 100 100" class="moon-visual">
-      <defs>
-        <mask id="${uniqueId}">
-          <circle cx="${cx}" cy="${cy}" r="${r}" fill="white"/>
-          <ellipse cx="${shadowCX}" cy="${cy}" rx="${shadowRX}" ry="${r}" fill="black"/>
-        </mask>
-      </defs>
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${shadowColor}" stroke="${borderColor}" stroke-width="1"/>
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${moonColor}" mask="url(#${uniqueId})"/>
+      ${clip}
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${shadowColor}"/>
+      <path d="${crescentPath('left', 1 - ((phase - 0.75) / 0.25))}" fill="${moonColor}" clip-path="url(#${uniqueId})"/>
+      ${border}
     </svg>`;
   }
 

@@ -3,7 +3,7 @@
  *
  * showLanding(onProfileLoaded) renders the landing screen and calls
  * onProfileLoaded(profile) when the user picks or creates a profile.
- * main.js provides the callback so profile.js has no dependency on Widgets.
+ * The caller provides the callback so profile.js has no dependency on routing.
  */
 const Profile = (() => {
   const DEFAULTS = {
@@ -119,13 +119,19 @@ const Profile = (() => {
     });
   }
 
-  function confirmName(el, defaultLayout, onProfileLoaded) {
+  async function confirmName(el, defaultLayout, onProfileLoaded) {
+    const btn = el.querySelector('#btn-confirm-name');
     const name = (el.querySelector('#landing-name-input').value || '').trim() || 'My Dashboard';
     const id   = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
     const profile = { ...DEFAULTS[defaultLayout], id, name };
-    DashboardAPI.saveProfile(profile).catch(err => {
+    if (btn) btn.disabled = true;
+    try {
+      await DashboardAPI.saveProfile(profile);
+    } catch (err) {
+      if (btn) btn.disabled = false;
       AppUI.reportError('Profile save failed', err);
-    });
+      return;
+    }
     launch(profile, onProfileLoaded);
   }
 
