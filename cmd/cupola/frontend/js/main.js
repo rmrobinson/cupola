@@ -130,6 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const kioskProfileId = params.get('profile');
 
   Stream.connect();
+  installForegroundRefresh();
   AppUI.registerServiceWorker();
   Horizon.start();
 
@@ -150,6 +151,28 @@ document.addEventListener('DOMContentLoaded', () => {
     Profile.showLanding(profile => launchCanvas(profile));
   }
 });
+
+function installForegroundRefresh() {
+  let lastRefreshAt = Date.now();
+  const refresh = (evt) => {
+    if (document.visibilityState && document.visibilityState !== 'visible') return;
+    const now = Date.now();
+    if (now - lastRefreshAt < 750) return;
+    lastRefreshAt = now;
+
+    if (window.CupolaActiveProfile) Grid.refreshState();
+
+    const restoredFromPageCache = evt?.type === 'pageshow' && evt.persisted;
+    if (restoredFromPageCache || Stream.shouldReconnectOnResume()) {
+      Stream.reconnectNow();
+    }
+  };
+
+  window.addEventListener('pageshow', refresh);
+  window.addEventListener('focus', refresh);
+  window.addEventListener('online', refresh);
+  document.addEventListener('visibilitychange', refresh);
+}
 
 async function launchCanvas(profile) {
   await _configReady;
