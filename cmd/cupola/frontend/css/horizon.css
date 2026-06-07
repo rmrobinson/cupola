@@ -1,5 +1,5 @@
 /* Horizon: full-viewport time-of-day gradient, fixed behind all content.
-   JavaScript (Horizon.start in main.js) updates #horizon-bg's background
+   JavaScript (Horizon.start in horizon.js) updates #horizon-bg's background
    every 30 s. Transition provides smooth colour blending between updates. */
 
 html, body {

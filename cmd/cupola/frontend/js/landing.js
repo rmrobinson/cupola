@@ -3,6 +3,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     AppUI.registerServiceWorker();
+    if (typeof Horizon !== 'undefined') Horizon.start();
 
     const params = new URLSearchParams(window.location.search);
     const kioskProfileId = params.get('kiosk') === '1' ? params.get('profile') : '';
