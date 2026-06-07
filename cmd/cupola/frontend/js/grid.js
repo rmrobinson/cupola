@@ -11,6 +11,7 @@ const Grid = (() => {
   let _profile = null;
   let _onSave = null;
   let _saveTimer = null;
+  let _locked = false;
 
   // ── Public API ────────────────────────────────────────────────────────
 
@@ -49,6 +50,7 @@ const Grid = (() => {
   }
 
   function addWidget(wc) {
+    if (_locked) return;
     const grid = document.getElementById('widget-grid');
     const cols = gridCols(grid);
     wc.pos.w = Math.max(1, Math.min(wc.pos.w || 1, cols));
@@ -87,6 +89,23 @@ const Grid = (() => {
     await Promise.allSettled(refreshes);
   }
 
+  function setLocked(locked) {
+    _locked = !!locked;
+    removeDragOverlay();
+    const canvas = document.getElementById('canvas');
+    canvas?.classList.toggle('layout-locked', _locked);
+    if (_locked) {
+      document.querySelectorAll('.widget-config-panel').forEach(panel => panel.classList.add('hidden'));
+      document.querySelectorAll('.widget-resizing,.drag-source').forEach(cell => {
+        cell.classList.remove('widget-resizing', 'drag-source');
+      });
+    }
+  }
+
+  function isLocked() {
+    return _locked;
+  }
+
   // ── Cell creation ─────────────────────────────────────────────────────
 
   async function createCell(wc, displayPos = null) {
@@ -105,7 +124,7 @@ const Grid = (() => {
     chrome.className = 'widget-chrome';
     chrome.innerHTML = `
       <span class="drag-handle" title="Drag to move">&#8942;&#8942;</span>
-      <span class="widget-type-label">${esc(humanLabel(wc.type))}</span>
+      <span class="widget-type-label">${esc(widgetLabel(def, wc.type))}</span>
       <button class="btn-widget-config${(def?.configSchema?.length || def?.buildConfig) ? '' : ' hidden'}" title="Configure">&#9881;</button>
       <button class="btn-widget-remove" title="Remove">&times;</button>
     `;
@@ -131,6 +150,7 @@ const Grid = (() => {
     initResize(resizeHandle, cell, wc);
 
     chrome.addEventListener('pointerdown', e => {
+      if (_locked) return;
       if (e.target.closest('button,input,select,textarea,a')) return;
       chrome.setPointerCapture(e.pointerId);
       startPointerDrag(e, cell, wc);
@@ -165,6 +185,7 @@ const Grid = (() => {
     if (def.buildConfig) {
       // Widget provides its own async config panel builder; rebuild on each open.
       chrome.querySelector('.btn-widget-config').addEventListener('click', () => {
+        if (_locked) return;
         const wasHidden = configPanel.classList.contains('hidden');
         configPanel.classList.toggle('hidden');
         if (wasHidden) def.buildConfig(configPanel, wc, onConfigSave);
@@ -172,6 +193,7 @@ const Grid = (() => {
     } else {
       buildConfigPanel(configPanel, def, wc, onConfigSave);
       chrome.querySelector('.btn-widget-config').addEventListener('click', () => {
+        if (_locked) return;
         configPanel.classList.toggle('hidden');
       });
     }
@@ -324,6 +346,7 @@ const Grid = (() => {
   // ── Drag-and-drop ─────────────────────────────────────────────────────
 
   function startPointerDrag(e, cell, wc) {
+    if (_locked) return;
     if (e.button != null && e.button !== 0) return;
     e.preventDefault();
     const grid = document.getElementById('widget-grid');
@@ -447,6 +470,7 @@ const Grid = (() => {
 
   function initResize(hitTarget, cell, wc, opts = {}) {
     hitTarget.addEventListener('pointerdown', e => {
+      if (_locked) return;
       if (opts.hitTest && !isResizeHit(e, hitTarget)) return;
       e.preventDefault();
       e.stopPropagation();
@@ -628,6 +652,10 @@ const Grid = (() => {
     return type.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
 
+  function widgetLabel(def, type) {
+    return def?.label || humanLabel(type);
+  }
+
   function esc(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
@@ -658,5 +686,5 @@ const Grid = (() => {
     cell._refreshState = null;
   }
 
-  return { init, addWidget, removeWidget, destroy, refreshState };
+  return { init, addWidget, removeWidget, destroy, refreshState, setLocked, isLocked };
 })();

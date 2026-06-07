@@ -97,7 +97,7 @@ func TestSDKAdapterBuildsLookupRequest(t *testing.T) {
 	assertQuery("plantsDescription", "false")
 }
 
-func TestMapResponseSelectsCurrentByLocalDateAndAggregates(t *testing.T) {
+func TestMapResponseSelectsCurrentByUTCDateAndAggregates(t *testing.T) {
 	loc, _ := time.LoadLocation("America/Toronto")
 	resp := &pollen.LookupForecastResponse{
 		RegionCode: "CA",
@@ -181,7 +181,20 @@ func TestMapResponsePlantAggregateTieBreakUsesStableCodeOrder(t *testing.T) {
 	}
 }
 
-func TestMapResponseTomorrowFirstHasNoCurrent(t *testing.T) {
+func TestMapResponseSelectsUTCDateAfterLocalEvening(t *testing.T) {
+	loc, _ := time.LoadLocation("America/Toronto")
+	state := mapResponse(&pollen.LookupForecastResponse{
+		DailyInfo: []*pollen.DayInfo{dayInfo(2026, 6, 7, []*pollen.PollenTypeInfo{typeInfo("GRASS", "Grass", true, 2, "Low", "", 0, 1, 0)}, nil)},
+	}, time.Date(2026, 6, 7, 0, 43, 0, 0, time.UTC), loc)
+	if state.Current == nil || state.Current.Date != "2026-06-07" {
+		t.Fatalf("current = %+v, want UTC day 2026-06-07", state.Current)
+	}
+	if len(state.Days) != 1 {
+		t.Fatalf("days = %d, want 1", len(state.Days))
+	}
+}
+
+func TestMapResponseMissingUTCDateHasNoCurrent(t *testing.T) {
 	loc, _ := time.LoadLocation("America/Toronto")
 	state := mapResponse(&pollen.LookupForecastResponse{
 		DailyInfo: []*pollen.DayInfo{dayInfo(2026, 6, 7, []*pollen.PollenTypeInfo{typeInfo("GRASS", "Grass", true, 2, "Low", "", 0, 1, 0)}, nil)},

@@ -23,7 +23,7 @@ const WidgetPicker = (() => {
 
   function render(availDomains, onPick) {
     const all = window.CupolaWidgets || [];
-    const byLabel = (a, b) => humanLabel(a.type).localeCompare(humanLabel(b.type));
+    const byLabel = (a, b) => widgetLabel(a).localeCompare(widgetLabel(b));
     const available = all.filter(w => isAvailable(w, availDomains)).sort(byLabel);
     const unavailable = all.filter(w => !isAvailable(w, availDomains)).sort(byLabel);
 
@@ -78,7 +78,7 @@ const WidgetPicker = (() => {
       return `
         <button class="picker-item${cls}" data-type="${esc(d.type)}"
           title="${isUnavailable ? `Requires domain: ${esc(domainStr)}` : ''}">
-          <span class="picker-item-type">${esc(humanLabel(d.type))}</span>
+          <span class="picker-item-type">${esc(widgetLabel(d))}</span>
           <span class="picker-item-domain">${esc(domainStr)}</span>
         </button>
       `;
@@ -119,6 +119,10 @@ const WidgetPicker = (() => {
 
   function humanLabel(type) {
     return type.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function widgetLabel(def) {
+    return def?.label || humanLabel(def.type);
   }
 
   function esc(s) {

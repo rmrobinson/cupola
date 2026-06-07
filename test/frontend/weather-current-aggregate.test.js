@@ -57,6 +57,7 @@ test('weather current aggregate registers for current weather, AQHI, solar, and 
   const widget = loadWidget();
 
   assert.equal(widget.type, 'weather-current-aggregate');
+  assert.equal(widget.label, 'Weather Snapshot');
   assert.deepEqual(Array.from(widget.domains), ['weather.current', 'weather.air_quality', 'solar.weather.current', 'weather.pollen']);
   assert.equal(widget.defaultSize.w, 6);
   assert.equal(widget.defaultSize.h, 4);

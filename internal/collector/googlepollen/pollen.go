@@ -264,7 +264,7 @@ func mapResponse(resp *pollen.LookupForecastResponse, now time.Time, loc *time.L
 		return state
 	}
 	state.RegionCode = resp.RegionCode
-	today := now.In(loc).Format("2006-01-02")
+	today := now.UTC().Format("2006-01-02")
 	for _, info := range resp.DailyInfo {
 		day, ok := mapDay(info)
 		if !ok {

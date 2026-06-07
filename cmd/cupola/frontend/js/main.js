@@ -184,7 +184,13 @@ async function launchCanvas(profile) {
   Grid.init(profile, saveProfile);
   window.CupolaActiveProfile = profile;
 
-  // "+ Widget" button
+  const lockBtn = document.getElementById('btn-layout-lock');
+  if (lockBtn && !lockBtn.dataset.bound) {
+    lockBtn.dataset.bound = '1';
+    lockBtn.addEventListener('click', () => setLayoutLocked(!Grid.isLocked()));
+  }
+  setLayoutLocked(isPWAApp());
+
   const addBtn = document.getElementById('btn-add-widget');
   if (addBtn && !addBtn.dataset.bound) {
     addBtn.dataset.bound = '1';
@@ -214,6 +220,24 @@ async function launchCanvas(profile) {
       window.location.href = '/admin';
     });
   }
+}
+
+function setLayoutLocked(locked) {
+  Grid.setLocked(locked);
+  const addBtn = document.getElementById('btn-add-widget');
+  const lockBtn = document.getElementById('btn-layout-lock');
+  if (addBtn) addBtn.disabled = locked;
+  if (lockBtn) {
+    lockBtn.textContent = locked ? 'Unlock' : 'Lock';
+    lockBtn.title = locked ? 'Unlock layout editing' : 'Lock layout';
+    lockBtn.setAttribute('aria-pressed', locked ? 'true' : 'false');
+  }
+}
+
+function isPWAApp() {
+  return window.matchMedia?.('(display-mode: standalone)').matches ||
+    window.matchMedia?.('(display-mode: fullscreen)').matches ||
+    window.navigator?.standalone === true;
 }
 
 async function exportDashboard(btn) {

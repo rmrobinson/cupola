@@ -161,6 +161,7 @@
 
   window.CupolaWidgets.push({
     type: 'weather-current-aggregate',
+    label: 'Weather Snapshot',
     domains: ['weather.current', 'weather.air_quality', 'solar.weather.current', 'weather.pollen'],
     defaultSize: { w: 6, h: 4 },
     subscriptionParams: () => null,

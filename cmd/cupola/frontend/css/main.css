@@ -546,6 +546,10 @@ button {
   gap: 8px;
 }
 
+.canvas.layout-locked #btn-add-widget {
+  opacity: 0.45;
+}
+
 /* ── Widget cell / chrome ──────────────────────────────────────────────── */
 
 .widget-cell {
@@ -577,6 +581,11 @@ button {
 
 .widget-chrome:active { cursor: grabbing; }
 
+.canvas.layout-locked .widget-chrome {
+  cursor: default;
+  touch-action: auto;
+}
+
 .drag-handle {
   cursor: grab;
   opacity: 0.4;
@@ -597,6 +606,12 @@ button {
 }
 
 .drag-handle:active { cursor: grabbing; }
+
+.canvas.layout-locked .drag-handle,
+.canvas.layout-locked .btn-widget-config,
+.canvas.layout-locked .btn-widget-remove {
+  display: none;
+}
 
 .widget-type-label {
   flex: 1;
@@ -746,6 +761,10 @@ button {
   height: 10px;
   background: rgba(255,255,255,0.2);
   border-radius: 2px;
+}
+
+.canvas.layout-locked .widget-resize-handle {
+  display: none;
 }
 
 .widget-resizing .widget-resize-handle::after {
@@ -2071,6 +2090,36 @@ button {
   .widget-weather-current-aggregate.has-weather {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .widget-weather-current-aggregate.has-weather .wca-current {
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(7rem, 1fr);
+    align-items: start;
+    column-gap: clamp(10px, 4cqw, 18px);
+    row-gap: clamp(2px, 1.4cqh, 5px);
+  }
+
+  .widget-weather-current-aggregate.has-weather .wca-temp {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .widget-weather-current-aggregate.has-weather .wca-condition {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .widget-weather-current-aggregate.has-weather .wca-details {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    text-align: right;
+  }
+
+  .widget-weather-current-aggregate.has-weather .wca-bar-block {
+    grid-column: 1 / -1;
+    margin-top: 0;
   }
 
   .widget-weather-current-aggregate.has-weather .wca-side {
