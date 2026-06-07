@@ -35,9 +35,12 @@ collectors:
 
   weather_envcanada:
     enabled: true
+    # Optional fallback for weather.current when weather_ecowitt is disabled.
+    current_conditions_enabled: false
     # Station auto-discovered from lat/lon; override if discovery fails:
     # station_code: s0000585
     # province: ON
+    poll_interval_current_conditions: 10m
     poll_interval_forecast: 1h
     poll_interval_hourly_forecast: 20m
     poll_interval_alerts: 15m
