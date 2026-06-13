@@ -2870,13 +2870,13 @@ button {
 }
 
 .flag-cloth {
+  align-self: flex-start;
   margin-top: clamp(3px, 3cqh, 5px);
   flex-shrink: 0;
   width: clamp(32px, min(26cqw, 32cqh), 48px);
   height: clamp(20px, min(16cqw, 20cqh), 30px);
   background: rgba(255,255,255,0.15);
   border-radius: 0 3px 3px 0;
-  transition: margin-top 0.5s;
 }
 
 .flag-cloth-emoji {
@@ -2890,7 +2890,8 @@ button {
 }
 
 .flag-cloth-half {
-  margin-top: clamp(24px, 31cqh, 44px);
+  align-self: center;
+  margin-top: 0;
 }
 
 .flag-status-label {
