@@ -2655,6 +2655,12 @@ button {
   transition: color 0.5s;
 }
 
+.ra-deficit {
+  font-size: clamp(0.65rem, min(4cqw, 7.5cqh), 1rem);
+  opacity: 0.8;
+  transition: color 0.5s;
+}
+
 .ra-waiting {
   font-size: clamp(0.6rem, min(3.5cqw, 7cqh), 0.8rem);
   opacity: 0.45;

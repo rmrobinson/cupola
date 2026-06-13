@@ -12,12 +12,26 @@
     { value: 'saturday',  label: 'Saturday'  },
   ];
 
-  // Color and watering advice based on accumulated mm.
-  function rainfallLevel(mm) {
-    if (mm <= 0)   return { color: '#e17055', advice: 'water now'        };
-    if (mm < 10)   return { color: '#fdcb6e', advice: 'consider watering' };
-    if (mm < 25)   return { color: '#74b9ff', advice: 'probably okay'    };
-    return               { color: '#00b894', advice: 'no watering needed' };
+  const SOIL_TYPES = [
+    { value: 'loam',  label: 'Loam',  targetMM: 25 },
+    { value: 'sandy', label: 'Sandy', targetMM: 35 },
+    { value: 'clay',  label: 'Clay',  targetMM: 18 },
+  ];
+
+  function soilTarget(soilType) {
+    return (SOIL_TYPES.find(s => s.value === soilType) || SOIL_TYPES[0]).targetMM;
+  }
+
+  // Returns watering advice based on fraction of weekly target received.
+  function rainfallLevel(mm, soilType) {
+    const target = soilTarget(soilType);
+    const pct    = mm / target;
+    const deficit = Math.max(0, target - mm);
+
+    if (pct >= 1.0) return { color: '#00b894', advice: 'No watering needed', deficit: 0      };
+    if (pct >= 0.7) return { color: '#74b9ff', advice: 'Light watering',      deficit        };
+    if (pct >= 0.3) return { color: '#fdcb6e', advice: 'Moderate watering',   deficit        };
+    return               { color: '#e17055', advice: 'Heavy watering',      deficit        };
   }
 
   function capitalise(s) {
@@ -30,7 +44,8 @@
   }
 
   function render(container, state, config) {
-    const since = config?.since || 'sunday';
+    const since    = config?.since     || 'sunday';
+    const soilType = config?.soil_type || 'loam';
 
     if (!state) {
       container.innerHTML = `
@@ -52,14 +67,18 @@
     }
 
     const mm    = entry.rain_mm ?? 0;
-    const level = rainfallLevel(mm);
+    const level = rainfallLevel(mm, soilType);
     const from  = fmtDate(entry.period_start);
+    const deficitLine = level.deficit > 0
+      ? `<div class="ra-deficit" style="color:${level.color}">${level.deficit.toFixed(1)}mm short</div>`
+      : '';
 
     container.innerHTML = `
       <div class="widget-rain-accum">
         <div class="ra-amount" style="color:${level.color}">${mm.toFixed(1)}<span class="ra-unit">mm</span></div>
         <div class="ra-from">since ${from}</div>
         <div class="ra-advice" style="color:${level.color}">${level.advice}</div>
+        ${deficitLine}
       </div>`;
   }
 
@@ -76,6 +95,13 @@
         type:    'select',
         default: 'sunday',
         options: DAYS,
+      },
+      {
+        key:     'soil_type',
+        label:   'Soil type',
+        type:    'select',
+        default: 'loam',
+        options: SOIL_TYPES.map(s => ({ value: s.value, label: s.label })),
       },
     ],
 
