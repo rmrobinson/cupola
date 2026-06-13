@@ -88,13 +88,13 @@ func (c *RainCollector) refresh(ctx context.Context) {
 		return
 	}
 
-	creds, err := dialCreds(c.useTLS, c.caCert)
+	opts, err := dialOpts(c.useTLS, c.caCert)
 	if err != nil {
 		log.Printf("[weatherserver.rain] dial creds: %v", err)
 		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "error", Message: err.Error()})
 		return
 	}
-	conn, err := grpc.NewClient(c.address, creds)
+	conn, err := grpc.NewClient(c.address, opts...)
 	if err != nil {
 		log.Printf("[weatherserver.rain] dial: %v", err)
 		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "error", Message: err.Error()})

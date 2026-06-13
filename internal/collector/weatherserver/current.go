@@ -84,11 +84,11 @@ func (c *CurrentCollector) streamLoop(ctx context.Context) {
 // (true/false, err) on a stream failure, where the bool indicates whether at
 // least one message was received before the failure.
 func (c *CurrentCollector) runStream(ctx context.Context) (wasConnected bool, _ error) {
-	creds, err := dialCreds(c.useTLS, c.caCert)
+	opts, err := dialOpts(c.useTLS, c.caCert)
 	if err != nil {
 		return false, err
 	}
-	conn, err := grpc.NewClient(c.address, creds)
+	conn, err := grpc.NewClient(c.address, opts...)
 	if err != nil {
 		return false, fmt.Errorf("dial %s: %w", c.address, err)
 	}
