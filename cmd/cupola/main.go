@@ -192,7 +192,7 @@ func main() {
 			radiusKM = 250
 		}
 		log.Printf("dump1090: registering collector for %s (radius=%.0fkm)", a.URL, radiusKM)
-		registry.Register(dump1090.New(a.URL, interval, cfg.Location.Lat, cfg.Location.Lon, radiusKM, stateStore))
+		registry.Register(dump1090.New(a.URL, interval, cfg.Location.Lat, cfg.Location.Lon, radiusKM, a.Verbose, stateStore))
 	}
 
 	// Traffic: one incidents collector aggregating configured traffic sources.

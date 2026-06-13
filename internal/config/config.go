@@ -155,6 +155,7 @@ type Dump1090Config struct {
 	URL          string   `yaml:"url"`
 	PollInterval Duration `yaml:"poll_interval"`
 	RadiusKM     float64  `yaml:"radius_km"` // filter to this radius; 0 = no filter (default 250)
+	Verbose      bool     `yaml:"verbose"`   // log per-poll aircraft count; false by default
 }
 
 type HouseConfig struct {
