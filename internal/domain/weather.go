@@ -2,6 +2,20 @@ package domain
 
 import "time"
 
+type RainAccumulationEntry struct {
+	DayOfWeek   string    `json:"day_of_week"`
+	RainMM      float64   `json:"rain_mm"`
+	PeriodStart time.Time `json:"period_start"`
+	PeriodEnd   time.Time `json:"period_end"`
+}
+
+type WeatherRainAccumulation struct {
+	StateBase
+	Entries map[string]RainAccumulationEntry `json:"entries"`
+}
+
+func (WeatherRainAccumulation) DomainType() DomainType { return DomainWeatherRainAccumulation }
+
 type WeatherCurrent struct {
 	StateBase
 	Temperature   float64 `json:"temperature"`

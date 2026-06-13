@@ -62,6 +62,7 @@ type TilesConfig struct {
 }
 
 type CollectorsConfig struct {
+	WeatherServer       *WeatherServerConfig       `yaml:"weather_server"`
 	WeatherEcowitt      *EcowittConfig             `yaml:"weather_ecowitt"`
 	WeatherEnvCanada    *EnvCanadaWeatherConfig    `yaml:"weather_envcanada"`
 	AirQualityEnvCanada *EnvCanadaAirQualityConfig `yaml:"air_quality_envcanada"`
@@ -77,6 +78,13 @@ type CollectorsConfig struct {
 	Municipal           []MunicipalConfig          `yaml:"municipal"`
 	IMAP                *IMAPConfig                `yaml:"imap"`
 	WasteCollection     *WasteCollectionConfig     `yaml:"waste_collection"`
+}
+
+type WeatherServerConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Address string `yaml:"address"` // gRPC server address, e.g. "localhost:9090" or "example.com:443"
+	TLS     bool   `yaml:"tls"`     // use TLS (required for port 443 / grpcs)
+	CACert  string `yaml:"ca_cert"` // path to PEM CA certificate; leave empty to use system roots
 }
 
 type EcowittConfig struct {

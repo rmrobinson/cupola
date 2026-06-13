@@ -19,6 +19,7 @@ import (
 	"github.com/rmrobinson/cupola/internal/collector/astro"
 	"github.com/rmrobinson/cupola/internal/collector/dump1090"
 	ecowittcollector "github.com/rmrobinson/cupola/internal/collector/ecowitt"
+	weatherservercollector "github.com/rmrobinson/cupola/internal/collector/weatherserver"
 	"github.com/rmrobinson/cupola/internal/collector/envcanada"
 	flagcollector "github.com/rmrobinson/cupola/internal/collector/flag"
 	"github.com/rmrobinson/cupola/internal/collector/googlepollen"
@@ -70,7 +71,9 @@ func main() {
 	registry := collector.NewRegistry()
 	stateStore := store.NewStateStore()
 	currentWeather := resolveCurrentWeatherConfig(cfg.Collectors)
-	if currentWeather.conflict {
+	if currentWeather.conflict && currentWeather.source == currentWeatherSourceWeatherServer {
+		log.Printf("weather.current: weather_server takes priority; ecowitt/envcanada current conditions skipped")
+	} else if currentWeather.conflict {
 		log.Printf("weather.current: both Ecowitt and Environment Canada current conditions are enabled; using Ecowitt and skipping envcanada.current")
 	}
 
@@ -149,6 +152,12 @@ func main() {
 			interval = 4 * time.Hour
 		}
 		registry.Register(flagcollector.NewCanadaWithURLInLocation(c.URL, cfg.Location.Lat, cfg.Location.Lon, interval, stateStore, loc))
+	}
+
+	// weather-server gRPC streaming weather station.
+	if currentWeather.source == currentWeatherSourceWeatherServer {
+		log.Printf("weatherserver: registering current collector at %s (tls=%v)", currentWeather.weatherServerAddr, currentWeather.weatherServerTLS)
+		registry.Register(weatherservercollector.NewCurrentCollector(currentWeather.weatherServerAddr, currentWeather.weatherServerTLS, currentWeather.weatherServerCACert, stateStore))
 	}
 
 	// Ecowitt GW2000 local weather station.
@@ -237,6 +246,12 @@ func main() {
 	}
 
 	subManager := store.NewSubscriptionManager()
+
+	// weather-server rain accumulation collector (parameterised by subscription day-of-week).
+	if c := cfg.Collectors.WeatherServer; c != nil && c.Enabled && strings.TrimSpace(c.Address) != "" {
+		log.Printf("weatherserver: registering rain accumulation collector at %s (tls=%v)", c.Address, c.TLS)
+		registry.Register(weatherservercollector.NewRainCollector(c.Address, c.TLS, c.CACert, subManager, stateStore, loc))
+	}
 
 	transitAgencies, err := gtfsrt.NewAgencyManager(sqliteStore, gtfsStore, cfg.Server.DataDir)
 	if err != nil {
@@ -423,16 +438,20 @@ type resolvedAirQualityConfig struct {
 type currentWeatherSource string
 
 const (
-	currentWeatherSourceNone      currentWeatherSource = ""
-	currentWeatherSourceEcowitt   currentWeatherSource = "ecowitt.current"
-	currentWeatherSourceEnvCanada currentWeatherSource = "envcanada.current"
+	currentWeatherSourceNone          currentWeatherSource = ""
+	currentWeatherSourceWeatherServer currentWeatherSource = "weatherserver.current"
+	currentWeatherSourceEcowitt       currentWeatherSource = "ecowitt.current"
+	currentWeatherSourceEnvCanada     currentWeatherSource = "envcanada.current"
 )
 
 type resolvedCurrentWeatherConfig struct {
-	source     currentWeatherSource
-	interval   time.Duration
-	ecowittURL string
-	conflict   bool
+	source              currentWeatherSource
+	interval            time.Duration
+	ecowittURL          string
+	weatherServerAddr   string
+	weatherServerTLS    bool
+	weatherServerCACert string
+	conflict            bool
 }
 
 type resolvedPollenConfig struct {
@@ -442,6 +461,17 @@ type resolvedPollenConfig struct {
 }
 
 func resolveCurrentWeatherConfig(cfg config.CollectorsConfig) resolvedCurrentWeatherConfig {
+	weatherServerEnabled := false
+	weatherServerAddr := ""
+	weatherServerTLS := false
+	weatherServerCACert := ""
+	if c := cfg.WeatherServer; c != nil && c.Enabled && strings.TrimSpace(c.Address) != "" {
+		weatherServerEnabled = true
+		weatherServerAddr = c.Address
+		weatherServerTLS = c.TLS
+		weatherServerCACert = c.CACert
+	}
+
 	ecowittEnabled := false
 	ecowittURL := ""
 	ecowittInterval := time.Minute
@@ -462,6 +492,15 @@ func resolveCurrentWeatherConfig(cfg config.CollectorsConfig) resolvedCurrentWea
 		}
 	}
 
+	if weatherServerEnabled {
+		return resolvedCurrentWeatherConfig{
+			source:              currentWeatherSourceWeatherServer,
+			weatherServerAddr:   weatherServerAddr,
+			weatherServerTLS:    weatherServerTLS,
+			weatherServerCACert: weatherServerCACert,
+			conflict:            ecowittEnabled || envCanadaEnabled,
+		}
+	}
 	if ecowittEnabled {
 		return resolvedCurrentWeatherConfig{
 			source:     currentWeatherSourceEcowitt,
