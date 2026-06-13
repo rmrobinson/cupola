@@ -20,6 +20,7 @@ type WeatherCurrent struct {
 	StateBase
 	Temperature   float64 `json:"temperature"`
 	FeelsLike     float64 `json:"feels_like"`
+	DewPoint      float64 `json:"dew_point"`
 	Humidity      float64 `json:"humidity"`
 	WindSpeed     float64 `json:"wind_speed"`
 	WindDirection int     `json:"wind_direction"`

@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"google.golang.org/grpc"
 
 	"github.com/rmrobinson/cupola/internal/domain"
-	weatherv1 "github.com/rmrobinson/cupola/internal/proto/weather/v1"
+	weatherv1 "github.com/rmrobinson/weather-server/proto/weather/v1"
 	"github.com/rmrobinson/cupola/internal/store"
 )
 
@@ -22,8 +21,6 @@ type CurrentCollector struct {
 	useTLS     bool
 	caCert     string
 	stateStore *store.StateStore
-	mu         sync.RWMutex
-	state      domain.WeatherCurrent
 }
 
 func NewCurrentCollector(address string, useTLS bool, caCert string, stateStore *store.StateStore) *CurrentCollector {
@@ -39,9 +36,7 @@ func (c *CurrentCollector) ID() string                { return "weatherserver.cu
 func (c *CurrentCollector) Domain() domain.DomainType { return domain.DomainWeatherCurrent }
 
 func (c *CurrentCollector) State() domain.DomainState {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.state
+	return c.stateStore.Get(c.Domain())
 }
 
 func (c *CurrentCollector) Start(ctx context.Context) error {
@@ -62,9 +57,14 @@ func (c *CurrentCollector) streamLoop(ctx context.Context) {
 		}
 		if err != nil {
 			log.Printf("[weatherserver.current] stream: %v; reconnect in %s", err, backoff)
-			c.stateStore.PublishSystem(store.SystemEvent{
-				CollectorID: c.ID(), Status: "error", Message: err.Error(),
-			})
+			// Suppress the error event for transient RST_STREAM resets (wasConnected=true):
+			// the stream will reconnect in 1s and the UI won't flash "unavailable".
+			// Only surface an error when we genuinely can't connect.
+			if !wasConnected {
+				c.stateStore.PublishSystem(store.SystemEvent{
+					CollectorID: c.ID(), Status: "error", Message: err.Error(),
+				})
+			}
 		}
 		if wasConnected {
 			backoff = time.Second
@@ -80,9 +80,9 @@ func (c *CurrentCollector) streamLoop(ctx context.Context) {
 }
 
 // runStream opens one streaming RPC call and processes messages until an error
-// or context cancellation. Returns (true, nil) after a clean ctx shutdown,
-// (true/false, err) on a stream failure, where the bool indicates whether at
-// least one message was received before the failure.
+// or context cancellation. Returns (wasConnected, nil) on ctx cancellation,
+// (wasConnected, err) on stream failure; wasConnected is true if at least one
+// message was received before the failure.
 func (c *CurrentCollector) runStream(ctx context.Context) (wasConnected bool, _ error) {
 	opts, err := dialOpts(c.useTLS, c.caCert)
 	if err != nil {
@@ -123,6 +123,8 @@ func (c *CurrentCollector) applyReading(r *weatherv1.WeatherReading) {
 	state := domain.WeatherCurrent{
 		StateBase:     domain.StateBase{UpdatedAt: r.Timestamp.AsTime()},
 		Temperature:   r.TempC,
+		FeelsLike:     r.FeelsLikeC,
+		DewPoint:      r.DewPointC,
 		Humidity:      r.HumidityPct,
 		Pressure:      r.PressureHpa,
 		WindSpeed:     r.WindSpeedMs * 3.6,
@@ -135,13 +137,9 @@ func (c *CurrentCollector) applyReading(r *weatherv1.WeatherReading) {
 		RainWeekly:    r.RainWeeklyMm,
 		RainMonthly:   r.RainMonthlyMm,
 		RainYearly:    r.RainYearlyMm,
-		Condition: conditionString(r.Condition),
-		FeelsLike: r.FeelsLikeC,
+		Condition:     conditionString(r.Condition),
 	}
 
-	c.mu.Lock()
-	c.state = state
-	c.mu.Unlock()
 	c.stateStore.Set(state)
 	log.Printf("[weatherserver.current] %.1f°C (feels %.1f°C) hum=%.0f%% wind=%.1fkm/h dir=%d° UV=%.0f pres=%.1fhPa cond=%s",
 		state.Temperature, state.FeelsLike, state.Humidity,

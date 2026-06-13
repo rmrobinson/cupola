@@ -4,14 +4,13 @@ import (
 	"context"
 	"log"
 	"strings"
-	"sync"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/rmrobinson/cupola/internal/domain"
-	weatherv1 "github.com/rmrobinson/cupola/internal/proto/weather/v1"
+	weatherv1 "github.com/rmrobinson/weather-server/proto/weather/v1"
 	"github.com/rmrobinson/cupola/internal/store"
 )
 
@@ -28,8 +27,6 @@ type RainCollector struct {
 	subs       *store.SubscriptionManager
 	stateStore *store.StateStore
 	loc        *time.Location
-	mu         sync.RWMutex
-	state      domain.WeatherRainAccumulation
 	wake       chan struct{}
 }
 
@@ -56,9 +53,7 @@ func (c *RainCollector) OnSubscription() {
 }
 
 func (c *RainCollector) State() domain.DomainState {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.state
+	return c.stateStore.Get(c.Domain())
 }
 
 func (c *RainCollector) Start(ctx context.Context) error {
@@ -103,8 +98,16 @@ func (c *RainCollector) refresh(ctx context.Context) {
 	defer conn.Close()
 
 	client := weatherv1.NewWeatherServiceClient(conn)
-	entries := make(map[string]domain.RainAccumulationEntry, len(allParams))
 
+	// Seed from previous state so a failed individual query keeps its last good value.
+	entries := make(map[string]domain.RainAccumulationEntry, len(allParams))
+	if prev, ok := c.stateStore.Get(c.Domain()).(domain.WeatherRainAccumulation); ok {
+		for k, v := range prev.Entries {
+			entries[k] = v
+		}
+	}
+
+	anySuccess := false
 	for _, params := range allParams {
 		since, _ := params["since"].(string)
 		if since == "" {
@@ -130,21 +133,21 @@ func (c *RainCollector) refresh(ctx context.Context) {
 			PeriodStart: resp.ActualStart.AsTime(),
 			PeriodEnd:   resp.ActualEnd.AsTime(),
 		}
+		anySuccess = true
 	}
 
-	if len(entries) == 0 {
+	if !anySuccess {
 		return
 	}
 
-	state := domain.WeatherRainAccumulation{
+	c.stateStore.Set(domain.WeatherRainAccumulation{
 		StateBase: domain.StateBase{UpdatedAt: time.Now()},
 		Entries:   entries,
+	})
+	// Only publish "ok" on transition from a non-ok state.
+	if snap, _ := c.stateStore.GetSystem(c.ID()); snap.Status != "ok" {
+		c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
 	}
-	c.mu.Lock()
-	c.state = state
-	c.mu.Unlock()
-	c.stateStore.Set(state)
-	c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
 }
 
 func parseWeekday(s string) (time.Weekday, bool) {

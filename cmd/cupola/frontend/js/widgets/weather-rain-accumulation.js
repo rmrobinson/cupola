@@ -14,10 +14,10 @@
 
   // Color and watering advice based on accumulated mm.
   function rainfallLevel(mm) {
-    if (mm <= 0)   return { color: '#e17055', advice: 'Water now'       };
-    if (mm < 10)   return { color: '#fdcb6e', advice: 'Consider watering' };
-    if (mm < 25)   return { color: '#74b9ff', advice: 'Probably okay'   };
-    return               { color: '#00b894', advice: 'No watering needed' };
+    if (mm <= 0)   return { color: '#e17055', advice: 'water now'        };
+    if (mm < 10)   return { color: '#fdcb6e', advice: 'consider watering' };
+    if (mm < 25)   return { color: '#74b9ff', advice: 'probably okay'    };
+    return               { color: '#00b894', advice: 'no watering needed' };
   }
 
   function capitalise(s) {
@@ -26,7 +26,7 @@
 
   function fmtDate(iso) {
     if (!iso) return '';
-    return new Date(iso).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    return new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
   }
 
   function render(container, state, config) {
@@ -58,8 +58,7 @@
     container.innerHTML = `
       <div class="widget-rain-accum">
         <div class="ra-amount" style="color:${level.color}">${mm.toFixed(1)}<span class="ra-unit">mm</span></div>
-        <div class="ra-since">since ${capitalise(since)}</div>
-        <div class="ra-from">${from}</div>
+        <div class="ra-from">since ${from}</div>
         <div class="ra-advice" style="color:${level.color}">${level.advice}</div>
       </div>`;
   }
