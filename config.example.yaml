@@ -28,6 +28,12 @@ tiles:
   cache_path: "data/tiles/local.pmtiles"
 
 collectors:
+  # weather-server gRPC service (highest priority for weather.current and rain accumulation).
+  # Also enables the weather.rain_accumulation domain for the lawn-watering widget.
+  weather_server:
+    enabled: false
+    address: "localhost:9090"
+
   weather_ecowitt:
     enabled: true
     url: "http://192.168.1.x"
@@ -35,7 +41,7 @@ collectors:
 
   weather_envcanada:
     enabled: true
-    # Optional fallback for weather.current when weather_ecowitt is disabled.
+    # Optional fallback for weather.current when weather_server and weather_ecowitt are disabled.
     current_conditions_enabled: false
     # Station auto-discovered from lat/lon; override if discovery fails:
     # station_code: s0000585

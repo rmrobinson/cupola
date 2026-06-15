@@ -25,6 +25,7 @@ type Collector struct {
 	radiusKM   float64 // 0 = no geographic filter
 	siteLat    float64
 	siteLon    float64
+	verbose    bool
 	stateStore *store.StateStore
 	wake       chan struct{}
 }
@@ -32,13 +33,15 @@ type Collector struct {
 // New creates a Collector. baseURL is the root of the dump1090/readsb HTTP server
 // (e.g. "http://192.168.1.10:8080"). siteLat/siteLon and radiusKM are used to
 // filter aircraft to within a bounding circle; pass radiusKM=0 to disable filtering.
-func New(baseURL string, interval time.Duration, siteLat, siteLon, radiusKM float64, stateStore *store.StateStore) *Collector {
+// Set verbose=true to log the per-poll aircraft count.
+func New(baseURL string, interval time.Duration, siteLat, siteLon, radiusKM float64, verbose bool, stateStore *store.StateStore) *Collector {
 	return &Collector{
 		url:        strings.TrimRight(baseURL, "/") + "/data/aircraft.json",
 		interval:   interval,
 		radiusKM:   radiusKM,
 		siteLat:    siteLat,
 		siteLon:    siteLon,
+		verbose:    verbose,
 		stateStore: stateStore,
 		wake:       make(chan struct{}, 1),
 	}
@@ -202,7 +205,9 @@ func (c *Collector) fetch() {
 		Aircraft:  targets,
 	})
 	c.stateStore.PublishSystem(store.SystemEvent{CollectorID: c.ID(), Status: "ok"})
-	log.Printf("[dump1090] %d aircraft in range", len(targets))
+	if c.verbose {
+		log.Printf("[dump1090] %d aircraft in range", len(targets))
+	}
 }
 
 func firstNonZero(a, b float64) float64 {
