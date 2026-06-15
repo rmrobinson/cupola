@@ -2619,6 +2619,8 @@ button {
 /* ── Rain accumulation widget ──────────────────────────────────────────── */
 
 .widget-rain-accum {
+  container-type: size;
+  container-name: rain-widget;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -2626,6 +2628,10 @@ button {
   justify-content: center;
   gap: clamp(2px, 3cqh, 8px);
   text-align: center;
+}
+
+@media (max-width: 640px) {
+  .ra-deficit { display: none; }
 }
 
 .ra-amount {
