@@ -82,5 +82,6 @@
     subscriptionParams: () => null,
     render(container, state, config) { render(container, state, config); },
     onUpdate(container, state, config) { render(container, state, config); },
+    getCount(state) { return state?.aircraft?.length || null; },
   });
 })();

@@ -125,10 +125,12 @@ const Grid = (() => {
     chrome.innerHTML = `
       <span class="drag-handle" title="Drag to move">&#8942;&#8942;</span>
       <span class="widget-type-label">${esc(widgetLabel(def, wc.type))}</span>
+      <span class="widget-chrome-badge hidden"></span>
       <button class="btn-widget-config${(def?.configSchema?.length || def?.buildConfig) ? '' : ' hidden'}" title="Configure">&#9881;</button>
       <button class="btn-widget-remove" title="Remove">&times;</button>
     `;
     chrome.querySelector('.btn-widget-remove').addEventListener('click', () => removeWidget(wc.id));
+    const chromeBadge = chrome.querySelector('.widget-chrome-badge');
 
     const configPanel = document.createElement('div');
     configPanel.className = 'widget-config-panel hidden';
@@ -177,8 +179,7 @@ const Grid = (() => {
           Subscriptions.create(subId, d, def.subscriptionParams(wc.config));
         });
       }
-      const hasState = isMulti ? Object.keys(currentState).length > 0 : !!currentState;
-      if (hasState) def.render(content, currentState, wc.config);
+      renderCurrentState();
       configPanel.classList.add('hidden');
       scheduleSave();
     };
@@ -215,6 +216,17 @@ const Grid = (() => {
       renderCurrentState();
     }
 
+    function updateChromeBadge() {
+      if (!def?.getCount) return;
+      const n = def.getCount(currentState, wc.config);
+      if (n != null) {
+        chromeBadge.textContent = n;
+        chromeBadge.classList.remove('hidden');
+      } else {
+        chromeBadge.classList.add('hidden');
+      }
+    }
+
     function renderCurrentState() {
       const hasState = isMulti ? Object.keys(stateMap).length > 0 : !!currentState;
       if (!hasState) {
@@ -228,6 +240,7 @@ const Grid = (() => {
         def.render(content, currentState, wc.config);
         rendered = true;
       }
+      updateChromeBadge();
     }
 
     cell._refreshState = refreshWidgetState;
@@ -257,16 +270,11 @@ const Grid = (() => {
         ? (data) => {
             stateMap[d] = data || null;
             currentState = stateMap;
-            def.onUpdate(content, stateMap, wc.config);
+            renderCurrentState();
           }
         : (data) => {
             currentState = data || null;
-            if (!data) {
-              renderUnavailable(content, d);
-              rendered = false;
-              return;
-            }
-            def.onUpdate(content, data, wc.config);
+            renderCurrentState();
           };
       streamHandlers.push({ domain: d, handler });
       Stream.on(d, handler);

@@ -42,14 +42,14 @@
     return Number.isFinite(i.lat) && Number.isFinite(i.lon) && (i.lat !== 0 || i.lon !== 0);
   }
 
-  function render(container, state, config) {
+  function filterIncidents(state, config) {
     const maxN = config?.max_items > 0 ? Number(config.max_items) : 10;
     const sevFilter = Array.isArray(config?.severities) && config.severities.length > 0
       ? config.severities : null;
     const radiusKm = config?.radius_km > 0 ? Number(config.radius_km) : null;
     const homeLat = window.CupolaConfig?.lat;
     const homeLon = window.CupolaConfig?.lon;
-    const incidents = (state?.incidents || [])
+    return (state?.incidents || [])
       .filter(i => !sevFilter || sevFilter.includes(i.severity))
       .filter(i => !radiusKm || !homeLat || !homeLon || !hasLocation(i) ||
                    haversineKm(homeLat, homeLon, i.lat, i.lon) <= radiusKm)
@@ -67,13 +67,14 @@
         return (SEV_ORDER[a.severity] ?? 3) - (SEV_ORDER[b.severity] ?? 3);
       })
       .slice(0, maxN);
+  }
+
+  function render(container, state, config) {
+    const incidents = filterIncidents(state, config);
 
     if (incidents.length === 0) {
       container.innerHTML = `
         <div class="widget-traffic-incidents">
-          <div class="traffic-header">
-            <span class="traffic-title">Traffic Incidents</span>
-          </div>
           <p class="traffic-empty">${state ? 'No active incidents' : 'Waiting for data…'}</p>
         </div>`;
       return;
@@ -81,10 +82,6 @@
 
     container.innerHTML = `
       <div class="widget-traffic-incidents">
-        <div class="traffic-header">
-          <span class="traffic-title">Traffic Incidents</span>
-          <span class="traffic-count">${incidents.length}</span>
-        </div>
         <div class="traffic-list">
           ${incidents.map(incidentRow).join('')}
         </div>
@@ -170,5 +167,6 @@
     subscriptionParams: () => ({ province: 'ON' }),
     render(container, state, config)      { render(container, state, config); },
     onUpdate(container, data, config)     { render(container, data, config); },
+    getCount(state, config)               { return state ? filterIncidents(state, config).length : null; },
   });
 })();

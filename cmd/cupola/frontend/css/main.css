@@ -659,6 +659,18 @@ button {
   -webkit-touch-callout: none;
 }
 
+.widget-chrome-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.5);
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .btn-widget-config {
   background: transparent;
   border: none;
@@ -2951,29 +2963,14 @@ button {
   overflow: hidden;
 }
 
-.traffic-header {
+.road-filter-row {
   display: flex;
   align-items: center;
   gap: clamp(4px, 2cqw, 8px);
   padding: clamp(3px, 2cqh, 6px) clamp(6px, 3cqw, 10px) clamp(2px, 1.5cqh, 4px);
   border-bottom: 1px solid rgba(255,255,255,0.1);
   flex-shrink: 0;
-}
-
-.traffic-title {
-  font-size: clamp(0.58rem, min(3cqw, 6cqh), 0.75rem);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.7;
-  flex: 1;
-}
-
-.traffic-count {
-  font-size: clamp(0.52rem, min(2.6cqw, 5.5cqh), 0.69rem);
-  background: rgba(255,255,255,0.15);
-  border-radius: 10px;
-  padding: 1px 7px;
+  flex-wrap: wrap;
 }
 
 .road-filter-label {

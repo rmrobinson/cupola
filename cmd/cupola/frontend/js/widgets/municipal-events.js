@@ -17,21 +17,23 @@
     });
   }
 
+  function filterEvents(state, config) {
+    let events = (state?.events || []).slice();
+    const sourceFilter = (config?.source || '').trim();
+    if (sourceFilter) {
+      const filters = sourceFilter.split(',').map(s => s.trim()).filter(Boolean);
+      events = events.filter(e => filters.some(f => e.source_id === f || e.source_id?.startsWith(f)));
+    }
+    return events;
+  }
+
   function render(container, state, config) {
     if (!state) {
       container.innerHTML = `<div class="widget-unavailable"><span class="widget-unavailable-label">Source unavailable</span><span style="font-size:10px;opacity:.5">municipal.events</span></div>`;
       return;
     }
 
-    let events = state.events || [];
-
-    const sourceFilter = (config?.source || '').trim();
-    if (sourceFilter) {
-      const filters = sourceFilter.split(',').map(s => s.trim()).filter(Boolean);
-      events = events.filter(e => filters.some(f => e.source_id === f || e.source_id?.startsWith(f)));
-    }
-
-    events = events.slice().sort((a, b) =>
+    const events = filterEvents(state, config).sort((a, b) =>
       new Date(b.published_at || 0).getTime() - new Date(a.published_at || 0).getTime()
     );
 
@@ -75,6 +77,10 @@
     ],
     subscriptionParams: () => null,
     render(container, state, config)  { render(container, state, config); },
-    onUpdate(container, data, config)  { render(container, data, config); },
+    onUpdate(container, data, config) { render(container, data, config); },
+    getCount(state, config) {
+      const n = filterEvents(state, config).length;
+      return n > 0 ? n : null;
+    },
   });
 })();
