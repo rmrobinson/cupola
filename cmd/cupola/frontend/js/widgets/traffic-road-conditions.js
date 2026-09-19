@@ -16,25 +16,25 @@
     return '';
   }
 
-  function render(container, state, config) {
-    const roadFilter    = (config?.road || '').trim().toUpperCase();
+  function filterSegments(state, config) {
+    const roadFilter   = (config?.road || '').trim().toUpperCase();
     // regions is stored as an array; accept a legacy string too
-    const rawRegions    = config?.regions ?? (config?.region ? [config.region] : []);
-    const regionFilter  = Array.isArray(rawRegions) ? rawRegions.filter(Boolean) : [];
+    const rawRegions   = config?.regions ?? (config?.region ? [config.region] : []);
+    const regionFilter = Array.isArray(rawRegions) ? rawRegions.filter(Boolean) : [];
+    let segs = state?.conditions || [];
+    if (roadFilter) segs = segs.filter(c => (c.roadway_name || '').toUpperCase().includes(roadFilter));
+    if (regionFilter.length > 0) segs = segs.filter(c => regionFilter.includes(c.region || ''));
+    return segs;
+  }
+
+  function render(container, state, config) {
+    const roadFilter   = (config?.road || '').trim().toUpperCase();
+    const rawRegions   = config?.regions ?? (config?.region ? [config.region] : []);
+    const regionFilter = Array.isArray(rawRegions) ? rawRegions.filter(Boolean) : [];
     const maxN = config?.max_segments > 0 ? Number(config.max_segments) : 10;
 
-    let segments = state?.conditions || [];
-    if (roadFilter) {
-      segments = segments.filter(c =>
-        (c.roadway_name || '').toUpperCase().includes(roadFilter)
-      );
-    }
-    if (regionFilter.length > 0) {
-      segments = segments.filter(c => regionFilter.includes(c.region || ''));
-    }
-
     // Show adverse conditions first, then limit.
-    segments = segments
+    const segments = filterSegments(state, config)
       .slice()
       .sort((a, b) => {
         const aOk = conditionClass(a.conditions) === '';
@@ -44,18 +44,16 @@
       })
       .slice(0, maxN);
 
-    const filterLabels = [
+    const filterChips = [
       roadFilter ? `<span class="road-filter-label">${esc(roadFilter)}</span>` : '',
       ...regionFilter.map(rg => `<span class="road-filter-label">${esc(rg)}</span>`),
     ].join('');
+    const filterRow = filterChips ? `<div class="road-filter-row">${filterChips}</div>` : '';
 
     if (segments.length === 0) {
       container.innerHTML = `
         <div class="widget-road-conditions">
-          <div class="traffic-header">
-            <span class="traffic-title">Road Conditions</span>
-            ${filterLabels}
-          </div>
+          ${filterRow}
           <p class="traffic-empty">${state ? 'No road condition data' : 'Waiting for data…'}</p>
         </div>`;
       return;
@@ -63,10 +61,7 @@
 
     container.innerHTML = `
       <div class="widget-road-conditions">
-        <div class="traffic-header">
-          <span class="traffic-title">Road Conditions</span>
-          ${filterLabels}
-        </div>
+        ${filterRow}
         <div class="road-cond-list">
           ${segments.map(segmentRow).join('')}
         </div>
@@ -167,5 +162,11 @@
     subscriptionParams: () => null,
     render(container, state, config)  { render(container, state, config); },
     onUpdate(container, data, config) { render(container, data, config); },
+    getCount(state, config) {
+      if (!state) return null;
+      const maxN = config?.max_segments > 0 ? Number(config.max_segments) : 10;
+      const n = Math.min(filterSegments(state, config).length, maxN);
+      return n > 0 ? n : null;
+    },
   });
 })();

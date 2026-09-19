@@ -178,6 +178,11 @@
     subscriptionParams: () => null,
     render(container, stateMap, config)   { render(container, stateMap, config); },
     onUpdate(container, stateMap, config) { render(container, stateMap, config); },
+    getCount(stateMap, config) {
+      if (!stateMap || Object.keys(stateMap).length === 0) return null;
+      const n = collect(stateMap, config || {}).length;
+      return n > 0 ? n : null;
+    },
     onRemove(container) {
       const ovl = window.CupolaOverlays;
       if (!ovl) return;

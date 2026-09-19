@@ -115,7 +115,6 @@
       container.innerHTML = `
         <div class="widget-notes">
           <div class="notes-toolbar">
-            <span class="widget-title">Notes</span>
             <button class="btn-new-note btn-small">+ New</button>
           </div>
           <div class="notes-editor hidden"></div>

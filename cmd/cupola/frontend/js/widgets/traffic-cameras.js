@@ -79,9 +79,6 @@
     if (cameras.length === 0) {
       container.innerHTML = `
         <div class="widget-traffic-cameras">
-          <div class="traffic-header">
-            <span class="traffic-title">Traffic Cameras</span>
-          </div>
           <p class="traffic-empty">${state ? 'No cameras available' : 'Waiting for data…'}</p>
         </div>`;
       return;
@@ -89,9 +86,6 @@
 
     container.innerHTML = `
       <div class="widget-traffic-cameras">
-        <div class="traffic-header">
-          <span class="traffic-title">Traffic Cameras</span>
-        </div>
         <div class="camera-grid">
           ${cameras.map(cameraThumb).join('')}
         </div>
@@ -117,7 +111,15 @@
       { key: 'max_cameras', label: 'Max cameras (list mode)',          type: 'number', default: 4 },
     ],
     subscriptionParams: () => ({ province: 'ON' }),
-    render(container, state, config)  { render(container, state, config); },
-    onUpdate(container, data, config) { render(container, data, config); },
+    render(container, state, config)   { render(container, state, config); },
+    onUpdate(container, data, config)  { render(container, data, config); },
+    onRemove(container)                { stopRefresh(container); },
+    getCount(state, config) {
+      if ((config?.camera_id || '').trim()) return null;
+      const allCams = state?.cameras || [];
+      if (!allCams.length) return null;
+      const maxN = config?.max_cameras > 0 ? Number(config.max_cameras) : 4;
+      return Math.min(allCams.length, maxN);
+    },
   });
 })();
