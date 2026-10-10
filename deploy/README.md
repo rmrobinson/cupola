@@ -44,3 +44,18 @@ After installation:
 systemctl status cupolad
 journalctl -u cupolad -f
 ```
+
+## Updating from your own machine, without SSHing in
+
+`~/bin/build-and-deploy-service` (not part of this repo) rsyncs this repo to
+a remote host, builds it there natively, and restarts the service — run
+from the repo root. The binary/unit name (`cupolad`) differs from the `cmd/`
+subdirectory (`cupola`), so pass `--cmd`:
+
+```sh
+SERVICE_DEPLOY_HOST=your.host build-and-deploy-service --cmd cupola cupolad
+```
+
+This only updates the binary on an already-installed service (via
+`install.sh`, above) — it doesn't create the user, directories, or the unit
+file.
