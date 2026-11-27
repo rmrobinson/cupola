@@ -66,6 +66,7 @@ func TestNewSourcesBuildsConfigured511Provider(t *testing.T) {
 		ID:                "ab511",
 		Type:              "511",
 		Province:          "AB",
+		APIKey:            "test-key",
 		PublicURL:         "https://511.alberta.ca",
 		IncidentsURL:      "https://example.test/ab/events",
 		CamerasURL:        "https://example.test/ab/cameras",
@@ -91,6 +92,25 @@ func TestNewSourcesSkips511ProviderWithoutURLs(t *testing.T) {
 		ID:       "ab511",
 		Type:     "511",
 		Province: "AB",
+		APIKey:   "test-key",
+	}})
+
+	if len(sources.Incidents) != 0 || len(sources.Cameras) != 0 || len(sources.RoadConditions) != 0 {
+		t.Fatalf("expected no sources, got %+v", sources)
+	}
+	if len(skipped) != 1 {
+		t.Fatalf("expected one skipped source, got %v", skipped)
+	}
+}
+
+func TestNewSourcesSkips511ProviderWithoutAPIKey(t *testing.T) {
+	sources, skipped := NewSources([]SourceSpec{{
+		ID:                "ab511",
+		Type:              "511",
+		Province:          "AB",
+		IncidentsURL:      "https://example.test/ab/events",
+		CamerasURL:        "https://example.test/ab/cameras",
+		RoadConditionsURL: "https://example.test/ab/roads",
 	}})
 
 	if len(sources.Incidents) != 0 || len(sources.Cameras) != 0 || len(sources.RoadConditions) != 0 {

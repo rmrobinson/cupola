@@ -208,6 +208,7 @@ func main() {
 				ID:                src.ID,
 				Type:              src.Type,
 				Province:          src.Province,
+				APIKey:            src.APIKey,
 				URL:               src.URL,
 				IncidentsURL:      src.IncidentsURL,
 				CamerasURL:        src.CamerasURL,

@@ -143,6 +143,7 @@ type TrafficSourceConfig struct {
 	Type              string `yaml:"type"`
 	Enabled           *bool  `yaml:"enabled"`
 	Province          string `yaml:"province"`
+	APIKey            string `yaml:"api_key"`
 	URL               string `yaml:"url"`
 	IncidentsURL      string `yaml:"incidents_url"`
 	CamerasURL        string `yaml:"cameras_url"`

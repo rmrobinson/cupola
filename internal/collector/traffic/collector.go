@@ -7,12 +7,14 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/rmrobinson/cupola/internal/domain"
 	"github.com/rmrobinson/cupola/internal/store"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -27,10 +29,12 @@ const (
 
 var client = &http.Client{Timeout: 30 * time.Second}
 
+
 type SourceSpec struct {
 	ID                string
 	Type              string
 	Province          string
+	APIKey            string
 	URL               string
 	IncidentsURL      string
 	CamerasURL        string
@@ -107,12 +111,19 @@ func newAPI511Source(spec SourceSpec) (*API511Source, []string) {
 		warnings = append(warnings, fmt.Sprintf("%s: 511 source has no configured API URLs", id))
 		return nil, warnings
 	}
+	apiKey := strings.TrimSpace(spec.APIKey)
+	if apiKey == "" {
+		warnings = append(warnings, fmt.Sprintf("%s: 511 source has no api_key configured; source not registered", id))
+		return nil, warnings
+	}
 	return &API511Source{
 		id:                id,
+		apiKey:            apiKey,
 		eventsURL:         eventsURL,
 		camerasURL:        camerasURL,
 		roadConditionsURL: roadConditionsURL,
 		publicURL:         publicURL,
+		limiter: rate.NewLimiter(rate.Every(6*time.Second), 10), // 10 calls per 60s per key
 	}, warnings
 }
 
@@ -324,10 +335,12 @@ func dedupeTrafficIncidents(incidents []domain.TrafficIncident) ([]domain.Traffi
 
 type API511Source struct {
 	id                string
+	apiKey            string
 	eventsURL         string
 	camerasURL        string
 	roadConditionsURL string
 	publicURL         string
+	limiter           *rate.Limiter
 }
 
 func (s *API511Source) ID() string { return s.id }
@@ -351,7 +364,10 @@ func (s *API511Source) Fetch(ctx context.Context) ([]domain.TrafficIncident, err
 	if s.eventsURL == "" {
 		return nil, fmt.Errorf("%s incidents URL is not configured", s.ID())
 	}
-	body, err := getJSON(ctx, s.eventsURL)
+	if err := s.limiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("%s rate limit: %w", s.ID(), err)
+	}
+	body, err := getJSON(ctx, s.withKey(s.eventsURL))
 	if err != nil {
 		return nil, err
 	}
@@ -500,7 +516,10 @@ func (s *API511Source) FetchCameras(ctx context.Context) ([]domain.TrafficCamera
 	if s.camerasURL == "" {
 		return nil, fmt.Errorf("%s cameras URL is not configured", s.ID())
 	}
-	body, err := getJSON(ctx, s.camerasURL)
+	if err := s.limiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("%s rate limit: %w", s.ID(), err)
+	}
+	body, err := getJSON(ctx, s.withKey(s.camerasURL))
 	if err != nil {
 		return nil, err
 	}
@@ -657,7 +676,10 @@ func (s *API511Source) FetchRoadConditions(ctx context.Context) ([]domain.Traffi
 	if s.roadConditionsURL == "" {
 		return nil, fmt.Errorf("%s road conditions URL is not configured", s.ID())
 	}
-	body, err := getJSON(ctx, s.roadConditionsURL)
+	if err := s.limiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("%s rate limit: %w", s.ID(), err)
+	}
+	body, err := getJSON(ctx, s.withKey(s.roadConditionsURL))
 	if err != nil {
 		return nil, err
 	}
@@ -715,6 +737,20 @@ func (c *RoadConditionsCollector) fetch(ctx context.Context) error {
 		return fmt.Errorf("all traffic road condition sources failed: %s", strings.Join(failed, "; "))
 	}
 	return nil
+}
+
+func (s *API511Source) withKey(rawURL string) string {
+	if s.apiKey == "" {
+		return rawURL
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	q := parsed.Query()
+	q.Set("key", s.apiKey)
+	parsed.RawQuery = q.Encode()
+	return parsed.String()
 }
 
 // ── Shared HTTP helper ────────────────────────────────────────────────────────

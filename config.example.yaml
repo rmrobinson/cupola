@@ -85,6 +85,7 @@ collectors:
       - id: on511
         type: 511
         province: ON
+        api_key: "${ON511_API_KEY}"
         public_url: "https://511on.ca"
         incidents_url: "https://511on.ca/api/v2/get/event?format=json&lang=en"
         cameras_url: "https://511on.ca/api/v2/get/Cameras?format=json&lang=en"
