@@ -8,6 +8,7 @@ require (
 	github.com/protomaps/go-pmtiles v1.30.2
 	github.com/rmrobinson/weather-server v0.0.0-20260613201254-86bb87cdfd2e
 	golang.org/x/net v0.52.0
+	golang.org/x/time v0.15.0
 	google.golang.org/api v0.271.0
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
@@ -94,7 +95,6 @@ require (
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/term v0.41.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
-	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240716161551-93cc26a95ae9 // indirect
 	google.golang.org/genproto v0.0.0-20260217215200-42d3e9bedb6d // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171 // indirect
